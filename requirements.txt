@@ -1,0 +1,15 @@
+gymnasium
+jax[cuda12]
+flax
+optax
+matplotlib
+-e .
+pandas
+tqdm
+typed-argument-parser
+numpy
+pytest
+brax
+gymnax
+distrax
+jumanji
