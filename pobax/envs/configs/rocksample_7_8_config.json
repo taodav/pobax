@@ -1,0 +1,9 @@
+{
+  "size": 7,
+  "rocks": 8,
+  "good_rock_reward": 10.0,
+  "bad_rock_reward": -10.0,
+  "exit_reward": 10.0,
+  "half_efficiency_distance": 20.0,
+  "gamma": 0.99
+}

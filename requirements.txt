@@ -1,5 +1,5 @@
 gymnasium
-jax[cuda12]
+jax[cpu]
 flax
 optax
 matplotlib
