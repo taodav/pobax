@@ -38,6 +38,38 @@ class ScannedRNN(nn.Module):
         )
 
 
+class FixedHorizonPlanningRNN(ScannedRNN):
+    horizon: int = 3
+
+    @functools.partial(
+        nn.scan,
+        variable_broadcast="params",
+        in_axes=0,
+        out_axes=0,
+        split_rngs={"params": False},
+    )
+    @nn.compact
+    def __call__(self, carry, x):
+        """Applies the module."""
+        rnn_state = carry
+        ins, resets = x
+        rnn_state = jnp.where(
+            resets[:, np.newaxis],
+            self.initialize_carry(ins.shape[0], ins.shape[1]),
+            rnn_state,
+        )
+
+        def apply_n_times(rnn_state):
+            rnn_state, y = nn.GRUCell(features=self.hidden_size)(rnn_state, ins)
+            return rnn_state, y
+
+        outs, all_outs = jax.lax.scan(
+            apply_n_times, rnn_state, None, self.horizon
+        )
+        new_rnn_state, y = outs
+        return new_rnn_state, y
+
+
 class SmallImageCNN(nn.Module):
     hidden_size: int
 

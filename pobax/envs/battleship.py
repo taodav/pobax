@@ -1,4 +1,5 @@
 from functools import partial
+from typing import Tuple, Union, Optional
 
 import chex
 import jax
@@ -6,6 +7,9 @@ import jax.numpy as jnp
 from jax import random, lax
 import gymnax
 from gymnax.environments.environment import Environment, EnvParams
+from gymnax.environments import environment, spaces
+
+from .wrappers import GymnaxWrapper
 
 
 @chex.dataclass
@@ -59,6 +63,39 @@ def place_ship_randomly(key: chex.PRNGKey, board: jnp.ndarray, ship_length: int)
 
     return new_board, new_pos, pose.astype(int)
 
+
+class PerfectMemoryWrapper(GymnaxWrapper):
+    def observation_space(self, params: EnvParams):
+        """
+        Obs space is whether or not you hit a ship +
+        action_mask for illegal actions.
+        """
+        return gymnax.environments.spaces.Box(-1, 1, (self._env.rows * self._env.cols,))
+
+    @partial(jax.jit, static_argnums=(0,))
+    def reset(
+            self, key: chex.PRNGKey, params: Optional[environment.EnvParams] = None
+    ) -> Tuple[chex.Array, environment.EnvState]:
+        _, env_state = self._env.reset(key, params)
+        obs = (env_state.hits_misses == 2).astype(int) + (env_state.hits_misses == 1) * (-1)
+        obs = obs.flatten()
+
+        return obs, env_state
+
+    @partial(jax.jit, static_argnums=(0,))
+    def step(
+            self,
+            key: chex.PRNGKey,
+            state: BattleShipState,
+            action: Union[int, float, jnp.ndarray],
+            params: Optional[environment.EnvParams] = None,
+    ) -> Tuple[chex.Array, environment.EnvState, float, bool, dict]:
+        _, state, reward, done, info = self._env.step(
+            key, state, action, params
+        )
+        obs = (state.hits_misses == 2).astype(int) + (state.hits_misses == 1) * (-1)
+        obs = obs.flatten()
+        return obs, state, reward, done, info
 
 class Battleship(Environment):
     def __init__(self,
