@@ -80,13 +80,11 @@ def make_train(config: dict, rand_key: jax.random.PRNGKey):
 
     assert hasattr(env_params, 'max_steps_in_episode')
 
-    double_critic = config["DOUBLE_CRITIC"]
     memoryless = config["MEMORYLESS"]
 
     network_fn, action_size = get_network_fn(env, env_params, memoryless=memoryless)
 
     network = network_fn(action_size,
-                         double_critic=double_critic,
                          hidden_size=config['HIDDEN_SIZE'])
 
     steps_filter = partial(filter_period_first_dim, n=config['STEPS_LOG_FREQ'])
@@ -195,12 +193,6 @@ def make_train(config: dict, rand_key: jax.random.PRNGKey):
                 return advantages, advantages + traj_batch.value
 
             gae_lambda = jnp.array(lambda0)
-            if double_critic:
-                # last_val is index 1 here b/c we squeezed earlier.
-                _calculate_gae = jax.vmap(_calculate_gae,
-                                          in_axes=[transition_axes_map, 1, None, 0],
-                                          out_axes=2)
-                gae_lambda = jnp.array([lambda0, lambda1])
             advantages, targets = _calculate_gae(traj_batch, last_val, last_done, gae_lambda)
 
             # UPDATE NETWORK
@@ -224,18 +216,10 @@ def make_train(config: dict, rand_key: jax.random.PRNGKey):
                         value_loss = (
                             jnp.maximum(value_losses, value_losses_clipped).mean()
                         )
-                        # Lambda discrepancy loss
-                        if double_critic:
-                            value_loss = ld_weight * (jnp.square(value[..., 0] - value[..., 1])).mean() + \
-                                         (1 - ld_weight) * value_loss
 
                         # CALCULATE ACTOR LOSS
                         ratio = jnp.exp(log_prob - traj_batch.log_prob)
 
-                        # which advantage do we use to update our policy?
-                        if double_critic:
-                            gae = (alpha * gae[..., 0] +
-                                   (1 - alpha) * gae[..., 1])
                         gae = (gae - gae.mean()) / (gae.std() + 1e-8)
                         loss_actor1 = ratio * gae
                         loss_actor2 = (
@@ -402,8 +386,6 @@ if __name__ == "__main__":
         "NUM_MINIBATCHES": 4,
         "GAMMA": 0.99,
         "MEMORYLESS": args.memoryless,
-        # "DOUBLE_CRITIC": args.double_critic,
-        "DOUBLE_CRITIC": False,
         "ACTION_CONCAT": args.action_concat,
         "CLIP_EPS": 0.2,
         "ENT_COEF": args.entropy_coeff,
