@@ -1,15 +1,18 @@
 from functools import partial
+from typing import Tuple, Union, Optional
 
 import chex
 import gymnax
 from chex import PRNGKey
 from gymnax.environments.environment import EnvParams, Environment
+from gymnax.environments import environment
 import jax
 import jax.numpy as jnp
-from jumanji.environments.routing.pac_man import PacMan, State, Observation
+from jumanji.environments.routing.pac_man import PacMan, State
 from jumanji.environments.routing.pac_man.generator import AsciiGenerator
 import numpy as np
 
+from .wrappers import GymnaxWrapper
 
 # It's important for [0, 0] to be an unreachable spot,
 # for pellet tracking.
@@ -85,6 +88,67 @@ def generate_los_map(generator: AsciiGenerator):
 
     return jnp.array(los_map)
 
+@chex.dataclass
+class PerfectMemoryPocmanState:
+    env_state: State
+    wall_map: jnp.ndarray
+    ghost_map: jnp.ndarray
+    pellet_map: jnp.ndarray
+
+class PerfectMemoryWrapper(GymnaxWrapper):
+    def observation_space(self, params: EnvParams):
+        return gymnax.environments.spaces.Box(0, 1, (self._env.x_size, self._env.y_size, 4))
+
+    @partial(jax.jit, static_argnums=(0,))
+    def reset(
+            self, key: chex.PRNGKey, params: Optional[environment.EnvParams] = None
+    ) -> Tuple[chex.Array, environment.EnvState]:
+        obs, env_state = self._env.reset(key, params)
+        rows, cols = state.grid.shape
+        expanded_map = jnp.zeros((2 * rows - 1, 2 * cols - 1)) - 1
+        pos_row, pos_col = expanded_map.shape[0] // 2, expanded_map.shape[1] // 2
+        positions = jnp.array([[pos_row - 1, pos_col],
+                               [pos_row, pos_col + 1],
+                               [pos_row + 1, pos_col],
+                               [pos_row, pos_col - 1],
+                               [pos_row, pos_col]])
+        wall_map = expanded_map.at[positions].set(jnp.concatenate(obs[:4], jnp.array([0])))
+        pellet_map = expanded_map.at[positions].set(obs[4])
+
+        # Ghosts
+        x, y = jnp.ogrid[:expanded_map.shape[0], :expanded_map.shape[1]]
+        distance = np.abs(x - pos_row) + np.abs(y - pos_col)
+        ghost_map = expanded_map.at[distance <= 2].set(obs[5])
+        ghost_map = ghost_map.at[pos_row, :pos_col].set(obs[6])
+        ghost_map = ghost_map.at[:pos_row, pos_col].set(obs[7])
+        ghost_map = ghost_map.at[pos_row, pos_col + 1:].set(obs[8])
+        ghost_map = ghost_map.at[pos_row + 1:, pos_col].set(obs[9])
+
+        powerpill = expanded_map + obs[10]
+
+        obs = jnp.stack([wall_map, ghost_map, pellet_map, powerpill], axis=-1)
+
+        return (obs,
+                PerfectMemoryPocmanState(
+                    env_state=env_state,
+                    wall_map=wall_map,
+                    ghost_map=ghost_map,
+                    pellet_map=pellet_map
+                ))
+
+    @partial(jax.jit, static_argnums=(0,))
+    def step(
+            self,
+            key: chex.PRNGKey,
+            state: PerfectMemoryPocmanState,
+            action: Union[int, float, jnp.ndarray],
+            params: Optional[environment.EnvParams] = None,
+    ) -> Tuple[chex.Array, environment.EnvState, float, bool, dict]:
+        obs, next_rs_state, reward, done, info = self._env.step(
+            key, state, action, params
+        )
+        # First we need to shift all our maps, depending on what direction we travelled
+        pass
 
 class PocMan(PacMan, Environment):
     """
@@ -127,7 +191,7 @@ class PocMan(PacMan, Environment):
         obs = obs.at[3].set(state.grid[state.player_locations.y, jnp.maximum(state.player_locations.x + 1, 0)])  # left
 
         # Now calculate if you smell food,
-        # manhattan dist <= 2 means obs[4] = 1.
+        # manhattan dist <= 1 means obs[4] = 1.
         pellet_dists = jnp.abs(loc[None, ...] - state.pellet_locations).sum(axis=-1)
         obs = obs.at[4].set(jnp.any(pellet_dists <= 1).astype(obs.dtype))
 
