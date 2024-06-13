@@ -88,6 +88,7 @@ def generate_los_map(generator: AsciiGenerator):
 
     return jnp.array(los_map)
 
+
 @chex.dataclass
 class PerfectMemoryPocmanState:
     env_state: State
@@ -95,9 +96,43 @@ class PerfectMemoryPocmanState:
     ghost_map: jnp.ndarray
     pellet_map: jnp.ndarray
 
+
 class PerfectMemoryWrapper(GymnaxWrapper):
+    def __init__(self, env, ghost_obs_decay_rate: float = 0.9):
+        super().__init__(env)
+        self.ghost_obs_decay_rate = ghost_obs_decay_rate
+
     def observation_space(self, params: EnvParams):
         return gymnax.environments.spaces.Box(0, 1, (self._env.x_size, self._env.y_size, 4))
+
+    @staticmethod
+    def _update_maps(prev_wall_map: jnp.ndarray,
+                     prev_pellet_map: jnp.ndarray,
+                     prev_ghost_map: jnp.ndarray,
+                     obs: jnp.ndarray):
+        pos_row, pos_col = prev_wall_map.shape[0] // 2, prev_wall_map.shape[1] // 2
+
+        # Walls and pellets
+        positions = jnp.array([[pos_row - 1, pos_col],
+                               [pos_row, pos_col + 1],
+                               [pos_row + 1, pos_col],
+                               [pos_row, pos_col - 1],
+                               [pos_row, pos_col]])
+        wall_map = prev_wall_map.at[positions].set(jnp.concatenate(obs[:4], jnp.array([0])))
+        pellet_map = prev_pellet_map.at[positions].set(obs[4])
+
+        # Ghosts
+        x, y = jnp.ogrid[:prev_ghost_map.shape[0], :prev_ghost_map.shape[1]]
+        distance = np.abs(x - pos_row) + np.abs(y - pos_col)
+        ghost_map = prev_ghost_map.at[distance <= 2].set(obs[5])
+        ghost_map = ghost_map.at[pos_row, :pos_col].set(obs[6])
+        ghost_map = ghost_map.at[:pos_row, pos_col].set(obs[7])
+        ghost_map = ghost_map.at[pos_row, pos_col + 1:].set(obs[8])
+        ghost_map = ghost_map.at[pos_row + 1:, pos_col].set(obs[9])
+
+        powerpill = jnp.zeros_like(prev_wall_map) + obs[10]
+
+        return wall_map, pellet_map, ghost_map, powerpill
 
     @partial(jax.jit, static_argnums=(0,))
     def reset(
@@ -106,25 +141,9 @@ class PerfectMemoryWrapper(GymnaxWrapper):
         obs, env_state = self._env.reset(key, params)
         rows, cols = state.grid.shape
         expanded_map = jnp.zeros((2 * rows - 1, 2 * cols - 1)) - 1
-        pos_row, pos_col = expanded_map.shape[0] // 2, expanded_map.shape[1] // 2
-        positions = jnp.array([[pos_row - 1, pos_col],
-                               [pos_row, pos_col + 1],
-                               [pos_row + 1, pos_col],
-                               [pos_row, pos_col - 1],
-                               [pos_row, pos_col]])
-        wall_map = expanded_map.at[positions].set(jnp.concatenate(obs[:4], jnp.array([0])))
-        pellet_map = expanded_map.at[positions].set(obs[4])
 
-        # Ghosts
-        x, y = jnp.ogrid[:expanded_map.shape[0], :expanded_map.shape[1]]
-        distance = np.abs(x - pos_row) + np.abs(y - pos_col)
-        ghost_map = expanded_map.at[distance <= 2].set(obs[5])
-        ghost_map = ghost_map.at[pos_row, :pos_col].set(obs[6])
-        ghost_map = ghost_map.at[:pos_row, pos_col].set(obs[7])
-        ghost_map = ghost_map.at[pos_row, pos_col + 1:].set(obs[8])
-        ghost_map = ghost_map.at[pos_row + 1:, pos_col].set(obs[9])
-
-        powerpill = expanded_map + obs[10]
+        wall_map, pellet_map, ghost_map, powerpill = \
+            self._get_wall_and_pellet_maps(expanded_map, expanded_map, expanded_map, obs)
 
         obs = jnp.stack([wall_map, ghost_map, pellet_map, powerpill], axis=-1)
 
@@ -143,12 +162,45 @@ class PerfectMemoryWrapper(GymnaxWrapper):
             state: PerfectMemoryPocmanState,
             action: Union[int, float, jnp.ndarray],
             params: Optional[environment.EnvParams] = None,
-    ) -> Tuple[chex.Array, environment.EnvState, float, bool, dict]:
+    ) -> Tuple[chex.Array, PerfectMemoryPocmanState, float, bool, dict]:
         obs, next_rs_state, reward, done, info = self._env.step(
-            key, state, action, params
+            key, state.env_state, action, params
         )
-        # First we need to shift all our maps, depending on what direction we travelled
-        pass
+        rows, cols = state.grid.shape
+        expanded_map = jnp.zeros((2 * rows - 1, 2 * cols - 1)) - 1
+
+        # first we shift our map depending on movement
+        def shift_map(arr: jnp.ndarray):
+            if action == 0:  # UP
+                shifted = expanded_map.at[1:].set(arr[:-1])
+            elif action == 1:  # RIGHT
+                shifted = expanded_map.at[:, :-1].set(arr[:, 1:])
+            elif action == 2:  # DOWN
+                shifted = expanded_map.at[:-1].set(arr[1:])
+            elif action == 3:  # LEFT
+                shifted = expanded_map.at[:, 1:].set(arr[:, :-1])
+            return shifted
+
+        shifted_wall_map, shifted_ghost_map, shifted_pellet_map = \
+            jax.vmap(shift_map)(jnp.stack([state.wall_map, state.ghost_map, state.pellet_map]))
+
+        # now we need to decay our ghost map, seeing as they move
+        shifted_ghost_map *= self.ghost_obs_decay_rate
+
+        # TODO: now we incorporate our current obs
+        wall_map, pellet_map, ghost_map, powerpill = \
+            self._get_wall_and_pellet_maps(shifted_wall_map, shifted_pellet_map, shifted_ghost_map, obs)
+
+        obs = jnp.stack([wall_map, ghost_map, pellet_map, powerpill], axis=-1)
+
+        next_state = PerfectMemoryPocmanState(
+            env_state=next_rs_state,
+            wall_map=wall_map,
+            ghost_map=ghost_map,
+            pellet_map=pellet_map
+        )
+        return obs, next_state, reward, done, info
+
 
 class PocMan(PacMan, Environment):
     """
