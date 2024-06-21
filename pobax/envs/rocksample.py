@@ -78,7 +78,7 @@ class RockSample(Environment):
 
     def __init__(self,
                  key: chex.PRNGKey,
-                 config_path: Path = Path(ROOT_DIR, 'porl', 'envs',
+                 config_path: Path = Path(ROOT_DIR, 'pobax', 'envs',
                                           'configs', 'rocksample_7_8_config.json')):
         """
         RockSample environment in Gymnax.
@@ -186,7 +186,7 @@ class RockSample(Environment):
         state, action, rand_key = check_inps
 
         rock_idx = action - 5
-        dist = jnp.linalg.norm(state.position, self.rock_positions[rock_idx], 2)
+        dist = jnp.linalg.norm(state.position - self.rock_positions[rock_idx], ord=2)
         prob = half_dist_prob(dist, self.half_efficiency_distance)
 
         # w.p. prob we return correct rock observation.
