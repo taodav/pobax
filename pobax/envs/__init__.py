@@ -6,11 +6,14 @@ from jax import random
 from definitions import ROOT_DIR
 
 from .battleship import Battleship
+from .battleship import PerfectMemoryWrapper as BSPerfectMemoryWrapper
 from .classic import load_pomdp, load_pomdp
 from .compass_world import CompassWorld
 from .fishing import Fishing
 from .pocman import PocMan
+from .pocman import PerfectMemoryWrapper as PMPerfectMemoryWrapper
 from .rocksample import RockSample
+from .rocksample import PerfectMemoryWrapper as RSPerfectMemoryWrapper
 from .reacher_pomdp import ReacherPOMDP
 from .simple_chain import SimpleChain, FullyObservableSimpleChain
 from .tmaze import TMaze
@@ -68,10 +71,11 @@ def load_brax_env(env_str: str,
 
 
 def get_env(env_name: str,
-                   rand_key: random.PRNGKey,
-                   normalize_env: bool = False,
-                   gamma: float = 0.99,
-                   action_concat: bool = False):
+            rand_key: random.PRNGKey,
+            normalize_env: bool = False,
+            gamma: float = 0.99,
+            perfect_memory: bool = False,
+            action_concat: bool = False):
 
     mask_dims = None
     if env_name in masked_gymnax_env_map:
@@ -110,9 +114,15 @@ def get_env(env_name: str,
         env = Battleship(rows=rows, cols=cols, ship_lengths=ship_lengths)
         env_params = env.default_params
 
+        if perfect_memory:
+            env = BSPerfectMemoryWrapper(env)
+
     elif env_name == 'pocman':
         env = PocMan()
         env_params = env.default_params
+
+        if perfect_memory:
+            env = PMPerfectMemoryWrapper(env)
 
     elif env_name == 'ReacherPOMDP':
         env = ReacherPOMDP()
@@ -129,11 +139,13 @@ def get_env(env_name: str,
     elif 'rocksample' in env_name:  # [rocksample, rocksample_15_15]
 
         if len(env_name.split('_')) > 1:
-            config_path = Path(ROOT_DIR, 'porl', 'envs', 'configs', f'{env_name}_config.json')
+            config_path = Path(ROOT_DIR, 'pobax', 'envs', 'configs', f'{env_name}_config.json')
             env = RockSample(rand_key, config_path=config_path)
         else:
             env = RockSample(rand_key)
         env_params = env.default_params
+        if perfect_memory:
+            env = RSPerfectMemoryWrapper(env)
 
     else:
         env, env_params = gymnax.make(env_name)

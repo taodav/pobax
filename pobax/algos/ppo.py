@@ -57,7 +57,6 @@ def env_step(runner_state, unused, network, env, env_params):
     return runner_state, transition
 
 
-
 def filter_period_first_dim(x, n: int):
     if isinstance(x, jnp.ndarray) or isinstance(x, np.ndarray):
         return x[::n]
@@ -72,8 +71,9 @@ def make_train(config: dict, rand_key: jax.random.PRNGKey):
     )
     env_key, rand_key = jax.random.split(rand_key)
     env, env_params = get_env(config['ENV_NAME'], env_key,
-                                     gamma=config["GAMMA"],
-                                     action_concat=config["ACTION_CONCAT"])
+                              gamma=config["GAMMA"],
+                              action_concat=config["ACTION_CONCAT"],
+                              perfect_memory=config["PERFECT_MEMORY"])
 
     if hasattr(env, 'gamma'):
         config['GAMMA'] = env.gamma
@@ -385,6 +385,7 @@ if __name__ == "__main__":
         "UPDATE_EPOCHS": 4,
         "NUM_MINIBATCHES": 4,
         "GAMMA": 0.99,
+        "PERFECT_MEMORY": args.perfect_memory,
         "MEMORYLESS": args.memoryless,
         "ACTION_CONCAT": args.action_concat,
         "CLIP_EPS": 0.2,

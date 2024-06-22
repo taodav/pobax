@@ -75,8 +75,16 @@ class SmallImageCNN(nn.Module):
 
     @nn.compact
     def __call__(self, x):
+        # 10x10 2 dimensions
+        if len(x.shape) == 2 and x.shape[-3] == x.shape[-2] and x.shape[-3] == 10:
+            out1 = nn.Conv(features=self.hidden_size, kernel_size=5, strides=1, padding=0)(x)
+            out1 = nn.relu(out1)
+            out2 = nn.Conv(features=self.hidden_size, kernel_size=4, strides=1, padding=0)(out1)
+            out2 = nn.relu(out2)
+            conv_out = nn.Conv(features=self.hidden_size, kernel_size=3, strides=1, padding=0)(out2)
+
         # 5x5
-        if x.shape[-3] == x.shape[-2] and x.shape[-3] == 5:
+        elif x.shape[-3] == x.shape[-2] and x.shape[-3] == 5:
             out1 = nn.Conv(features=self.hidden_size, kernel_size=(4, 4), strides=1, padding=1)(x)
             out1 = nn.relu(out1)
             out2 = nn.Conv(features=self.hidden_size, kernel_size=(3, 3), strides=1, padding=0)(out1)

@@ -70,7 +70,8 @@ class PerfectMemoryWrapper(GymnaxWrapper):
         Obs space is whether or not you hit a ship +
         action_mask for illegal actions.
         """
-        return gymnax.environments.spaces.Box(-1, 1, (self._env.rows * self._env.cols,))
+        # return gymnax.environments.spaces.Box(-1, 1, (self._env.rows * self._env.cols,))
+        return gymnax.environments.spaces.Box(-1, 1, (self._env.rows, self._env.cols,))
 
     @partial(jax.jit, static_argnums=(0,))
     def reset(
@@ -78,7 +79,7 @@ class PerfectMemoryWrapper(GymnaxWrapper):
     ) -> Tuple[chex.Array, environment.EnvState]:
         _, env_state = self._env.reset(key, params)
         obs = (env_state.hits_misses == 2).astype(int) + (env_state.hits_misses == 1) * (-1)
-        obs = obs.flatten()
+        # obs = obs.flatten()
 
         return obs, env_state
 
@@ -94,7 +95,7 @@ class PerfectMemoryWrapper(GymnaxWrapper):
             key, state, action, params
         )
         obs = (state.hits_misses == 2).astype(int) + (state.hits_misses == 1) * (-1)
-        obs = obs.flatten()
+        # obs = obs.flatten()
         return obs, state, reward, done, info
 
 class Battleship(Environment):

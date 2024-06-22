@@ -39,7 +39,6 @@ def test_rocksample():
     assert obs[2 * env.size + rock_to_check - 1] == 0
     assert rew > 0
 
-
     # now we check that it's turned into a bad rock
     actions_to_rock = [0, 2]  # for 11, 11
     rew = 0
@@ -63,7 +62,7 @@ def test_rocksample():
         step_key, key = jax.random.split(key)
         obs, state, rew, terminal, info = env.step(step_key, state, a, env_params)
 
-    # now we check checking a previous good, currently bad rock.
+    # now we check checking bad rock.
     rock_to_check = 5
     step_key, key = jax.random.split(key)
     obs, state, _, _, _ = env.step(step_key, state, 4 + rock_to_check, env_params)

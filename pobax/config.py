@@ -25,6 +25,7 @@ class Hyperparams(Tap):
 
 
 class PPOHyperparams(Hyperparams):
+    perfect_memory: bool = False
     memoryless: bool = False
     action_concat: bool = False
 

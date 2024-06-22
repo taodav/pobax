@@ -27,8 +27,11 @@ class RockSampleState:
     rock_morality: chex.Array
 
 
-class PerfectMemoryRockSampleState(RockSampleState):
+@chex.dataclass
+class PerfectMemoryRockSampleState:
     mem: chex.Array
+    position: chex.Array
+    rock_morality: chex.Array
 
 
 class PerfectMemoryWrapper(GymnaxWrapper):
@@ -55,6 +58,21 @@ class PerfectMemoryWrapper(GymnaxWrapper):
         obs, next_rs_state, reward, done, info = self._env.step(
             key, state, action, params
         )
+
+        # If we sample at a particular rock position, we always return -1
+        # for that observation
+        def sample_obs():
+            ele = (self.rock_positions == next_rs_state.position)
+            bool_pos = jnp.all(ele, axis=-1)
+            obs_rocks = obs[2 * self._env.size:]
+            obs_rocks = obs_rocks * (1 - bool_pos) + bool_pos * (-1)
+            new_obs = obs.at[2 * self._env.size:].set(obs_rocks)
+            return new_obs
+        obs = jax.lax.cond(action == 4,
+                           sample_obs,
+                           lambda : obs)
+
+
         # now we need to incorporate these new obs into mem
         rock_obs = obs[-self._env.k:]
         mask = rock_obs == 0
