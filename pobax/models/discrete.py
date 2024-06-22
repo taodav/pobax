@@ -161,20 +161,26 @@ class BattleShipActorCriticRNN(nn.Module):
     def __call__(self, hidden, x):
         # Obs is a t x b x obs_size array.
         obs, dones = x
-        hit = obs[..., 0:1]
-        valid_action_mask = obs[..., 1:self.action_dim + 1]
-        obs = jnp.concatenate([hit, obs[..., self.action_dim + 1:]], axis=-1)
 
-        embedding = nn.Dense(
-            2 * self.hidden_size, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
-        )(obs)
-        embedding = nn.relu(embedding)
+        # if we're in this case, obs is an image
+        if len(obs.shape) == 4:
+            embedding = SmallImageCNN(hidden_size=self.hidden_size)(obs)
+            embedding = nn.relu(embedding)
+        else:
+            hit = obs[..., 0:1]
+            valid_action_mask = obs[..., 1:self.action_dim + 1]
+            obs = jnp.concatenate([hit, obs[..., self.action_dim + 1:]], axis=-1)
 
-        embedding = jnp.concatenate((hit, embedding), axis=-1)
-        embedding = nn.Dense(
-            self.hidden_size, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
-        )(embedding)
-        embedding = nn.relu(embedding)
+            embedding = nn.Dense(
+                2 * self.hidden_size, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
+            )(obs)
+            embedding = nn.relu(embedding)
+
+            embedding = jnp.concatenate((hit, embedding), axis=-1)
+            embedding = nn.Dense(
+                self.hidden_size, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
+            )(embedding)
+            embedding = nn.relu(embedding)
 
         rnn_in = (embedding, dones)
         hidden, embedding = ScannedRNN(hidden_size=self.hidden_size)(hidden, rnn_in)
@@ -217,20 +223,27 @@ class BattleShipActorCritic(nn.Module):
     def __call__(self, hidden, x):
         # Obs is a t x b x obs_size array.
         obs, dones = x
-        hit = obs[..., 0:1]
-        valid_action_mask = obs[..., 1:self.action_dim + 1]
-        obs = jnp.concatenate([hit, obs[..., self.action_dim + 1:]], axis=-1)
 
-        embedding = nn.Dense(
-            2 * self.hidden_size, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
-        )(obs)
-        embedding = nn.relu(embedding)
+        # if we're in this case, obs is an image
+        if len(obs.shape) == 4:
+            valid_action_mask = (obs == 0).reshape(*obs.shape[:-2], -1)
+            embedding = SmallImageCNN(hidden_size=self.hidden_size)(obs)
+            embedding = nn.relu(embedding)
+        else:
+            hit = obs[..., 0:1]
+            valid_action_mask = obs[..., 1:self.action_dim + 1]
+            obs = jnp.concatenate([hit, obs[..., self.action_dim + 1:]], axis=-1)
 
-        embedding = jnp.concatenate((hit, embedding), axis=-1)
-        embedding = nn.Dense(
-            self.hidden_size, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
-        )(embedding)
-        embedding = nn.relu(embedding)
+            embedding = nn.Dense(
+                2 * self.hidden_size, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
+            )(obs)
+            embedding = nn.relu(embedding)
+
+            embedding = jnp.concatenate((hit, embedding), axis=-1)
+            embedding = nn.Dense(
+                self.hidden_size, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
+            )(embedding)
+            embedding = nn.relu(embedding)
 
         embedding = nn.Dense(
             self.hidden_size, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)

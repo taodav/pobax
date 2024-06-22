@@ -8,11 +8,11 @@ from .discrete import *
 
 def get_network_fn(env: environment.Environment, env_params: environment.EnvParams,
                    memoryless: bool = False):
-    if isinstance(env, Battleship) or (hasattr(env, '_unwrapped') and isinstance(env._unwrapped, Battleship)):
+    if isinstance(env, Battleship) or ((hasattr(env, '_unwrapped') and isinstance(env._unwrapped, Battleship))):
         network_fn = BattleShipActorCriticRNN
-        action_size = env.action_space(env_params).n
         if memoryless:
             network_fn = BattleShipActorCritic
+        action_size = env.action_space(env_params).n
     elif isinstance(env.action_space(env_params), spaces.Discrete):
         action_size = env.action_space(env_params).n
 

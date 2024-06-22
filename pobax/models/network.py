@@ -75,8 +75,9 @@ class SmallImageCNN(nn.Module):
 
     @nn.compact
     def __call__(self, x):
+        num_dims = len(x.shape) - 2
         # 10x10 2 dimensions
-        if len(x.shape) == 2 and x.shape[-3] == x.shape[-2] and x.shape[-3] == 10:
+        if num_dims == 2 and x.shape[-2] == x.shape[-1] and x.shape[-2] == 10:
             out1 = nn.Conv(features=self.hidden_size, kernel_size=5, strides=1, padding=0)(x)
             out1 = nn.relu(out1)
             out2 = nn.Conv(features=self.hidden_size, kernel_size=4, strides=1, padding=0)(out1)
@@ -109,8 +110,8 @@ class SmallImageCNN(nn.Module):
             raise NotImplementedError
 
         conv_out = nn.relu(conv_out)
-        # Convolutions "flatten" the last three dimensions.
-        flat_out = conv_out.reshape((*conv_out.shape[:-3], -1))  # Flatten
+        # Convolutions "flatten" the last num_dims dimensions.
+        flat_out = conv_out.reshape((*conv_out.shape[:-num_dims], -1))  # Flatten
         final_out = nn.Dense(features=self.hidden_size)(flat_out)
         return final_out
 
