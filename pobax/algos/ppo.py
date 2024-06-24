@@ -90,11 +90,6 @@ def make_train(config: dict, rand_key: jax.random.PRNGKey):
     steps_filter = partial(filter_period_first_dim, n=config['STEPS_LOG_FREQ'])
     update_filter = partial(filter_period_first_dim, n=config['UPDATE_LOG_FREQ'])
 
-    # Used for vmapping over our double critic.
-    transition_axes_map = Transition(
-        None, None, 2, None, None, None, None
-    )
-
     _env_step = partial(env_step, network=network, env=env, env_params=env_params)
 
     def train(vf_coeff, lambda0, lr, rng):
