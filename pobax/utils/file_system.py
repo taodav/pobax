@@ -1,9 +1,12 @@
 from collections import OrderedDict
 import hashlib
 import importlib
+import inspect
 from pathlib import Path
+import sys
 import time
 from typing import Union
+from types import FunctionType, CellType
 
 import jax
 import jax.numpy as jnp
@@ -96,3 +99,64 @@ def load_train_state(key: jax.random.PRNGKey, fpath: Path):
 
     return env, env_params, args, network, ts
 
+
+def get_fn_from_module(entry: str, fn_name: str = 'make_train'):
+    """
+    Gets a function based off of an entry string, and a function name.
+    :param entry: string (without the python call) of the entrypoint. So for example, 'batch_run_ppo.py' for a call to
+                  python batch_run_ppo.py, or '-m pobax.algos.ppo' for python -m pobax.algos.ppo
+    :param fn_name: name of the function we want to load in the module
+    :return: the function in the module.
+    """
+    if entry.startswith('-m'):
+        module_entry = entry.split(' ')[-1]
+        # Load the module
+        module = importlib.import_module(module_entry)
+    else:
+        # assume here that the entry point is the project root
+        assert entry.endswith('.py')
+        fpath = Path(ROOT_DIR, entry)
+        module_name = fpath.stem
+
+        # Create a module spec
+        spec = importlib.util.spec_from_file_location(module_name, fpath)
+
+        # Create a module from the spec
+        module = importlib.util.module_from_spec(spec)
+
+        # Execute the module
+        spec.loader.exec_module(module)
+
+        # Add the module to sys.modules
+        sys.modules[module_name] = module
+
+    # Get the function from the module
+    fn = getattr(module, fn_name)
+    return fn
+
+
+def get_inner_fn_arguments(fn: FunctionType, inner_fn_name: str = 'train'):
+    # Get the code object of the outer function
+    # outer_code = outer_function.__code__
+    outer_code = fn.__code__
+
+    # Extract the constants from the outer function's code object
+    constants = outer_code.co_consts
+
+    # Find the nested function within the constants
+    nested_func_code = None
+    for const in constants:
+        # if inspect.iscode(const) and const.co_name == 'nested_function':
+        if inspect.iscode(const) and const.co_name == inner_fn_name:
+            nested_func_code = const
+            break
+
+    # Dummy closure for free variables
+    dummy_closure = tuple(CellType() for _ in nested_func_code.co_freevars)
+
+    # Create a function object from the nested function's code object
+    nested_function = FunctionType(nested_func_code, globals(), inner_fn_name, None, dummy_closure)
+
+    # Get the arguments of the nested function
+    args = inspect.signature(nested_function).parameters
+    return list(args.keys())
