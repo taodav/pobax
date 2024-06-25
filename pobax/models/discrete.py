@@ -164,6 +164,7 @@ class BattleShipActorCriticRNN(nn.Module):
 
         # if we're in this case, obs is an image
         if len(obs.shape) == 4:
+            valid_action_mask = (obs == 0).reshape(*obs.shape[:-2], -1)
             embedding = SmallImageCNN(hidden_size=self.hidden_size)(obs)
             embedding = nn.relu(embedding)
         else:

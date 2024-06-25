@@ -14,6 +14,7 @@ hparams = {
             'env': 'battleship_10',
             'action_concat': False,
             'perfect_memory': True,
+            'memoryless': True,
             'lr': lrs,
             'lambda0': ' '.join(map(str, lambda0s)),
             'hidden_size': 512,

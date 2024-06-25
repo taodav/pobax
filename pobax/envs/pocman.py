@@ -118,8 +118,8 @@ class PerfectMemoryWrapper(GymnaxWrapper):
                                [pos_row + 1, pos_col],
                                [pos_row, pos_col - 1],
                                [pos_row, pos_col]])
-        wall_map = prev_wall_map.at[positions].set(jnp.concatenate(obs[:4], jnp.array([0])))
-        pellet_map = prev_pellet_map.at[positions].set(obs[4])
+        wall_map = prev_wall_map.at[positions[:, 0], positions[:, 1]].set(jnp.concatenate([obs[:4], jnp.array([1])]))
+        pellet_map = prev_pellet_map.at[positions[:, 0], positions[:, 1]].set(obs[4])
 
         # Ghosts
         x, y = jnp.ogrid[:prev_ghost_map.shape[0], :prev_ghost_map.shape[1]]
@@ -132,18 +132,18 @@ class PerfectMemoryWrapper(GymnaxWrapper):
 
         powerpill = jnp.zeros_like(prev_wall_map) + obs[10]
 
-        return wall_map, pellet_map, ghost_map, powerpill
+        return wall_map, ghost_map, pellet_map, powerpill
 
     @partial(jax.jit, static_argnums=(0,))
     def reset(
             self, key: chex.PRNGKey, params: Optional[environment.EnvParams] = None
     ) -> Tuple[chex.Array, environment.EnvState]:
         obs, env_state = self._env.reset(key, params)
-        rows, cols = state.grid.shape
+        rows, cols = env_state.grid.shape
         expanded_map = jnp.zeros((2 * rows - 1, 2 * cols - 1)) - 1
 
-        wall_map, pellet_map, ghost_map, powerpill = \
-            self._get_wall_and_pellet_maps(expanded_map, expanded_map, expanded_map, obs)
+        wall_map, ghost_map, pellet_map, powerpill = \
+            self._update_maps(expanded_map, expanded_map, expanded_map, obs)
 
         obs = jnp.stack([wall_map, ghost_map, pellet_map, powerpill], axis=-1)
 
@@ -166,19 +166,19 @@ class PerfectMemoryWrapper(GymnaxWrapper):
         obs, next_rs_state, reward, done, info = self._env.step(
             key, state.env_state, action, params
         )
-        rows, cols = state.grid.shape
+        rows, cols = next_rs_state.grid.shape
         expanded_map = jnp.zeros((2 * rows - 1, 2 * cols - 1)) - 1
 
         # first we shift our map depending on movement
         def shift_map(arr: jnp.ndarray):
             if action == 0:  # UP
                 shifted = expanded_map.at[1:].set(arr[:-1])
-            elif action == 1:  # RIGHT
-                shifted = expanded_map.at[:, :-1].set(arr[:, 1:])
+            elif action == 1:  # LEFT
+                shifted = expanded_map.at[:, 1:].set(arr[:, :-1])
             elif action == 2:  # DOWN
                 shifted = expanded_map.at[:-1].set(arr[1:])
-            elif action == 3:  # LEFT
-                shifted = expanded_map.at[:, 1:].set(arr[:, :-1])
+            elif action == 3:  # RIGHT
+                shifted = expanded_map.at[:, :-1].set(arr[:, 1:])
             return shifted
 
         shifted_wall_map, shifted_ghost_map, shifted_pellet_map = \
@@ -188,8 +188,8 @@ class PerfectMemoryWrapper(GymnaxWrapper):
         shifted_ghost_map *= self.ghost_obs_decay_rate
 
         # TODO: now we incorporate our current obs
-        wall_map, pellet_map, ghost_map, powerpill = \
-            self._get_wall_and_pellet_maps(shifted_wall_map, shifted_pellet_map, shifted_ghost_map, obs)
+        wall_map, ghost_map, pellet_map, powerpill = \
+            self._update_maps(shifted_wall_map, shifted_pellet_map, shifted_ghost_map, obs)
 
         obs = jnp.stack([wall_map, ghost_map, pellet_map, powerpill], axis=-1)
 
@@ -240,7 +240,7 @@ class PocMan(PacMan, Environment):
         obs = obs.at[0].set(state.grid[jnp.maximum(state.player_locations.x - 1, 0), state.player_locations.y])  # up
         obs = obs.at[1].set(state.grid[state.player_locations.x, jnp.minimum(state.player_locations.y + 1, state.grid.shape[1] - 1)])  # right
         obs = obs.at[2].set(state.grid[jnp.minimum(state.player_locations.x + 1, state.grid.shape[0] - 1), state.player_locations.x])  # down
-        obs = obs.at[3].set(state.grid[state.player_locations.y, jnp.maximum(state.player_locations.x + 1, 0)])  # left
+        obs = obs.at[3].set(state.grid[state.player_locations.x, jnp.maximum(state.player_locations.y - 1, 0)])  # left
 
         # Now calculate if you smell food,
         # manhattan dist <= 1 means obs[4] = 1.

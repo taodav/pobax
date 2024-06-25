@@ -14,6 +14,7 @@ hparams = {
             'env': 'rocksample_15_15',
             'action_concat': True,
             'perfect_memory': True,
+            'memoryless': True,
             'lr': ' '.join(map(str, lrs)),
             'lambda0': lambda0s,
             'hidden_size': 1024,
