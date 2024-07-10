@@ -4,7 +4,7 @@ import jax.numpy as jnp
 from jax._src.nn.initializers import orthogonal, constant
 import numpy as np
 
-from .network import SimpleNN, ScannedRNN, SmallImageCNN
+from .network import SimpleNN, ScannedRNN, SmallImageCNN, RNNApproximator
 from .value import Critic
 
 
@@ -26,16 +26,57 @@ class DiscreteActor(nn.Module):
         return pi
 
 
+# class DiscreteActorCritic(nn.Module):
+#     action_dim: int
+#     fix_rnn: bool = False
+#     horizon: int = 3
+#     hidden_size: int = 128
+#     depth: int = 3
+#     double_critic: bool = False
+
+#     @nn.compact
+#     def __call__(self, _, x):
+#         obs, dones = x
+#         if self.fix_rnn:
+#             _, embedding = FixedHorizonPlanningRNN(hidden_size=self.hidden_size, horizon=self.horizon)(obs)
+#         else:
+#             embedding = SimpleNN(hidden_size=self.hidden_size, depth=self.depth)(obs)
+
+#         actor = DiscreteActor(self.action_dim, hidden_size=self.hidden_size)
+#         pi = actor(embedding)
+
+#         critic = Critic(hidden_size=self.hidden_size)
+
+#         if self.double_critic:
+#             critic = nn.vmap(Critic,
+#                              variable_axes={'params': 0},
+#                              split_rngs={'params': True},
+#                              in_axes=None,
+#                              out_axes=2,
+#                              axis_size=2)(hidden_size=self.hidden_size)
+
+#         v = critic(embedding)
+
+#         return _, pi, jnp.squeeze(v, axis=-1)
+    
 class DiscreteActorCritic(nn.Module):
     action_dim: int
+    approximator: str = 'mlp'
+    horizon: int = 3
     hidden_size: int = 128
+    depth: int = 3
     double_critic: bool = False
 
     @nn.compact
-    def __call__(self, _, x):
+    def __call__(self, hidden, x):
         obs, dones = x
-
-        embedding = SimpleNN(hidden_size=self.hidden_size)(obs)
+        if self.approximator == 'rnn':
+            embedding = nn.Dense(self.hidden_size, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(obs)
+            embedding = nn.relu(embedding)
+            rnn_in = (embedding, dones)
+            hidden, embedding = RNNApproximator(hidden_size=self.hidden_size, horizon=self.horizon)(hidden, rnn_in)
+        else:
+            embedding = SimpleNN(hidden_size=self.hidden_size, depth=self.depth)(obs)
 
         actor = DiscreteActor(self.action_dim, hidden_size=self.hidden_size)
         pi = actor(embedding)
@@ -52,7 +93,7 @@ class DiscreteActorCritic(nn.Module):
 
         v = critic(embedding)
 
-        return _, pi, jnp.squeeze(v, axis=-1)
+        return hidden, pi, jnp.squeeze(v, axis=-1)
 
 
 class DiscreteActorCriticRNN(nn.Module):

@@ -17,8 +17,10 @@ import orbax.checkpoint
 from pobax.config import PPOHyperparams
 from pobax.envs import get_env
 from pobax.envs.wrappers import LogEnvState
-from pobax.models import get_network_fn, ScannedRNN
-from pobax.utils.file_system import get_results_path
+from pobax.models import get_network_fn, ScannedRNN, ContinuousActorCritic, DiscreteActorCritic
+from pobax.utils.file_system import get_results_path, numpyify_and_save
+import csv
+from pathlib import Path
 
 
 class Transition(NamedTuple):
@@ -81,10 +83,20 @@ def make_train(config: dict, rand_key: jax.random.PRNGKey):
     assert hasattr(env_params, 'max_steps_in_episode')
 
     memoryless = config["MEMORYLESS"]
+    approximator = config["APPROXIMATOR"]
+    horizon = config["HORIZON"]
 
     network_fn, action_size = get_network_fn(env, env_params, memoryless=memoryless)
-
-    network = network_fn(action_size,
+    if network_fn is ContinuousActorCritic or network_fn is DiscreteActorCritic:
+        print(f"using depth {config['DEPTH']}, approximator={approximator}, horizon={horizon}")
+        network = network_fn(action_size, 
+                            approximator=approximator,
+                            horizon=horizon,
+                         hidden_size=config['HIDDEN_SIZE'],
+                         depth=config['DEPTH'])
+    else:
+        print(f"not using depth {config['DEPTH']}")
+        network = network_fn(action_size,
                          hidden_size=config['HIDDEN_SIZE'])
 
     steps_filter = partial(filter_period_first_dim, n=config['STEPS_LOG_FREQ'])
@@ -317,10 +329,24 @@ def make_train(config: dict, rand_key: jax.random.PRNGKey):
                             info["timestep"][info["returned_episode"]] * config["NUM_ENVS"]
                     )
                     avg_return_values = jnp.mean(info["returned_episode_returns"][info["returned_episode"]])
+                    # TODO: save timesteps and avg episodic return to a csv file
                     if len(timesteps) > 0:
                         print(
                             f"timesteps={timesteps[0]} - {timesteps[-1]}, avg episodic return={avg_return_values:.2f}"
                         )
+                    # Save to CSV file
+                    file_type = 'MEMORYLESS' if config['MEMORYLESS'] else 'RNN'
+                    file_path = Path(f'plotting/results/{config["ENV_NAME"]}/{file_type}.csv')  # Corrected path
+                    file_path.parent.mkdir(parents=True, exist_ok=True)
+                    # Check if the file exists and open it accordingly
+                    with file_path.open('a', newline='') as file:
+                        writer = csv.writer(file)
+                        # If the file was empty, write the header
+                        if file.tell() == 0:
+                            writer.writerow(['Start Timestep', 'End Timestep', 'Average Episodic Return'])
+                        # Write data
+                        if len(timesteps) > 0:
+                            writer.writerow([timesteps[0], timesteps[-1], avg_return_values])
 
                 jax.debug.callback(callback, metric)
 
@@ -379,25 +405,29 @@ if __name__ == "__main__":
     config = {
         "NUM_ENVS": 4,
         "NUM_EVAL_ENVS": 10,
-        "NUM_STEPS": 128,
+        "NUM_STEPS": args.num_steps,
         "TOTAL_TIMESTEPS": args.total_steps,
         "DEFAULT_MAX_STEPS_IN_EPISODE": args.default_max_steps_in_episode,
         "UPDATE_EPOCHS": 4,
         "NUM_MINIBATCHES": 4,
         "GAMMA": 0.99,
         "MEMORYLESS": args.memoryless,
+        "APPROXIMATOR": args.approximator,
+        "HORIZON": args.horizon,
         "ACTION_CONCAT": args.action_concat,
         "CLIP_EPS": 0.2,
         "ENT_COEF": args.entropy_coeff,
         "VF_COEF": args.vf_coeff,
         "MAX_GRAD_NORM": 0.5,
         "HIDDEN_SIZE": args.hidden_size,
+        "DEPTH": args.depth,
         "STEPS_LOG_FREQ": args.steps_log_freq,
         "UPDATE_LOG_FREQ": args.update_log_freq,
         "ENV_NAME": args.env,
         "ANNEAL_LR": True,
         "DEBUG": args.debug,
     }
+    print(config["NUM_STEPS"])
 
     rng = jax.random.PRNGKey(args.seed)
     make_train_rng, rng = jax.random.split(rng)
@@ -448,10 +478,12 @@ if __name__ == "__main__":
     }
 
     # Save all results with Orbax
-    orbax_checkpointer = orbax.checkpoint.PyTreeCheckpointer()
-    save_args = orbax_utils.save_args_from_target(all_results)
+    # orbax_checkpointer = orbax.checkpoint.PyTreeCheckpointer()
+    # save_args = orbax_utils.save_args_from_target(all_results)
 
     print(f"Saving results to {results_path}")
-    orbax_checkpointer.save(results_path, all_results, save_args=save_args)
+    # orbax_checkpointer.save(results_path, all_results, save_args=save_args)
+    
+    numpyify_and_save(results_path, all_results)
 
     print("Done.")

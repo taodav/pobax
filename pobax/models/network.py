@@ -37,7 +37,6 @@ class ScannedRNN(nn.Module):
             jax.random.PRNGKey(0), (batch_size, hidden_size)
         )
 
-
 class FixedHorizonPlanningRNN(ScannedRNN):
     horizon: int = 3
 
@@ -68,6 +67,28 @@ class FixedHorizonPlanningRNN(ScannedRNN):
         )
         new_rnn_state, y = outs
         return new_rnn_state, y
+
+class RNNApproximator(ScannedRNN):
+    horizon: int = 3
+
+    @functools.partial(
+        nn.scan,
+        variable_broadcast="params",
+        in_axes=0,
+        out_axes=0,
+        split_rngs={"params": False},
+    )
+    @nn.compact
+    def __call__(self, carry, x):
+        """Applies the module."""
+        rnn_state = carry
+        ins, _ = x
+        rnn_state = self.initialize_carry(ins.shape[0], ins.shape[1])
+        
+        for _ in range(self.horizon):
+            rnn_state, y = nn.GRUCell(features=self.hidden_size)(rnn_state, ins)
+        
+        return rnn_state, y
 
 
 class SmallImageCNN(nn.Module):
@@ -107,20 +128,60 @@ class SmallImageCNN(nn.Module):
         return final_out
 
 
-class SimpleNN(nn.Module):
+# class SimpleNN(nn.Module):
+#     hidden_size: int
+#     depth: int = 3
+
+#     @nn.compact
+#     def __call__(self, x):
+#         out = nn.Dense(self.hidden_size, kernel_init=orthogonal(2), bias_init=constant(0.0))(
+#             x
+#         )
+#         out = nn.relu(out)
+#         out = nn.Dense(
+#             self.hidden_size, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
+#         )(out) 
+#         out = nn.relu(out)
+#         out = nn.Dense(
+#             self.hidden_size, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
+#         )(out) 
+#         out = nn.relu(out)
+#         out = nn.Dense(
+#             self.hidden_size, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
+#         )(out) 
+#         out = nn.relu(out)
+#         out = nn.Dense(
+#             self.hidden_size, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
+#         )(out)
+#         return out
+
+class ResidualBlock(nn.Module):
     hidden_size: int
 
     @nn.compact
     def __call__(self, x):
-        out = nn.Dense(self.hidden_size, kernel_init=orthogonal(2), bias_init=constant(0.0))(
-            x
-        )
+        identity = x
+        out = nn.Dense(self.hidden_size, kernel_init=orthogonal(0.01), bias_init=constant(0.0))(x)
         out = nn.relu(out)
-        out = nn.Dense(
-            self.hidden_size, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
-        )(out)
+        out = nn.Dense(self.hidden_size, kernel_init=orthogonal(0.01), bias_init=constant(0.0))(out)
+        out += identity
         out = nn.relu(out)
-        out = nn.Dense(
-            self.hidden_size, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
-        )(out)
+        return out
+
+class SimpleNN(nn.Module):
+    hidden_size: int
+    depth: int = 3
+
+    @nn.compact
+    def __call__(self, x):
+        # Apply the first layer with specific initialization
+        out = nn.Dense(self.hidden_size, kernel_init=orthogonal(2), bias_init=constant(0.0))(x)
+        out = nn.relu(out)
+        
+        for _ in range((self.depth - 1) // 2):
+            out = ResidualBlock(self.hidden_size)(out)
+
+        # Apply the last layer without ReLU
+        out = nn.Dense(self.hidden_size, kernel_init=orthogonal(0.01), bias_init=constant(0.0))(out)
+        
         return out
