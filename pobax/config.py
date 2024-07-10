@@ -5,7 +5,7 @@ from tap import Tap
 
 
 class Hyperparams(Tap):
-    env: str = 'tmaze_5'
+    env: str = 'Breakout-MinAtar'
     alg: Literal['ppo'] = 'ppo'
 
     default_max_steps_in_episode: int = 1000
@@ -25,10 +25,15 @@ class Hyperparams(Tap):
 
 
 class PPOHyperparams(Hyperparams):
+    perfect_memory: bool = False
     memoryless: bool = False
     action_concat: bool = False
+    
+    # fix rnn params
+    approximator: Literal['mlp', 'rnn'] = 'mlp'
+    horizon: int = 3
 
-    lr: list[float] = [2.5e-4]
+    lr: list[float] = [2.5e-3]
     lambda0: list[float] = [0.95]  # GAE lambda_0
     vf_coeff: list[float] = [0.5]
 
@@ -37,7 +42,8 @@ class PPOHyperparams(Hyperparams):
     max_grad_norm: float = 0.5
 
     not_anneal_lr: bool = True
-    hidden_size: int = 128
+    hidden_size: int = 16
+    depth: int = 3
     num_minibatches: int = 4
     num_envs: int = 4
     num_steps: int = 128

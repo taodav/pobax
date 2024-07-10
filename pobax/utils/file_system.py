@@ -95,4 +95,3 @@ def load_train_state(key: jax.random.PRNGKey, fpath: Path):
                            tx=tx)
 
     return env, env_params, args, network, ts
-
