@@ -5,11 +5,11 @@ from tap import Tap
 
 
 class Hyperparams(Tap):
-    env: str = 'Breakout-MinAtar'
+    env: str = 'Hopper-F-v0'
     alg: Literal['ppo'] = 'ppo'
 
     default_max_steps_in_episode: int = 1000
-    total_steps: int = int(1.5e6)
+    total_steps: int = int(5e6)
     gamma: float = 0.99
 
     num_eval_envs: int = 10
@@ -32,6 +32,7 @@ class PPOHyperparams(Hyperparams):
     # fix rnn params
     approximator: Literal['mlp', 'rnn'] = 'mlp'
     horizon: int = 3
+    num_stack: int = 1
 
     lr: list[float] = [2.5e-3]
     lambda0: list[float] = [0.95]  # GAE lambda_0

@@ -24,7 +24,8 @@ from .wrappers import (
     VecEnv,
     NormalizeVecReward,
     NormalizeVecObservation,
-    ActionConcatWrapper
+    ActionConcatWrapper,
+    StackObservationWrapper
 )
 
 
@@ -71,7 +72,8 @@ def get_env(env_name: str,
                    rand_key: random.PRNGKey,
                    normalize_env: bool = False,
                    gamma: float = 0.99,
-                   action_concat: bool = False):
+                   action_concat: bool = False,
+                   num_stacks: int = 1):
 
     mask_dims = None
     if env_name in masked_gymnax_env_map:
@@ -151,6 +153,10 @@ def get_env(env_name: str,
     if mask_dims is not None:
         env = MaskObservationWrapper(env, mask_dims=mask_dims)
 
+    if num_stacks > 1:
+        env = StackObservationWrapper(env, num_stack=num_stacks)
+        env = FlattenObservationWrapper(env)
+
     # Vectorize our environment
     env = VecEnv(env)
     if normalize_env:
@@ -158,6 +164,7 @@ def get_env(env_name: str,
         env = NormalizeVecReward(env, gamma)
     elif 'rocksample' in env_name:
         env = NormalizeVecReward(env, gamma)
+    
     return env, env_params
 
 

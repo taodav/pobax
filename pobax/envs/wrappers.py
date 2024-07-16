@@ -436,3 +436,42 @@ class ActionConcatWrapper(GymnaxWrapper):
 
         obs = jnp.concatenate([obs, action_vec])
         return obs, state, reward, done, info
+    
+
+@struct.dataclass
+class StackObservationEnvState:
+    env_state: environment.EnvState
+    observation_stack: jnp.ndarray
+
+class StackObservationWrapper(GymnaxWrapper):
+    def __init__(self, env, num_stack):
+        super().__init__(env)
+        self.num_stack = num_stack
+
+    def observation_space(self, params) -> spaces.Box:
+        base_space = self._env.observation_space(params)
+        assert isinstance(base_space, spaces.Box), "Base observation space must be a Box space."
+        new_shape = base_space.shape + (self.num_stack,)
+        return spaces.Box(
+            low=jnp.stack([base_space.low] * self.num_stack, axis=-1),
+            high=jnp.stack([base_space.high] * self.num_stack, axis=-1),
+            shape=new_shape,
+            dtype=base_space.dtype,
+        )
+
+    @partial(jax.jit, static_argnums=(0,))
+    def reset(self, key: chex.PRNGKey, params: Optional[environment.EnvParams] = None) -> Tuple[chex.Array, environment.EnvState]:
+        obs, state = self._env.reset(key, params)
+        # Stack the initial observation num_stack times
+        stacked_obs = jnp.stack([obs] * self.num_stack, axis=-1)
+        print(obs.shape)
+        print('stacked_obs', stacked_obs.shape)
+        return stacked_obs, state
+
+    @partial(jax.jit, static_argnums=(0,))
+    def step(self, key: chex.PRNGKey, state: environment.EnvState, action: Union[int, float, jnp.ndarray], params: Optional[environment.EnvParams] = None) -> Tuple[chex.Array, environment.EnvState, float, bool, dict]:
+        obs, state, reward, done, info = self._env.step(key, state, action, params)
+        # Stack the current observation num_stack times
+        stacked_obs = jnp.stack([obs] * self.num_stack, axis=-1)
+        return stacked_obs, state, reward, done, info
+
