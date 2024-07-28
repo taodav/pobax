@@ -3,6 +3,7 @@ import jax
 import jax.numpy as jnp
 import chex
 import numpy as np
+from collections import deque
 from flax import struct
 from functools import partial
 from typing import Optional, Tuple, Union, Any
@@ -436,12 +437,6 @@ class ActionConcatWrapper(GymnaxWrapper):
 
         obs = jnp.concatenate([obs, action_vec])
         return obs, state, reward, done, info
-    
-
-@struct.dataclass
-class StackObservationEnvState:
-    env_state: environment.EnvState
-    observation_stack: jnp.ndarray
 
 class StackObservationWrapper(GymnaxWrapper):
     def __init__(self, env, num_stack):
@@ -474,4 +469,65 @@ class StackObservationWrapper(GymnaxWrapper):
         # Stack the current observation num_stack times
         stacked_obs = jnp.stack([obs] * self.num_stack, axis=-1)
         return stacked_obs, state, reward, done, info
+
+@struct.dataclass
+class ObservationEnvState:
+    env_state: environment.EnvState
+    episode_returns: float
+    discounted_episode_returns: float
+    episode_lengths: int
+    returned_episode_returns: float
+    returned_discounted_episode_returns: float
+    returned_episode_lengths: int
+    timestep: int
+    observations: jnp.ndarray
+
+class ConcatRecentObservationsWrapper(GymnaxWrapper):
+    def __init__(self, env: environment.Environment, num_recent_observations: int):
+        super().__init__(env)
+        self.num_recent_observations = num_recent_observations
+
+    def observation_space(self, params) -> spaces.Box:
+        base_space = self._env.observation_space(params)
+        assert isinstance(base_space, spaces.Box), "Base observation space must be a Box space."
+        # Multiply the shape of the base space by the number of observations we are concatenating
+        new_shape = (base_space.shape[0] * self.num_recent_observations,)
+        return spaces.Box(
+            low=jnp.tile(base_space.low, self.num_recent_observations),
+            high=jnp.tile(base_space.high, self.num_recent_observations),
+            shape=new_shape,
+            dtype=base_space.dtype,
+        )
+
+    @partial(jax.jit, static_argnums=(0,))
+    def reset(self, key: chex.PRNGKey, params: Optional[environment.EnvParams] = None) -> Tuple[chex.Array, environment.EnvState]:
+        obs, env_state = self._env.reset(key, params)
+        initial_observations = jnp.tile(obs, (self.num_recent_observations,))
+        state = ObservationEnvState(env_state, 0, 0, 0, 0, 0, 0, 0, initial_observations)
+        # Reset the deque with the initial observation repeated
+        # Return the concatenated observations
+        print(obs.shape)
+        print('initial_observations', initial_observations.shape)
+        return initial_observations, state
+
+    @partial(jax.jit, static_argnums=(0,))
+    def step(self, key: chex.PRNGKey, state: environment.EnvState, action: Union[int, float, jnp.ndarray], params: Optional[environment.EnvParams] = None) -> Tuple[chex.Array, environment.EnvState, float, bool, dict]:
+        obs, env_state, reward, done, info = self._env.step(key, state.env_state, action, params)
+        # Update the observation deque with the new observation
+        new_observations = jnp.concatenate((state.observations[obs.shape[0]:], obs))
+        state = ObservationEnvState(
+            env_state=env_state,
+            episode_returns=state.episode_returns,
+            discounted_episode_returns=state.discounted_episode_returns,
+            episode_lengths=state.episode_lengths,
+            returned_episode_returns=state.returned_episode_returns,
+            returned_discounted_episode_returns=state.returned_discounted_episode_returns,
+            returned_episode_lengths=state.returned_episode_lengths,
+            timestep=state.timestep,
+            observations=new_observations,
+        )
+        
+        # Return the concatenated observations along with other step information
+        print(new_observations.shape)
+        return new_observations, state, reward, done, info
 

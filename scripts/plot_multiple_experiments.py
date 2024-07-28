@@ -167,7 +167,7 @@ def find_file_in_dir(file_name: str, base_dir: Path) -> Path:
             return path
 
 if __name__ == "__main__":
-    env_names = ['atari', 'bsuite', 'cartpole', 'mujoco', 'pong', 'reacher', 'swimmer']
+    env_names = ['atari', 'cartpole', 'mujoco', 'pong', 'reacher', 'swimmer']
     for env_name in env_names:
         # normal
         study_paths = [
@@ -202,12 +202,65 @@ if __name__ == "__main__":
             # ('RNN approximator + Horizon 12', Path(ROOT_DIR, 'results', f'{env_name}_rnn_approximator_horizon12_ppo'), 'yellow'),
 
             # truncation length
-            ('RNN + Truncation Length 1', Path(ROOT_DIR, 'results', f'{env_name}_rnn_truncation1_ppo_best'), 'blue'),
-            ('RNN + Truncation Length 2', Path(ROOT_DIR, 'results', f'{env_name}_rnn_truncation2_ppo_best'), 'green'),
-            ('RNN + Truncation Length 4', Path(ROOT_DIR, 'results', f'{env_name}_rnn_truncation4_ppo_best'), 'red'),
-            ('RNN + Truncation Length 32', Path(ROOT_DIR, 'results', f'{env_name}_rnn_truncation32_ppo_best'), 'yellow'),
-            ('RNN + Truncation Length 128', Path(ROOT_DIR, 'results', f'{env_name}_rnn_truncation128_ppo_best'), 'purple'),
+            # ('RNN + Truncation Length 1', Path(ROOT_DIR, 'results', f'{env_name}_rnn_truncation1_ppo_best'), 'blue'),
+            # ('RNN + Truncation Length 2', Path(ROOT_DIR, 'results', f'{env_name}_rnn_truncation2_ppo_best'), 'green'),
+            # ('RNN + Truncation Length 4', Path(ROOT_DIR, 'results', f'{env_name}_rnn_truncation4_ppo_best'), 'red'),
+            # ('RNN + Truncation Length 32', Path(ROOT_DIR, 'results', f'{env_name}_rnn_truncation32_ppo_best'), 'yellow'),
+            # ('RNN + Truncation Length 128', Path(ROOT_DIR, 'results', f'{env_name}_rnn_truncation128_ppo_best'), 'purple'),
 
+            # rnn hidden size
+            # ('RNN + Hidden Size 4', Path(ROOT_DIR, 'results', f'{env_name}_rnn_hidden4_ppo_best'), 'blue'),
+            # ('RNN + Hidden Size 8', Path(ROOT_DIR, 'results', f'{env_name}_rnn_hidden8_ppo_best'), 'green'),
+            # ('RNN + Hidden Size 16', Path(ROOT_DIR, 'results', f'{env_name}_rnn_hidden16_ppo_best'), 'red'),
+            # ('RNN + Hidden Size 32', Path(ROOT_DIR, 'results', f'{env_name}_rnn_hidden32_ppo_best'), 'yellow'),
+            # ('RNN + Hidden Size 64', Path(ROOT_DIR, 'results', f'{env_name}_rnn_hidden64_ppo_best'), 'brown'),
+            # ('RNN + Hidden Size 128', Path(ROOT_DIR, 'results', f'{env_name}_rnn_hidden128_ppo_best'), 'purple'),
+
+            # memoryless hidden size
+            # ('Memoryless + Hidden Size 4', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_hidden4_ppo_best'), 'blue'),
+            # ('Memoryless + Hidden Size 8', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_hidden8_ppo_best'), 'green'),
+            # ('Memoryless + Hidden Size 16', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_hidden16_ppo_best'), 'red'),
+            # ('Memoryless + Hidden Size 32', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_hidden32_ppo_best'), 'yellow'),
+            # ('Memoryless + Hidden Size 64', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_hidden64_ppo_best'), 'brown'),
+            # ('Memoryless + Hidden Size 128', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_hidden128_ppo_best'), 'purple'),
+
+            # stack
+            # ('PPO + RNN', Path(ROOT_DIR, 'results', f'{env_name}_rnn_ppo_best'), 'blue'),
+            # ('Memoryless + Stack 1 + Skip connection', Path(ROOT_DIR, 'saved_results', f'{env_name}_memoryless_stack1_ppo_best'), 'black'),
+            # ('RNN skip + Number Repeats 3', Path(ROOT_DIR, 'saved_results', f'{env_name}_rnn_approximator_ppo_best'), 'brown'),
+            # ('Memoryless + Stack 1', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_stack1_ppo_best'), 'green'),
+            # ('Memoryless + Stack 2', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_stack2_ppo_best'), 'red'),
+            # ('Memoryless + Stack 4', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_stack4_ppo_best'), 'yellow'),
+            # ('Memoryless + Stack 8', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_stack8_ppo_best'), 'purple'),
+            
+            # RNN skip hidden
+            # ('PPO + RNN', Path(ROOT_DIR, 'results', f'{env_name}_rnn_ppo_best'), 'blue'),
+            # ('RNN skip + Hidden 4 + Number repeats 3', Path(ROOT_DIR, 'results', f'{env_name}_rnn_approximator_hidden4_horizon3_ppo_best'), 'blue'),
+            # ('RNN skip + Hidden 8 + Number repeats 3', Path(ROOT_DIR, 'results', f'{env_name}_rnn_approximator_hidden8_horizon3_ppo_best'), 'green'),
+            # ('RNN skip + Hidden 16 + Number repeats 3', Path(ROOT_DIR, 'results', f'{env_name}_rnn_approximator_hidden16_horizon3_ppo_best'), 'red'),
+            # ('RNN skip + Hidden 32 + Number repeats 3', Path(ROOT_DIR, 'results', f'{env_name}_rnn_approximator_hidden32_horizon3_ppo_best'), 'yellow'),
+            # ('RNN skip + Hidden 64 + Number repeats 3', Path(ROOT_DIR, 'results', f'{env_name}_rnn_approximator_hidden64_horizon3_ppo_best'), 'brown'),
+            # ('RNN skip + Hidden 128 + Number repeats 3', Path(ROOT_DIR, 'results', f'{env_name}_rnn_approximator_hidden128_horizon3_ppo_best'), 'purple'),
+
+            # Observation + Memoryless
+            # ('PPO + RNN', Path(ROOT_DIR, 'results', f'{env_name}_rnn_ppo'), 'blue'),
+            # ('Memoryless + Stack Observation 1', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_observation1_ppo'), 'dark gray'),
+            # ('Memoryless + Stack Observation 2', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_observation2_ppo'), 'green'),
+            # ('Memoryless + Stack Observation 4', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_observation4_ppo'), 'red'),
+            # ('Memoryless + Stack Observation 8', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_observation8_ppo'), 'yellow'),
+
+            # Observation + RNN skip
+            ('PPO + RNN', Path(ROOT_DIR, 'results', f'{env_name}_rnn_ppo'), 'blue'),
+            ('RNN skip + Stack Observation 1', Path(ROOT_DIR, 'results', f'{env_name}_rnn_skip_observation1_ppo'), 'dark gray'),
+            ('RNN skip + Stack Observation 2', Path(ROOT_DIR, 'results', f'{env_name}_rnn_skip_observation2_ppo'), 'green'),
+            ('RNN skip + Stack Observation 4', Path(ROOT_DIR, 'results', f'{env_name}_rnn_skip_observation4_ppo'), 'red'),
+            ('RNN skip + Stack Observation 8', Path(ROOT_DIR, 'results', f'{env_name}_rnn_skip_observation8_ppo'), 'yellow'),
+
+
+            # reacher
+            # ('PPO + RNN', Path(ROOT_DIR, 'results', f'{env_name}_rnn_ppo'), 'blue'),
+            # ('RNN skip', Path(ROOT_DIR, 'results', f'{env_name}_rnn_approximator_ppo'), 'red'),
+            # ('Memoryless PPO', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_ppo'), 'dark gray'),
         ]
 
         # fixedlambda
@@ -253,12 +306,13 @@ if __name__ == "__main__":
                 hyperparams_dir = study_path.parent.parent / 'scripts' / 'hyperparams'
                 study_hparam_filename = study_path.stem + '.py'
                 hyperparam_path = find_file_in_dir(study_hparam_filename, hyperparams_dir)
+                print(f"Hyperparam path: {hyperparam_path}")
                 step_multiplier = get_total_steps_multiplier(best_res['scores'].shape[0], hyperparam_path)
             best_res['step_multiplier'] = [step_multiplier] * len(best_res['envs'])
 
         fig, axes = plot_reses(all_reses, individual_runs=False, n_rows=2)
 
-        save_plot_to = Path(ROOT_DIR, 'graphs', f'{plot_name}_truncation.jpg')
+        save_plot_to = Path(ROOT_DIR, 'graphs', f'{plot_name}_observation_rnn_skip.jpg')
 
         fig.savefig(save_plot_to, bbox_inches='tight')
         print(f"Saved figure to {save_plot_to}")

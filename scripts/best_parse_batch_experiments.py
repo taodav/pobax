@@ -80,7 +80,7 @@ def parse_exp_dir(study_path, study_hparam_path):
 
     study_paths = list(study_path.iterdir())
 
-    scores, envs, best_hyperparams = [], [], {}
+    scores, final_scores, envs, best_hyperparams = [], [], [], {}
     for results_path in tqdm(study_paths):
         restored = load_info(results_path)
 
@@ -105,6 +105,7 @@ def parse_exp_dir(study_path, study_hparam_path):
 
         final_seeds_combined = combine_seeds_and_envs(final_disc_returns)
         scores.append(seeds_combined[0, 0, 0])
+        final_scores.append(final_seeds_combined[0, 0, 0])
         envs.append(args['env'])
         best_hyperparams[args['env']] = {k: args[k] for k in train_sign_hparams}
 
@@ -114,9 +115,10 @@ def parse_exp_dir(study_path, study_hparam_path):
     parsed_res = {
         'envs': envs,
         'scores': np.stack(scores, axis=-1),
-        # 'final_scores': stacked_final_scores,
+        'final_scores': np.stack(final_scores, axis=-1),
         'dim_ref': dim_ref,
-        'hyperparams': best_hyperparams
+        'hyperparams': best_hyperparams,
+        'hidden_size': args['hidden_size']
     }
     return parsed_res
 

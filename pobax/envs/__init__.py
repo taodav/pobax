@@ -25,7 +25,8 @@ from .wrappers import (
     NormalizeVecReward,
     NormalizeVecObservation,
     ActionConcatWrapper,
-    StackObservationWrapper
+    StackObservationWrapper,
+    ConcatRecentObservationsWrapper
 )
 
 
@@ -73,7 +74,8 @@ def get_env(env_name: str,
                    normalize_env: bool = False,
                    gamma: float = 0.99,
                    action_concat: bool = False,
-                   num_stacks: int = 1):
+                   num_stacks: int = 1,
+                   num_observations: int = 1):
 
     mask_dims = None
     if env_name in masked_gymnax_env_map:
@@ -156,6 +158,9 @@ def get_env(env_name: str,
     if num_stacks > 1:
         env = StackObservationWrapper(env, num_stack=num_stacks)
         env = FlattenObservationWrapper(env)
+    
+    if num_observations > 1:
+        env = ConcatRecentObservationsWrapper(env, num_recent_observations=num_observations)
 
     # Vectorize our environment
     env = VecEnv(env)

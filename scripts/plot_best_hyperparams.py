@@ -167,7 +167,7 @@ def find_file_in_dir(file_name: str, base_dir: Path) -> Path:
             return path
 
 if __name__ == "__main__":
-    env_name = 'mujoco'
+    env_name = 'reacher'
 
     # normal
     study_paths = [
@@ -179,16 +179,22 @@ if __name__ == "__main__":
 
         # depth
 
-        ('PPO + RNN', Path(ROOT_DIR, 'results', f'{env_name}_rnn_depth3_ppo_best'), 'blue'),
-        ('Memoryless PPO + depth 3', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_depth3_ppo_best'), 'dark gray'),
-        ('Memoryless PPO + depth 5', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_depth5_ppo_best'), 'red'),
-        ('Memoryless PPO + depth 7', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_depth7_ppo_best'), 'yellow')
+        # ('PPO + RNN', Path(ROOT_DIR, 'results', f'{env_name}_rnn_depth3_ppo_best'), 'blue'),
+        # ('Memoryless PPO + depth 3', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_depth3_ppo_best'), 'dark gray'),
+        # ('Memoryless PPO + depth 5', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_depth5_ppo_best'), 'red'),
+        # ('Memoryless PPO + depth 7', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_depth7_ppo_best'), 'yellow')
 
         # width
         # ('PPO + RNN', Path(ROOT_DIR, 'results', f'{env_name}_rnn_width128_ppo_best'), 'blue'),
         # ('Memoryless PPO + width 128', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_width128_ppo_best'), 'dark gray'),
         # ('Memoryless PPO + width 256', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_width256_ppo_best'), 'red'),
         # ('Memoryless PPO + width 512', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_width512_ppo_best'), 'yellow')
+
+        # reacher
+        ('PPO + RNN', Path(ROOT_DIR, 'results', f'{env_name}_rnn_ppo_best'), 'blue'),
+        ('RNN skip', Path(ROOT_DIR, 'results', f'{env_name}_rnn_approximator_ppo_best'), 'red'),
+        ('Memoryless PPO', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_ppo_best'), 'dark gray'),
+    
     ]
 
     # fixedlambda
@@ -239,7 +245,7 @@ if __name__ == "__main__":
 
     fig, axes = plot_reses(all_reses, individual_runs=False, n_rows=2)
 
-    save_plot_to = Path(ROOT_DIR, 'graphs', f'{plot_name}_depth.jpg')
+    save_plot_to = Path(ROOT_DIR, 'graphs', f'{plot_name}_reacher.jpg')
 
     fig.savefig(save_plot_to, bbox_inches='tight')
     print(f"Saved figure to {save_plot_to}")

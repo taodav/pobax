@@ -76,7 +76,8 @@ def make_train(config: dict, rand_key: jax.random.PRNGKey):
     env, env_params = get_env(config['ENV_NAME'], env_key,
                                      gamma=config["GAMMA"],
                                      action_concat=config["ACTION_CONCAT"],
-                                     num_stacks=config["NUM_STACK"])
+                                     num_stacks=config["NUM_STACK"],
+                                     num_observations=config["NUM_OBSERVATION"],)
 
     if hasattr(env, 'gamma'):
         config['GAMMA'] = env.gamma
@@ -413,6 +414,7 @@ if __name__ == "__main__":
         "NUM_MINIBATCHES": 4,
         "GAMMA": 0.99,
         "NUM_STACK": args.num_stack,
+        "NUM_OBSERVATION": args.num_observation,
         "MEMORYLESS": args.memoryless,
         "APPROXIMATOR": args.approximator,
         "HORIZON": args.horizon,

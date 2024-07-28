@@ -5,11 +5,11 @@ from tap import Tap
 
 
 class Hyperparams(Tap):
-    env: str = 'Hopper-F-v0'
+    env: str = 'CartPole-v1'
     alg: Literal['ppo'] = 'ppo'
 
     default_max_steps_in_episode: int = 1000
-    total_steps: int = int(5e6)
+    total_steps: int = int(1e7)
     gamma: float = 0.99
 
     num_eval_envs: int = 10
@@ -33,6 +33,7 @@ class PPOHyperparams(Hyperparams):
     approximator: Literal['mlp', 'rnn'] = 'mlp'
     horizon: int = 3
     num_stack: int = 1
+    num_observation: int = 1
 
     lr: list[float] = [2.5e-3]
     lambda0: list[float] = [0.95]  # GAE lambda_0
@@ -43,7 +44,7 @@ class PPOHyperparams(Hyperparams):
     max_grad_norm: float = 0.5
 
     not_anneal_lr: bool = True
-    hidden_size: int = 16
+    hidden_size: int = 128
     depth: int = 3
     num_minibatches: int = 4
     num_envs: int = 4
