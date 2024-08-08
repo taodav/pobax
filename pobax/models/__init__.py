@@ -4,6 +4,7 @@ from pobax.envs.battleship import Battleship
 
 from .continuous import *
 from .discrete import *
+from pobax.envs import jumanji_envs
 
 
 def get_network_fn(env: environment.Environment, env_params: environment.EnvParams,
@@ -13,9 +14,13 @@ def get_network_fn(env: environment.Environment, env_params: environment.EnvPara
         action_size = env.action_space(env_params).n
         if memoryless:
             network_fn = BattleShipActorCritic
+    elif env.env_name in jumanji_envs:
+        action_size = env.action_space(env_params).n
+        network_fn = JumanjiActorCriticRNN
+        if memoryless:
+            network_fn = JumanjiActorCritic
     elif isinstance(env.action_space(env_params), spaces.Discrete):
         action_size = env.action_space(env_params).n
-
         # Check whether we use image observations
         obs_space_shape = env.observation_space(env_params).shape
         if len(obs_space_shape) > 1:

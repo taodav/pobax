@@ -3,14 +3,16 @@ import jax
 import jax.numpy as jnp
 import chex
 import numpy as np
-from collections import deque
+import jumanji
+import gymnasium as gym
+# import envpool
+from jumanji import specs
+from jumanji.specs import Array, BoundedArray, DiscreteArray, MultiDiscreteArray, Spec
 from flax import struct
 from functools import partial
 from typing import Optional, Tuple, Union, Any
 from gymnax.environments import environment, spaces
-from brax import envs
-from brax.envs.wrappers.training import EpisodeWrapper, AutoResetWrapper
-
+from .jumanji import jumanji_to_gymnax_obs, jumanji_specs_to_gymnax_spaces
 
 class GymnaxWrapper(object):
     """Base class for Gymnax wrappers."""
@@ -130,6 +132,7 @@ class LogWrapper(GymnaxWrapper):
     def __init__(self, env: environment.Environment, gamma: float = 0.99):
         super().__init__(env)
         self.gamma = gamma
+        self.env_name = None
 
     @partial(jax.jit, static_argnums=(0, -1))
     def reset(
@@ -178,6 +181,8 @@ class LogWrapper(GymnaxWrapper):
 
 class BraxGymnaxWrapper:
     def __init__(self, env_name, backend="positional"):
+        from brax import envs
+        from brax.envs.wrappers.training import EpisodeWrapper, AutoResetWrapper
         env = envs.get_environment(env_name=env_name, backend=backend)
         self.max_steps_in_episode = 1000
         env = EpisodeWrapper(env, episode_length=self.max_steps_in_episode, action_repeat=1)
@@ -208,6 +213,75 @@ class BraxGymnaxWrapper:
             shape=(self._env.action_size,),
         )
 
+class JumanjiGymnaxWrapper:
+    def __init__(self, env_name):
+        from jumanji.wrappers import AutoResetWrapper
+        env = jumanji.make(env_name)
+        env = AutoResetWrapper(env)
+        self.max_steps_in_episode = 100000
+        self._env = env
+
+    def reset(self, key, params=None):
+        state, timestep = self._env.reset(key)
+        obs = jumanji_to_gymnax_obs(timestep.observation)
+        print('obs shape', type(timestep.observation))
+        return obs, state
+
+    def step(self, key, state, action, params=None):
+        new_state, timestep = self._env.step(state, action)
+        done = jnp.bool_(timestep.last())
+        obs = jumanji_to_gymnax_obs(timestep.observation)
+        reward = jnp.array(timestep.reward)
+        return obs, new_state, reward, done, {}
+
+    def observation_space(self, params) -> spaces.Box:
+        observation_spaces = jumanji_specs_to_gymnax_spaces(
+            self._env.observation_spec
+        )
+        return observation_spaces
+
+    def action_space(self, params) -> spaces.Discrete:
+        action_space = jumanji_specs_to_gymnax_spaces(self._env.action_spec)
+        return action_space
+    
+# @struct.dataclass
+# class ProcgenEnvState:
+#     env_state: environment.EnvState
+#     handle: Any
+    
+# class ProcgenGymnaxWrapper:
+#     def __init__(self, env_name):
+#         env = envpool.make(task_id=env_name, num_envs=1, env_type="gym")
+#         self.max_steps_in_episode = 1000
+#         self._env = env
+#         self.handle, _, _, self.action_step = self._env.xla()
+
+#     def reset(self, key, params=None):
+#         obs, state = self._env.reset()
+#         obs = self._transpose(obs)
+#         # state is dict
+#         return obs, ProcgenEnvState(obs, self.handle)
+
+#     def step(self, key, state, action, params=None):
+#         handle0 = state.handle
+#         handle1, (new_states, reward, done, trunc, info) = self.action_step(handle0, action)
+#         new_obs = self._transpose(new_states)
+#         return new_obs, ProcgenEnvState(new_obs, handle1), reward, done, info
+    
+#     def _transpose(self, observation):
+#         # Transpose the observation from (C, H, W) to (H, W, C)
+#         return jnp.transpose(observation, (0, 2, 3, 1))
+
+#     def observation_space(self, params):
+#         print('observation_space', self._env.observation_space)
+
+#         space = self._env.observation_space
+#         # Update the shape of the observation space to reflect the new format
+#         new_shape = (space.shape[1], space.shape[2], space.shape[0])
+#         return spaces.Box(low=jnp.transpose(space.low), high=jnp.transpose(space.high), shape=new_shape)
+
+#     def action_space(self, params):
+#         return spaces.Discrete(self._env.action_space.n)
 
 class ClipAction(GymnaxWrapper):
     def __init__(self, env, low=-1.0, high=1.0):
@@ -530,4 +604,5 @@ class ConcatRecentObservationsWrapper(GymnaxWrapper):
         # Return the concatenated observations along with other step information
         print(new_observations.shape)
         return new_observations, state, reward, done, info
+
 

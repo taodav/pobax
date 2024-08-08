@@ -6,6 +6,7 @@ import numpy as np
 
 from .network import SimpleNN, ScannedRNN, SmallImageCNN, RNNApproximator
 from .value import Critic
+from .jumanji import *
 
 
 class DiscreteActor(nn.Module):
@@ -90,9 +91,8 @@ class DiscreteActorCritic(nn.Module):
                              in_axes=None,
                              out_axes=2,
                              axis_size=2)(hidden_size=self.hidden_size)
-
+        print(f'embedding shape: {embedding.shape}')
         v = critic(embedding)
-
         return hidden, pi, jnp.squeeze(v, axis=-1)
 
 
@@ -125,6 +125,7 @@ class DiscreteActorCriticRNN(nn.Module):
                              out_axes=2,
                              axis_size=2)(hidden_size=self.hidden_size)
 
+        print(f'embeeding shape: {embedding.shape}')
         v = critic(embedding)
 
         return hidden, pi, jnp.squeeze(v, axis=-1)
@@ -305,3 +306,71 @@ class BattleShipActorCritic(nn.Module):
         v = critic(embedding)
 
         return hidden, pi, jnp.squeeze(v, axis=-1)
+    
+jumanji_cnn_actor_dict = {
+    "Game2048-v1": (Game2048CNN, Game2048Actor),
+    "Sokoban-v0": (SokobanCNN, SokobanActor),
+    "Snake-v1": (SnakeCNN, SnakeActor),
+}
+
+class JumanjiActorCriticRNN(nn.Module):
+    env_name: str
+    action_dim: int
+    hidden_size: int = 128
+    double_critic: bool = False
+
+    @nn.compact
+    def __call__(self, hidden, x):
+        obs, dones = x
+        cnn, Actor = jumanji_cnn_actor_dict[self.env_name]
+
+        embedding = cnn(hidden_size=self.hidden_size)(obs)
+        embedding = nn.relu(embedding)
+
+        rnn_in = (embedding, dones)
+        hidden, embedding = ScannedRNN(hidden_size=self.hidden_size)(hidden, rnn_in)
+
+        actor = Actor(self.action_dim, hidden_size=self.hidden_size)
+        pi = actor(embedding, obs)
+
+        critic = Critic(hidden_size=self.hidden_size)
+
+        if self.double_critic:
+            critic = nn.vmap(Critic,
+                             variable_axes={'params': 0},
+                             split_rngs={'params': True},
+                             in_axes=None,
+                             out_axes=2,
+                             axis_size=2)(hidden_size=self.hidden_size)
+
+        v = critic(embedding)
+
+        return hidden, pi, jnp.squeeze(v, axis=-1)
+
+class JumanjiActorCritic(nn.Module):
+    env_name: str
+    action_dim: int
+    hidden_size: int = 128
+    double_critic: bool = False
+
+    @nn.compact
+    def __call__(self, _, x):
+        obs, dones = x
+        cnn, Actor = jumanji_cnn_actor_dict[self.env_name]
+        embedding = cnn(hidden_size=self.hidden_size)(obs)
+        embedding = nn.relu(embedding)
+
+        actor = Actor(self.action_dim, hidden_size=self.hidden_size)
+        pi = actor(embedding, obs)
+
+        critic = Critic(hidden_size=self.hidden_size)
+
+        if self.double_critic:
+            critic = nn.vmap(Critic,
+                             variable_axes={'params': 0},
+                             split_rngs={'params': True},
+                             in_axes=None,
+                             out_axes=2,
+                             axis_size=2)(hidden_size=self.hidden_size)
+        v = critic(embedding)
+        return _, pi, jnp.squeeze(v, axis=-1)

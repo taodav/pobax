@@ -167,7 +167,7 @@ def find_file_in_dir(file_name: str, base_dir: Path) -> Path:
             return path
 
 if __name__ == "__main__":
-    env_name = 'reacher'
+    env_name = 'game2048'
 
     # normal
     study_paths = [
@@ -191,9 +191,13 @@ if __name__ == "__main__":
         # ('Memoryless PPO + width 512', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_width512_ppo_best'), 'yellow')
 
         # reacher
-        ('PPO + RNN', Path(ROOT_DIR, 'results', f'{env_name}_rnn_ppo_best'), 'blue'),
-        ('RNN skip', Path(ROOT_DIR, 'results', f'{env_name}_rnn_approximator_ppo_best'), 'red'),
-        ('Memoryless PPO', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_ppo_best'), 'dark gray'),
+        # ('PPO + RNN', Path(ROOT_DIR, 'results', f'{env_name}_rnn_ppo_best'), 'blue'),
+        # ('RNN skip', Path(ROOT_DIR, 'results', f'{env_name}_rnn_approximator_ppo_best'), 'red'),
+        # ('Memoryless PPO', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_ppo_best'), 'dark gray'),
+
+        # jumanji
+        ('PPO + RNN', Path(ROOT_DIR, 'results', f'game2048_rnn_ppo_best'), 'blue'),
+        ('PPO + Memoryless', Path(ROOT_DIR, 'results', f'game2048_memoryless_ppo_best'), 'dark gray'),
     
     ]
 
@@ -245,7 +249,7 @@ if __name__ == "__main__":
 
     fig, axes = plot_reses(all_reses, individual_runs=False, n_rows=2)
 
-    save_plot_to = Path(ROOT_DIR, 'graphs', f'{plot_name}_reacher.jpg')
+    save_plot_to = Path(ROOT_DIR, 'graphs', f'{plot_name}_jumanji.jpg')
 
     fig.savefig(save_plot_to, bbox_inches='tight')
     print(f"Saved figure to {save_plot_to}")

@@ -58,6 +58,44 @@ masked_gymnax_env_map = {
 
 brax_envs = ['ant', 'walker2d', 'halfcheetah', 'hopper']
 
+jumanji_envs = [
+    'Game2048-v1', 
+    'GraphColoring-v0', 
+    'Minesweeper-v0', 
+    'RubiksCube-v0', 
+    'RubiksCube-partly-scrambled-v0', 
+    'SlidingTilePuzzle-v0', 
+    'Sudoku-v0', 
+    'Sudoku-very-easy-v0', 
+    'BinPack-v1', 
+    'FlatPack-v0', 
+    'JobShop-v0', 
+    'Knapsack-v1', 
+    'Tetris-v0', 
+    'Cleaner-v0', 
+    'Connector-v2', 
+    'CVRP-v1', 
+    'MultiCVRP-v0', 
+    'Maze-v0', 
+    'RobotWarehouse-v0', 
+    'Snake-v1', 
+    'TSP-v1', 
+    'MMST-v0', 
+    'PacMan-v0', 
+    'Sokoban-v0'
+]
+
+# procgen_envs = [
+#     'BigfishEasy-v0', 'BigfishHard-v0', 'BossfightEasy-v0', 'BossfightHard-v0', 'CaveflyerEasy-v0',
+#     'CaveflyerHard-v0', 'CaveflyerMemory-v0', 'ChaserEasy-v0', 'ChaserHard-v0', 'ChaserExtreme-v0', 
+#     'ClimberEasy-v0', 'ClimberHard-v0', 'CoinrunEasy-v0', 'CoinrunHard-v0', 'DodgeballEasy-v0', 
+#     'DodgeballHard-v0', 'DodgeballExtreme-v0', 'DodgeballMemory-v0', 'FruitbotEasy-v0', 'FruitbotHard-v0', 
+#     'HeistEasy-v0', 'HeistHard-v0', 'HeistMemory-v0', 'JumperEasy-v0', 'JumperHard-v0', 'JumperMemory-v0', 
+#     'LeaperEasy-v0', 'LeaperHard-v0', 'LeaperExtreme-v0', 'MazeEasy-v0', 'MazeHard-v0', 'MazeMemory-v0', 
+#     'MinerEasy-v0', 'MinerHard-v0', 'MinerMemory-v0', 'NinjaEasy-v0', 'NinjaHard-v0', 'PlunderEasy-v0',
+#     'PlunderHard-v0', 'StarpilotEasy-v0', 'StarpilotHard-v0', 'StarpilotExtreme-v0'
+# ]
+
 def load_brax_env(env_str: str,
                   gamma: float = 0.99):
     from gymnax import EnvParams
@@ -68,6 +106,21 @@ def load_brax_env(env_str: str,
     env = ClipAction(env)
     return env, env_params
 
+def load_jumanji_env(env_str: str,
+                        gamma: float = 0.99):
+    from gymnax import EnvParams
+    from .wrappers import JumanjiGymnaxWrapper, ClipAction
+    env = JumanjiGymnaxWrapper(env_str)
+    env_params = EnvParams(max_steps_in_episode=env.max_steps_in_episode)
+    return env, env_params
+
+# def load_procgen_env(env_str: str,
+#                         gamma: float = 0.99):
+#     from gymnax import EnvParams
+#     from .wrappers import ProcgenGymnaxWrapper, ClipAction
+#     env = ProcgenGymnaxWrapper(env_str)
+#     env_params = EnvParams(max_steps_in_episode=env.max_steps_in_episode)
+#     return env, env_params
 
 def get_env(env_name: str,
                    rand_key: random.PRNGKey,
@@ -129,6 +182,12 @@ def get_env(env_name: str,
 
     elif env_name in brax_envs:
         env, env_params = load_brax_env(env_name, gamma=gamma)
+    
+    elif env_name in jumanji_envs:
+        env, env_params = load_jumanji_env(env_name, gamma=gamma)
+
+    # elif env_name in procgen_envs:
+    #     env, env_params = load_procgen_env(env_name, gamma=gamma)
 
     elif 'rocksample' in env_name:  # [rocksample, rocksample_15_15]
 
@@ -151,6 +210,7 @@ def get_env(env_name: str,
         env = ActionConcatWrapper(env)
 
     env = LogWrapper(env, gamma=gamma)
+    env.env_name = env_name
 
     if mask_dims is not None:
         env = MaskObservationWrapper(env, mask_dims=mask_dims)

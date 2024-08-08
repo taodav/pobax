@@ -5,17 +5,20 @@ from dataclasses import replace
 from functools import partial
 import inspect
 
-
+import gymnax
+import jumanji
 from flax.training.train_state import TrainState
 from flax.training import orbax_utils
 import jax
 import jax.numpy as jnp
+import jumanji.environments
+import jumanji.specs
 import numpy as np
 import optax
 import orbax.checkpoint
 
 from pobax.config import PPOHyperparams
-from pobax.envs import get_env
+from pobax.envs import get_env, jumanji_envs
 from pobax.envs.wrappers import LogEnvState
 from pobax.models import get_network_fn, ScannedRNN, ContinuousActorCritic, DiscreteActorCritic
 from pobax.utils.file_system import get_results_path, numpyify_and_save
@@ -38,7 +41,11 @@ def env_step(runner_state, unused, network, env, env_params):
     rng, _rng = jax.random.split(rng)
 
     # SELECT ACTION
-    ac_in = (last_obs[np.newaxis, :], last_done[np.newaxis, :])
+    if isinstance(last_obs, jnp.ndarray):
+        ac_in = (last_obs[np.newaxis, :], last_done[np.newaxis, :])
+    else:
+        last_observation = {key: val[np.newaxis, :] for key, val in last_obs.items()}
+        ac_in = (last_observation, last_done[np.newaxis, :])
     hstate, pi, value = network.apply(train_state.params, hstate, ac_in)
     action = pi.sample(seed=_rng)
     log_prob = pi.log_prob(action)
@@ -78,7 +85,7 @@ def make_train(config: dict, rand_key: jax.random.PRNGKey):
                                      action_concat=config["ACTION_CONCAT"],
                                      num_stacks=config["NUM_STACK"],
                                      num_observations=config["NUM_OBSERVATION"],)
-
+    
     if hasattr(env, 'gamma'):
         config['GAMMA'] = env.gamma
 
@@ -96,6 +103,11 @@ def make_train(config: dict, rand_key: jax.random.PRNGKey):
                             horizon=horizon,
                          hidden_size=config['HIDDEN_SIZE'],
                          depth=config['DEPTH'])
+    elif env.env_name in jumanji_envs:
+        print(f"jumanji env {env.env_name}")
+        network = network_fn(env.env_name, 
+                         action_size,
+                         hidden_size=config['HIDDEN_SIZE'])
     else:
         print(f"not using depth {config['DEPTH']}")
         network = network_fn(action_size,
@@ -123,12 +135,28 @@ def make_train(config: dict, rand_key: jax.random.PRNGKey):
 
         # INIT NETWORK
         rng, _rng = jax.random.split(rng)
-        init_x = (
-            jnp.zeros(
-                (1, config["NUM_ENVS"], *env.observation_space(env_params).shape)
-            ),
-            jnp.zeros((1, config["NUM_ENVS"])),
-        )
+        observation_space = env.observation_space(env_params)
+        def initialize_observation_space(observation_space, num_envs):
+            """
+            Recursively initializes observation space where each space can potentially be another Dict.
+
+            Args:
+            observation_space (Dict or Space): The observation space which might be nested.
+            num_envs (int): The number of environments to initialize states for.
+
+            Returns:
+            dict: A dictionary with the same structure as observation_space, where each leaf is replaced by a zero-initialized array.
+            """
+            if isinstance(observation_space, gymnax.environments.spaces.Dict):
+                # If the observation space is a Dict, recursively initialize each sub-space
+                return {
+                    key: initialize_observation_space(subspace, num_envs)
+                    for key, subspace in observation_space.spaces.items()
+                }
+            else:
+                # Base case: observation_space is not a Dict, so initialize an array based on its shape
+                return jnp.zeros((1, num_envs, *observation_space.shape))
+        init_x = (initialize_observation_space(observation_space, config["NUM_ENVS"]), jnp.zeros((1, config["NUM_ENVS"])))
         init_hstate = ScannedRNN.initialize_carry(config["NUM_ENVS"], config['HIDDEN_SIZE'])
         network_params = network.init(_rng, init_hstate, init_x)
         if config["ANNEAL_LR"]:
@@ -191,7 +219,12 @@ def make_train(config: dict, rand_key: jax.random.PRNGKey):
 
             # CALCULATE ADVANTAGE
             train_state, env_state, last_obs, last_done, hstate, rng = runner_state
-            ac_in = (last_obs[np.newaxis, :], last_done[np.newaxis, :])
+            if isinstance(last_obs, jnp.ndarray):
+                ac_in = (last_obs[np.newaxis, :], last_done[np.newaxis, :])
+            else:
+                last_observation = {key: val[np.newaxis, :] for key, val in last_obs.items()}
+                ac_in = (last_observation, last_done[np.newaxis, :])
+            # ac_in = (last_obs[np.newaxis, :], last_done[np.newaxis, :])
             _, _, last_val = network.apply(train_state.params, hstate, ac_in)
             last_val = last_val.squeeze(0)
             def _calculate_gae(traj_batch, last_val, last_done, gae_lambda):
@@ -376,7 +409,6 @@ def make_train(config: dict, rand_key: jax.random.PRNGKey):
 
         reset_rng = jax.random.split(_rng, config["NUM_EVAL_ENVS"])
         eval_obsv, eval_env_state = env.reset(reset_rng, env_params)
-
         eval_init_hstate = ScannedRNN.initialize_carry(config["NUM_EVAL_ENVS"], config['HIDDEN_SIZE'])
 
         eval_runner_state = (
@@ -431,7 +463,6 @@ if __name__ == "__main__":
         "ANNEAL_LR": True,
         "DEBUG": args.debug,
     }
-    print(config["NUM_STEPS"])
 
     rng = jax.random.PRNGKey(args.seed)
     make_train_rng, rng = jax.random.split(rng)
