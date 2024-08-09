@@ -92,13 +92,16 @@ def make_train(config: dict, rand_key: jax.random.PRNGKey):
     assert hasattr(env_params, 'max_steps_in_episode')
 
     memoryless = config["MEMORYLESS"]
-    approximator = config["APPROXIMATOR"]
+    if memoryless:
+        approximator = config["APPROXIMATOR"]
+    double_critic = config["DOUBLE_CRITIC"]
     horizon = config["HORIZON"]
 
     network_fn, action_size = get_network_fn(env, env_params, memoryless=memoryless)
     if network_fn is ContinuousActorCritic or network_fn is DiscreteActorCritic:
         print(f"using depth {config['DEPTH']}, approximator={approximator}, horizon={horizon}")
         network = network_fn(action_size, 
+                            double_critic=double_critic,
                             approximator=approximator,
                             horizon=horizon,
                          hidden_size=config['HIDDEN_SIZE'],
@@ -107,10 +110,12 @@ def make_train(config: dict, rand_key: jax.random.PRNGKey):
         print(f"jumanji env {env.env_name}")
         network = network_fn(env.env_name, 
                          action_size,
+                         double_critic=double_critic,
                          hidden_size=config['HIDDEN_SIZE'])
     else:
-        print(f"not using depth {config['DEPTH']}")
+        print(f"not ussing depth {config['DEPTH']}")
         network = network_fn(action_size,
+                         double_critic=double_critic,
                          hidden_size=config['HIDDEN_SIZE'])
 
     steps_filter = partial(filter_period_first_dim, n=config['STEPS_LOG_FREQ'])
@@ -123,7 +128,7 @@ def make_train(config: dict, rand_key: jax.random.PRNGKey):
 
     _env_step = partial(env_step, network=network, env=env, env_params=env_params)
 
-    def train(vf_coeff, lambda0, lr, rng):
+    def train(vf_coeff, ld_weight, alpha, lambda1, lambda0, lr, rng):
         def linear_schedule(count):
             frac = (
                     1.0
@@ -240,6 +245,12 @@ def make_train(config: dict, rand_key: jax.random.PRNGKey):
                 return advantages, advantages + traj_batch.value
 
             gae_lambda = jnp.array(lambda0)
+            if double_critic:
+                # last_val is index 1 here b/c we squeezed earlier.
+                _calculate_gae = jax.vmap(_calculate_gae,
+                                          in_axes=[transition_axes_map, 1, None, 0],
+                                          out_axes=2)
+                gae_lambda = jnp.array([lambda0, lambda1])
             advantages, targets = _calculate_gae(traj_batch, last_val, last_done, gae_lambda)
 
             # UPDATE NETWORK
@@ -264,8 +275,17 @@ def make_train(config: dict, rand_key: jax.random.PRNGKey):
                             jnp.maximum(value_losses, value_losses_clipped).mean()
                         )
 
+                        # Lambda discrepancy loss
+                        if double_critic:
+                            value_loss = ld_weight * (jnp.square(value[..., 0] - value[..., 1])).mean() + \
+                                         (1 - ld_weight) * value_loss
                         # CALCULATE ACTOR LOSS
                         ratio = jnp.exp(log_prob - traj_batch.log_prob)
+                        
+                        # which advantage do we use to update our policy?
+                        if double_critic:
+                            gae = (alpha * gae[..., 0] +
+                                   (1 - alpha) * gae[..., 1])
 
                         gae = (gae - gae.mean()) / (gae.std() + 1e-8)
                         loss_actor1 = ratio * gae
@@ -448,6 +468,7 @@ if __name__ == "__main__":
         "NUM_STACK": args.num_stack,
         "NUM_OBSERVATION": args.num_observation,
         "MEMORYLESS": args.memoryless,
+        "DOUBLE_CRITIC": args.double_critic,
         "APPROXIMATOR": args.approximator,
         "HORIZON": args.horizon,
         "ACTION_CONCAT": args.action_concat,
