@@ -202,6 +202,12 @@ class PerfectMemoryWrapper(GymnaxWrapper):
         return obs, next_state, reward, done, info
 
 
+class StateWrapper(GymnaxWrapper):
+
+    def observation_space(self, params: EnvParams):
+        return gymnax.environments.spaces.Box(0, 1, (11,))
+
+
 class PocMan(PacMan, Environment):
     """
     Partially observable PacMan.

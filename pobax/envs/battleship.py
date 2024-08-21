@@ -98,6 +98,41 @@ class PerfectMemoryWrapper(GymnaxWrapper):
         # obs = obs.flatten()
         return obs, state, reward, done, info
 
+
+class StateWrapper(GymnaxWrapper):
+    def observation_space(self, params: EnvParams):
+        """
+        Obs space is whether or not you hit a ship +
+        action_mask for illegal actions.
+        """
+        # return gymnax.environments.spaces.Box(-1, 1, (self._env.rows * self._env.cols,))
+        return gymnax.environments.spaces.Box(-1, 1, (self._env.rows, self._env.cols, 2))
+
+    @partial(jax.jit, static_argnums=(0,))
+    def reset(
+            self, key: chex.PRNGKey, params: Optional[environment.EnvParams] = None
+    ) -> Tuple[chex.Array, environment.EnvState]:
+        _, env_state = self._env.reset(key, params)
+        hits_misses_obs = (env_state.hits_misses == 2).astype(int) + (env_state.hits_misses == 1) * (-1)
+
+        return jnp.stack((hits_misses_obs, env_state.board)), env_state
+
+    @partial(jax.jit, static_argnums=(0,))
+    def step(
+            self,
+            key: chex.PRNGKey,
+            state: BattleShipState,
+            action: Union[int, float, jnp.ndarray],
+            params: Optional[environment.EnvParams] = None,
+    ) -> Tuple[chex.Array, environment.EnvState, float, bool, dict]:
+        _, state, reward, done, info = self._env.step(
+            key, state, action, params
+        )
+        hits_misses_obs = (state.hits_misses == 2).astype(int) + (state.hits_misses == 1) * (-1)
+        obs = jnp.stack((hits_misses_obs, state.board))
+        return obs, state, reward, done, info
+
+
 class Battleship(Environment):
     def __init__(self,
                  rows: int = 10,

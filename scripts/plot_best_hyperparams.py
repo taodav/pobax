@@ -174,9 +174,10 @@ if __name__ == "__main__":
     study_paths = [
         # ('$\lambda$-discrepancy + Quantile PPO', Path(ROOT_DIR, 'results', f'{env_name}_quantile_LD_ppo'), 'green'),
         # ('$\lambda$-discrepancy + PPO', Path(ROOT_DIR, 'results', f'{env_name}_LD_ppo'), 'dark gray'),
-        ('Perfect Memory PPO (NN)', Path(ROOT_DIR, 'results', f'{env_name}_perfect_mem_ppo'), 'purple'),
+        ('Perfect Memory PPO (RNN)', Path(ROOT_DIR, 'results', f'{env_name}_perfect_mem_rnn_ppo'), 'purple'),
+        ('Perfect Memory PPO (NN)', Path(ROOT_DIR, 'results', f'{env_name}_perfect_mem_ppo'), 'pink'),
         ('PPO (RNN)', Path(ROOT_DIR, 'results', f'{env_name}_ppo'), 'blue'),
-        # ('Memoryless PPO', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_ppo'), 'dark gray'),
+        ('PPO (NN)', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_ppo'), 'dark gray'),
     ]
 
     # best
