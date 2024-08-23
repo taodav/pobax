@@ -1,3 +1,5 @@
+# adapted from https://github.com/ShaneFlandermeyer/tdmpc2-jax/blob/main/tdmpc2_jax/tdmpc2.py
+
 from __future__ import annotations
 from functools import partial
 from flax import struct
@@ -399,7 +401,7 @@ class TDMPC2(struct.PyTreeNode):
 
     @jax.jit
     def td_target(self, next_z: jax.Array, reward: jax.Array, terminal: jax.Array,
-                  key: PRNGKeyArray) -> jax.Array:
+                  key: chex.PRNGKey) -> jax.Array:
         action_key, ensemble_key, Q_key = jax.random.split(key, 3)
         next_action = self.model.sample_actions(
             next_z, self.model.policy_model.params, key=action_key)[0]
