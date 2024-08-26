@@ -17,10 +17,9 @@ from flax.metrics import tensorboard
 from flax.training.train_state import TrainState
 from pobax.agents.tdmpc2 import TDMPC2
 from pobax.envs import make_env
-from pobax.models.world_model import WorldModel
+from pobax.models.network import TDMPC2ImageCNN
+from pobax.models.world_model import WorldModel, vec_encoder
 from pobax.utils.buffer import SequentialReplayBuffer
-from pobax.utils.math import simnorm, mish
-from pobax.models.network import NormedLinear
 
 
 gpus = tf.config.experimental.list_physical_devices('GPU')
@@ -59,14 +58,10 @@ def train(cfg: dict):
     ##############################
     dtype = jnp.dtype(model_config.dtype)
     rng, model_key, encoder_key = jax.random.split(rng, 3)
-    encoder_module = nn.Sequential([
-                                       NormedLinear(encoder_config.encoder_dim, activation=mish, dtype=dtype)
-                                       for _ in range(encoder_config.num_encoder_layers-1)] + [
-                                       NormedLinear(
-                                           model_config.latent_dim,
-                                           activation=partial(simnorm, simplex_dim=model_config.simnorm_dim),
-                                           dtype=dtype)
-                                   ])
+
+    encoder_module = vec_encoder(encoder_config, model_config, dtype)
+    if 'dmc' in env_config and 'rgb' in env_config.dmc['obs_type']:
+        encoder_module = TDMPC2ImageCNN(simnorm_dim=model_config.simnorm_dim)
 
     if encoder_config.tabulate:
         print("Encoder")
@@ -77,8 +72,8 @@ def train(cfg: dict):
     ##############################
     # Replay buffer setup
     ##############################
-    # dummy_obs, _ = env.reset()
-    dummy_obs = env.reset()
+    dummy_obs, _ = env.reset()
+    # dummy_obs = env.reset()
     dummy_action = env.action_space.sample()
     dummy_next_obs, dummy_reward, dummy_term, dummy_trunc, _ = \
         env.step(dummy_action)

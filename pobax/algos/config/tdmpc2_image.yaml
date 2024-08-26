@@ -14,9 +14,9 @@ env:
   env_id: cheetah-run_front
   num_envs: 4
   utd_ratio: 0.5
-  asynchronous: True
+  asynchronous: False
 
-  dmc: { obs_type: rgb }
+  dmc: { obs_type: single_rgb }
 
 encoder:
   encoder_dim: 256

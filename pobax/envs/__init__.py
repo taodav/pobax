@@ -194,5 +194,6 @@ def make_env(env_config, seed):
     elif env_config.backend == "dmc":
         _env = make_dmc_env(env_config.env_id, seed, env_config.dmc.obs_type)
         env = gym.wrappers.RecordEpisodeStatistics(_env)
+        # env = _env
         return env
     raise ValueError("Environment not supported:", env_config)

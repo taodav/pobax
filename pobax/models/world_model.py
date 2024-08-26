@@ -16,6 +16,17 @@ from pobax.models.network import NormedLinear
 
 from pobax.utils.math import mish, simnorm
 
+def vec_encoder(encoder_config, model_config, dtype):
+    encoder_module = nn.Sequential([
+                                       NormedLinear(encoder_config.encoder_dim, activation=mish, dtype=dtype)
+                                       for _ in range(encoder_config.num_encoder_layers-1)] + [
+                                       NormedLinear(
+                                           model_config.latent_dim,
+                                           activation=partial(simnorm, simplex_dim=model_config.simnorm_dim),
+                                           dtype=dtype)
+                                   ])
+    return encoder_module
+
 
 class WorldModel(struct.PyTreeNode):
     # Models

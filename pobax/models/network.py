@@ -7,6 +7,8 @@ import jax.numpy as jnp
 from jax._src.nn.initializers import orthogonal, constant
 import numpy as np
 
+from pobax.utils.math import simnorm
+
 
 class ScannedRNN(nn.Module):
     hidden_size: int
@@ -181,3 +183,41 @@ class Ensemble(nn.Module):
                            out_axes=0,
                            axis_size=self.num)
         return ensemble()(*args, **kwargs)
+
+
+class TDMPC2ImageCNN(nn.Module):
+    simnorm_dim: int = 8
+
+    @nn.compact
+    def __call__(self, x):
+        num_features = x.shape[-3]
+
+        # preprocessing
+        # TODO(?): random augmentations to images
+        # https://github.com/nicklashansen/tdmpc2/blob/main/tdmpc2/common/layers.py#L27
+
+        # normalizing pixels
+        x = x / 255 - 0.5
+
+        # 64x64 2 dimensions
+        if x.shape[-2] == x.shape[-1] and x.shape[-2] == 64:
+            out1 = nn.Conv(features=num_features, kernel_size=7, strides=2, padding=0)(x)
+            out1 = nn.relu(out1)
+            out2 = nn.Conv(features=num_features, kernel_size=5, strides=2, padding=0)(out1)
+            out2 = nn.relu(out2)
+            out3 = nn.Conv(features=num_features, kernel_size=3, strides=2, padding=0)(out2)
+            out3 = nn.relu(out3)
+            conv_out = nn.Conv(features=num_features, kernel_size=3, strides=1, padding=0)(out3)
+        elif x.shape[-2] == x.shape[-1] and x.shape[-2] == 32:
+            out1 = nn.Conv(features=num_features, kernel_size=4, strides=2, padding=0)(x)
+            out1 = nn.relu(out1)
+            out2 = nn.Conv(features=num_features, kernel_size=3, strides=2, padding=0)(out1)
+            out2 = nn.relu(out2)
+            out3 = nn.Conv(features=num_features, kernel_size=3, strides=1, padding=0)(out2)
+            out3 = nn.relu(out3)
+            conv_out = nn.Conv(features=num_features, kernel_size=2, strides=1, padding=0)(out3)
+
+        # Convolutions "flatten" the last num_dims dimensions.
+        flat_out = conv_out.reshape((*conv_out.shape[:-3], -1))  # Flatten
+        final_out = simnorm(flat_out, simplex_dim=self.simnorm_dim)
+        return final_out

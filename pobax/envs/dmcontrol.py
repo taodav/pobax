@@ -17,7 +17,7 @@ class PixelWrapper(gym.Wrapper):
     Wrapper for pixel observations. Compatible with DMControl environments.
     """
 
-    def __init__(self, env, num_frames=3, render_size=64):
+    def __init__(self, env, num_frames=3, render_size=32):
         super().__init__(env)
         self.env = env
         self.observation_space = gym.spaces.Box(
@@ -34,14 +34,14 @@ class PixelWrapper(gym.Wrapper):
         return np.concatenate(self._frames)
 
     def reset(self, **kwargs):
-        self.env.reset()
+        _, info = self.env.reset()
         for _ in range(self._frames.maxlen):
             obs = self._get_obs()
-        return obs
+        return obs, info
 
     def step(self, action):
-        _, reward, done, info = self.env.step(action)
-        return self._get_obs(), reward, done, info
+        _, reward, done, trunc, info = self.env.step(action)
+        return self._get_obs(), reward, done, trunc, info
 
 
 class ExtendedTimeStep(NamedTuple):
@@ -225,7 +225,7 @@ def make_dmc_env(task, seed, obs_type):
     domain = dict(cup='ball_in_cup', pointmass='point_mass').get(domain, domain)
     if (domain, task) not in suite.ALL_TASKS:
         raise ValueError('Unknown task:', task)
-    assert obs_type in {'state', 'rgb'}, 'This task only supports state and rgb observations.'
+    assert obs_type in {'state', 'rgb', 'single_rgb'}, 'This task only supports state and rgb observations.'
     env = suite.load(domain,
                      task,
                      task_kwargs={'random': seed},
@@ -237,4 +237,6 @@ def make_dmc_env(task, seed, obs_type):
     env = TimeStepToGymWrapper(env, domain, task)
     if obs_type == 'rgb':
         env = PixelWrapper(env)
+    elif obs_type == 'single_rgb':
+        env = PixelWrapper(env, num_frames=1)
     return env

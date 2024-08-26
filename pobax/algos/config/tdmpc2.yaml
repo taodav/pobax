@@ -11,7 +11,7 @@ log_interval_steps: 10000
 
 env:
   backend: dmc
-  env_id: HalfCheetah-v4
+  env_id: cheetah-run_front
   num_envs: 4
   utd_ratio: 0.5
   asynchronous: True
