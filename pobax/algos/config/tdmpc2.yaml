@@ -10,7 +10,7 @@ save_interval_steps: 100000
 log_interval_steps: 10000
 
 env:
-  backend: gymnasium
+  backend: dmc
   env_id: HalfCheetah-v4
   num_envs: 4
   utd_ratio: 0.5

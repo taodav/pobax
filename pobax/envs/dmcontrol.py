@@ -33,7 +33,7 @@ class PixelWrapper(gym.Wrapper):
         self._frames.append(frame)
         return np.concatenate(self._frames)
 
-    def reset(self):
+    def reset(self, **kwargs):
         self.env.reset()
         for _ in range(self._frames.maxlen):
             obs = self._get_obs()

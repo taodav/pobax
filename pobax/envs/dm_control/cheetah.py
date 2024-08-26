@@ -6,7 +6,7 @@ from dm_control.suite import cheetah
 from dm_control.utils import rewards
 from dm_control.utils import io as resources
 
-_TASKS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'tasks')
+_TASKS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'dm_control')
 
 _CHEETAH_JUMP_HEIGHT = 1.2
 _CHEETAH_LIE_HEIGHT = 0.25
