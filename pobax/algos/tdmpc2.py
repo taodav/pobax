@@ -77,7 +77,8 @@ def train(cfg: dict):
     ##############################
     # Replay buffer setup
     ##############################
-    dummy_obs, _ = env.reset()
+    # dummy_obs, _ = env.reset()
+    dummy_obs = env.reset()
     dummy_action = env.action_space.sample()
     dummy_next_obs, dummy_reward, dummy_term, dummy_trunc, _ = \
         env.step(dummy_action)
