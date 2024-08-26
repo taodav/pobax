@@ -16,7 +16,7 @@ env:
   utd_ratio: 0.5
   asynchronous: True
 
-  dmc: { obs_type: state }
+  dmc: { obs_type: rgb }
 
 encoder:
   encoder_dim: 256
