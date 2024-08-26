@@ -1,416 +1,260 @@
-# adapted from https://github.com/ShaneFlandermeyer/tdmpc2-jax/blob/main/tdmpc2_jax/tdmpc2.py
-
-from __future__ import annotations
+import os
+from collections import defaultdict
 from functools import partial
-from flax import struct
+
+import flax.linen as nn
+import gymnasium as gym
+import hydra
 import jax
-import chex
-import optax
-
-from tdmpc2_jax.world_model import WorldModel
 import jax.numpy as jnp
-from tdmpc2_jax.common.loss import soft_crossentropy
 import numpy as np
-from typing import Any, Dict, Optional, Tuple
-from tdmpc2_jax.common.scale import percentile_normalization
-from tdmpc2_jax.common.util import sg
+import optax
+import orbax.checkpoint as ocp
+# Tensorboard: Prevent tf from allocating full GPU memory
+import tensorflow as tf
+import tqdm
+from flax.metrics import tensorboard
+from flax.training.train_state import TrainState
+from pobax.agents.tdmpc2 import TDMPC2
+from pobax.envs import make_env
+from pobax.models.world_model import WorldModel
+from pobax.utils.buffer import SequentialReplayBuffer
+from pobax.utils.math import simnorm, mish
+from pobax.models.network import NormedLinear
 
 
-class TDMPC2(struct.PyTreeNode):
-    model: WorldModel
-    scale: jax.Array
+gpus = tf.config.experimental.list_physical_devices('GPU')
+for gpu in gpus:
+    tf.config.experimental.set_memory_growth(gpu, True)
 
-    # Planning
-    mpc: bool
-    horizon: int = struct.field(pytree_node=False)
-    mppi_iterations: int = struct.field(pytree_node=False)
-    population_size: int = struct.field(pytree_node=False)
-    policy_prior_samples: int = struct.field(pytree_node=False)
-    num_elites: int = struct.field(pytree_node=False)
-    min_plan_std: float
-    max_plan_std: float
-    temperature: float
 
-    # Optimization
-    batch_size: int = struct.field(pytree_node=False)
-    discount: float
-    rho: float
-    consistency_coef: float
-    reward_coef: float
-    value_coef: float
-    continue_coef: float
-    entropy_coef: float
-    tau: float
+@hydra.main(config_name='tdmpc2', config_path='./config', version_base=None)
+def train(cfg: dict):
+    env_config = cfg['env']
+    encoder_config = cfg['encoder']
+    model_config = cfg['world_model']
+    tdmpc_config = cfg['tdmpc2']
 
-    @classmethod
-    def create(cls,
-               world_model: WorldModel,
-               # Planning
-               mpc: bool,
-               horizon: int,
-               mppi_iterations: int,
-               population_size: int,
-               policy_prior_samples: int,
-               num_elites: int,
-               min_plan_std: float,
-               max_plan_std: float,
-               temperature: float,
-               # Optimization
-               discount: float,
-               batch_size: int,
-               rho: float,
-               consistency_coef: float,
-               reward_coef: float,
-               value_coef: float,
-               continue_coef: float,
-               entropy_coef: float,
-               tau: float
-               ) -> TDMPC2:
+    ##############################
+    # Logger setup
+    ##############################
+    output_dir = hydra.core.hydra_config.HydraConfig.get().runtime.output_dir
+    writer = tensorboard.SummaryWriter(os.path.join(output_dir, 'tensorboard'))
+    writer.hparams(cfg)
 
-        return cls(model=world_model,
-                   mpc=mpc,
-                   horizon=horizon,
-                   mppi_iterations=mppi_iterations,
-                   population_size=population_size,
-                   policy_prior_samples=policy_prior_samples,
-                   num_elites=num_elites,
-                   min_plan_std=min_plan_std,
-                   max_plan_std=max_plan_std,
-                   temperature=temperature,
-                   discount=discount,
-                   batch_size=batch_size,
-                   rho=rho,
-                   consistency_coef=consistency_coef,
-                   reward_coef=reward_coef,
-                   value_coef=value_coef,
-                   continue_coef=continue_coef,
-                   entropy_coef=entropy_coef,
-                   tau=tau,
-                   scale=jnp.array([1.0]),
-                   )
+    ##############################
+    # Environment setup
+    ##############################
+    vector_env_cls = gym.vector.AsyncVectorEnv if env_config.asynchronous else gym.vector.SyncVectorEnv
+    env = vector_env_cls(
+        [
+            partial(make_env, env_config, seed)
+            for seed in range(cfg.seed, cfg.seed+env_config.num_envs)
+        ])
+    np.random.seed(cfg.seed)
+    rng = jax.random.PRNGKey(cfg.seed)
 
-    def act(self,
-            obs: np.ndarray,
-            prev_plan: Optional[Tuple[jax.Array]] = None,
-            train: bool = True,
-            *,
-            key: chex.PRNGKey):
-        z = self.model.encode(obs, self.model.encoder.params)
+    ##############################
+    # Agent setup
+    ##############################
+    dtype = jnp.dtype(model_config.dtype)
+    rng, model_key, encoder_key = jax.random.split(rng, 3)
+    encoder_module = nn.Sequential([
+                                       NormedLinear(encoder_config.encoder_dim, activation=mish, dtype=dtype)
+                                       for _ in range(encoder_config.num_encoder_layers-1)] + [
+                                       NormedLinear(
+                                           model_config.latent_dim,
+                                           activation=partial(simnorm, simplex_dim=model_config.simnorm_dim),
+                                           dtype=dtype)
+                                   ])
 
-        if self.mpc:
+    if encoder_config.tabulate:
+        print("Encoder")
+        print("--------------")
+        print(encoder_module.tabulate(jax.random.key(0),
+                                      env.observation_space.sample(), compute_flops=True))
 
-            num_envs = z.shape[0] if z.ndim > 1 else 1
-            if prev_plan is None:
+    ##############################
+    # Replay buffer setup
+    ##############################
+    dummy_obs, _ = env.reset()
+    dummy_action = env.action_space.sample()
+    dummy_next_obs, dummy_reward, dummy_term, dummy_trunc, _ = \
+        env.step(dummy_action)
+    replay_buffer = SequentialReplayBuffer(
+        capacity=cfg.max_steps//env_config.num_envs,
+        num_envs=env_config.num_envs,
+        seed=cfg.seed,
+        dummy_input=dict(
+            observation=dummy_obs,
+            action=dummy_action,
+            reward=dummy_reward,
+            next_observation=dummy_next_obs,
+            terminated=dummy_term,
+            truncated=dummy_trunc)
+    )
+
+    encoder = TrainState.create(
+        apply_fn=encoder_module.apply,
+        params=encoder_module.init(encoder_key, dummy_obs)['params'],
+        tx=optax.chain(
+            optax.zero_nans(),
+            optax.clip_by_global_norm(model_config.max_grad_norm),
+            optax.adam(encoder_config.learning_rate),
+        ))
+
+    model = WorldModel.create(
+        action_dim=np.prod(env.get_wrapper_attr('single_action_space').shape),
+        encoder=encoder,
+        **model_config,
+        key=model_key)
+    if model.action_dim >= 20:
+        tdmpc_config.mppi_iterations += 2
+
+    agent = TDMPC2.create(world_model=model, **tdmpc_config)
+    global_step = 0
+
+    options = ocp.CheckpointManagerOptions(
+        max_to_keep=1, save_interval_steps=cfg['save_interval_steps'])
+    checkpoint_path = os.path.join(output_dir, 'checkpoint')
+    with ocp.CheckpointManager(
+            checkpoint_path, options=options, item_names=(
+                    'agent', 'global_step', 'buffer_state')
+    ) as mngr:
+        if mngr.latest_step() is not None:
+            print('Checkpoint folder found, restoring from', mngr.latest_step())
+            abstract_buffer_state = jax.tree.map(
+                ocp.utils.to_shape_dtype_struct, replay_buffer.get_state()
+            )
+            restored = mngr.restore(mngr.latest_step(),
+                                    args=ocp.args.Composite(
+                                        agent=ocp.args.StandardRestore(agent),
+                                        global_step=ocp.args.JsonRestore(),
+                                        buffer_state=ocp.args.StandardRestore(abstract_buffer_state),
+                                    )
+                                    )
+            agent, global_step = restored.agent, restored.global_step
+            replay_buffer.restore(restored.buffer_state)
+        else:
+            print('No checkpoint folder found, starting from scratch')
+            mngr.save(
+                global_step,
+                args=ocp.args.Composite(
+                    agent=ocp.args.StandardSave(agent),
+                    global_step=ocp.args.JsonSave(global_step),
+                    buffer_state=ocp.args.StandardSave(replay_buffer.get_state()),
+                ),
+            )
+            mngr.wait_until_finished()
+
+        ##############################
+        # Training loop
+        ##############################
+        ep_info = {}
+        ep_count = np.zeros(env_config.num_envs, dtype=int)
+        prev_logged_step = global_step
+        prev_plan = (
+            jnp.zeros((env_config.num_envs, agent.horizon, agent.model.action_dim)),
+            jnp.full((env_config.num_envs, agent.horizon,
+                      agent.model.action_dim), agent.max_plan_std)
+        )
+        observation, _ = env.reset(seed=cfg.seed)
+
+        T = 500
+        seed_steps = int(max(5*T, 1000) * env_config.num_envs *
+                         env_config.utd_ratio)
+        pbar = tqdm.tqdm(initial=global_step, total=cfg.max_steps)
+        for global_step in range(global_step, cfg.max_steps, env_config.num_envs):
+            if global_step <= seed_steps:
+                action = env.action_space.sample()
+            else:
+                rng, action_key = jax.random.split(rng)
+                prev_plan = (prev_plan[0],
+                             jnp.full_like(prev_plan[1], agent.max_plan_std))
+                action, prev_plan = agent.act(
+                    observation, prev_plan=prev_plan, train=True, key=action_key)
+
+            next_observation, reward, terminated, truncated, info = env.step(action)
+
+            # Get real final observation and store transition
+            real_next_observation = next_observation.copy()
+            for ienv, trunc in enumerate(truncated):
+                if trunc:
+                    real_next_observation[ienv] = info['final_observation'][ienv]
+            replay_buffer.insert(dict(
+                observation=observation,
+                action=action,
+                reward=reward,
+                next_observation=real_next_observation,
+                terminated=terminated,
+                truncated=truncated))
+            observation = next_observation
+
+            # Handle terminations/truncations
+            done = np.logical_or(terminated, truncated)
+            if np.any(done):
                 prev_plan = (
-                    jnp.zeros((num_envs, self.horizon, self.model.action_dim)),
-                    jnp.full((num_envs, self.horizon, self.model.action_dim),
-                             self.max_plan_std)
+                    prev_plan[0].at[done].set(0),
+                    prev_plan[1].at[done].set(agent.max_plan_std)
+                )
+            if "final_info" in info:
+                for ienv, final_info in enumerate(info["final_info"]):
+                    if final_info is None:
+                        continue
+                    print(
+                        f"Episode {ep_count[ienv]}: {final_info['episode']['r'][0]:.2f}, {final_info['episode']['l'][0]}")
+                    writer.scalar(f'episode/return',
+                                  final_info['episode']['r'], global_step + ienv)
+                    writer.scalar(f'episode/length',
+                                  final_info['episode']['l'], global_step + ienv)
+                    ep_count[ienv] += 1
+
+            if global_step >= seed_steps:
+                if global_step == seed_steps:
+                    print('Pre-training on seed data...')
+                    num_updates = seed_steps
+                else:
+                    num_updates = max(1, int(env_config.num_envs * env_config.utd_ratio))
+
+                rng, *update_keys = jax.random.split(rng, num_updates+1)
+                log_this_step = global_step >= prev_logged_step + \
+                                cfg['log_interval_steps']
+                if log_this_step:
+                    all_train_info = defaultdict(list)
+                    prev_logged_step = global_step
+
+                for iupdate in range(num_updates):
+                    batch = replay_buffer.sample(agent.batch_size, agent.horizon)
+                    agent, train_info = agent.update(
+                        observations=batch['observation'],
+                        actions=batch['action'],
+                        rewards=batch['reward'],
+                        next_observations=batch['next_observation'],
+                        terminated=batch['terminated'],
+                        truncated=batch['truncated'],
+                        key=update_keys[iupdate])
+
+                    if log_this_step:
+                        for k, v in train_info.items():
+                            all_train_info[k].append(np.array(v))
+
+                if log_this_step:
+                    for k, v in all_train_info.items():
+                        writer.scalar(f'train/{k}_mean', np.mean(v), global_step)
+                        writer.scalar(f'train/{k}_std', np.std(v), global_step)
+
+                mngr.save(
+                    global_step,
+                    args=ocp.args.Composite(
+                        agent=ocp.args.StandardSave(agent),
+                        global_step=ocp.args.JsonSave(global_step),
+                        buffer_state=ocp.args.StandardSave(replay_buffer.get_state()),
+                    ),
                 )
 
-            action, plan = self.plan(
-                jnp.atleast_2d(z), prev_plan, train, jax.random.split(key, num_envs))
-            action = action.squeeze(0) if z.ndim == 1 else action
+            pbar.update(env_config.num_envs)
+        pbar.close()
 
-        else:
-            action = self.model.sample_actions(
-                z, self.model.policy_model.params, key=key)[0]
-            plan = None
 
-        return np.array(action), plan
-
-    @jax.jit
-    @partial(jax.vmap, in_axes=(None, 0, 0, None, 0), out_axes=0)
-    def plan(self,
-             z: jax.Array,
-             prev_plan: Tuple[jax.Array, jax.Array],
-             train: bool,
-             key: chex.PRNGKey,
-             ) -> Tuple[jax.Array, jax.Array]:
-        """
-        Select next action via MPPI planner
-
-        Parameters
-        ----------
-        z : jax.Array
-            Enncoded environment observation
-        key : PRNGKey
-            Jax PRNGKey
-        prev_mean : jax.Array, optional
-            Mean from previous planning interval. If present, MPPI is given a warm start by time-shifting this value by 1 step. If None, the MPPI mean is set to zero, by default None
-        train : bool, optional
-            If True, inject noise into the final selected action, by default False
-
-        Returns
-        -------
-        Tuple[jax.Array, jax.Array]
-            - Action output from planning
-            - Final mean value (for use in warm start)
-        """
-        z = jnp.atleast_2d(z)
-        # Sample trajectories from policy prior
-        key, *prior_keys = jax.random.split(key, self.horizon + 1)
-        policy_actions = jnp.zeros(
-            (self.horizon, self.policy_prior_samples, self.model.action_dim))
-        _z = z.repeat(self.policy_prior_samples, axis=0)
-        for t in range(self.horizon-1):
-            policy_actions = policy_actions.at[t].set(
-                self.model.sample_actions(_z, self.model.policy_model.params, key=prior_keys[t])[0])
-            _z = self.model.next(
-                _z, policy_actions[t], self.model.dynamics_model.params)
-        policy_actions = policy_actions.at[-1].set(
-            self.model.sample_actions(_z, self.model.policy_model.params, key=prior_keys[-1])[0])
-
-        # Initialize population state
-        z = z.repeat(self.population_size, axis=0)
-        mean = jnp.zeros((self.horizon, self.model.action_dim))
-        std = jnp.full((self.horizon, self.model.action_dim), self.max_plan_std)
-        # Warm start MPPI with the previous solution
-        mean = mean.at[:-1].set(prev_plan[0][1:])
-        std = std.at[:-1].set(prev_plan[1][1:])
-
-        actions = jnp.zeros(
-            (self.horizon, self.population_size, self.model.action_dim))
-        actions = actions.at[:, :self.policy_prior_samples].set(policy_actions)
-
-        # Iterate MPPI
-        key, action_noise_key, *value_keys = \
-            jax.random.split(key, self.mppi_iterations+1+1)
-        noise = jax.random.normal(
-            action_noise_key,
-            shape=(
-                self.mppi_iterations,
-                self.horizon,
-                self.population_size - self.policy_prior_samples,
-                self.model.action_dim
-            ))
-        for i in range(self.mppi_iterations):
-            # Sample actions
-            actions = actions.at[:, self.policy_prior_samples:].set(
-                mean[:, None, :] + std[:, None, :] * noise[i])
-            actions = actions.clip(-1, 1)
-
-            # Compute elite actions
-            value = self.estimate_value(z, actions, key=value_keys[i])
-            value = jnp.nan_to_num(value)
-            _, elite_inds = jax.lax.top_k(value, self.num_elites)
-            elite_values, elite_actions = value[elite_inds], actions[:, elite_inds]
-
-            # Update parameters
-            max_value = jnp.max(elite_values)
-            score = jnp.exp(self.temperature * (elite_values - max_value))
-            score /= score.sum(0)
-
-            mean = jnp.sum(score[None, :, None] * elite_actions, axis=1) / \
-                   (score.sum(0) + 1e-9)
-            std = jnp.sqrt(
-                jnp.sum(score[None, :, None] * (elite_actions -
-                                                mean[:, None, :])**2, axis=1) / (score.sum(0) + 1e-9)
-            ).clip(self.min_plan_std, self.max_plan_std)
-
-        # Select action based on the score
-        key, *final_action_keys = jax.random.split(key, 3)
-        action_ind = jax.random.choice(final_action_keys[0],
-                                       a=jnp.arange(self.num_elites), p=score)
-        actions = elite_actions[:, action_ind]
-
-        action, action_std = actions[0], std[0]
-        action += jnp.array(train, float) * action_std * jax.random.normal(
-            final_action_keys[1], shape=action.shape)
-
-        action = action.clip(-1, 1)
-        return action, (mean, std)
-
-    @jax.jit
-    def update(self,
-               observations: jax.Array,
-               actions: jax.Array,
-               rewards: jax.Array,
-               next_observations: jax.Array,
-               terminated: jax.Array,
-               truncated: jax.Array,
-               *,
-               key: chex.PRNGKey
-               ) -> Tuple[TDMPC2, Dict[str, Any]]:
-
-        world_model_key, policy_key = jax.random.split(key, 2)
-
-        def world_model_loss_fn(encoder_params: Dict,
-                                dynamics_params: Dict,
-                                value_params: Dict,
-                                reward_params: Dict,
-                                continue_params: Dict):
-            target_key, Q_key = jax.random.split(world_model_key, 2)
-            done = jnp.logical_or(terminated, truncated)
-            finished = jnp.zeros((self.horizon+1, self.batch_size), dtype=bool)
-
-            next_z = sg(self.model.encode(next_observations, encoder_params))
-            td_targets = self.td_target(next_z, rewards, terminated, key=target_key)
-
-            # Latent rollout (compute latent dynamics + consistency loss)
-            zs = jnp.zeros((self.horizon+1, self.batch_size, next_z.shape[-1]))
-            z = self.model.encode(jax.tree.map(
-                lambda x: x[0], observations), encoder_params)
-            zs = zs.at[0].set(z)
-            consistency_loss = 0
-            for t in range(self.horizon):
-                z = self.model.next(z, actions[t], dynamics_params)
-                zs = zs.at[t+1].set(z)
-                consistency_loss += self.rho**t * \
-                                    jnp.mean((z - next_z[t])**2, where=~finished[t][:, None])
-
-                # Keep track of which trajectories have reached a terminal state
-                finished = finished.at[t+1].set(jnp.logical_or(finished[t], done[t]))
-
-            # Get logits for loss computations
-            _, q_logits = self.model.Q(zs[:-1], actions, value_params, key=Q_key)
-            _, reward_logits = self.model.reward(zs[:-1], actions, reward_params)
-            if self.model.predict_continues:
-                continue_logits = self.model.continue_model.apply_fn(
-                    {'params': continue_params}, zs[1:]).squeeze(-1)
-
-            reward_loss = 0
-            value_loss = 0
-            for t in range(self.horizon):
-                reward_loss += self.rho**t * soft_crossentropy(
-                    reward_logits[t], rewards[t],
-                    self.model.symlog_min,
-                    self.model.symlog_max,
-                    self.model.num_bins).mean(where=~finished[t])
-
-                for q in range(self.model.num_value_nets):
-                    value_loss += self.rho**t * soft_crossentropy(
-                        q_logits[q, t], td_targets[t],
-                        self.model.symlog_min,
-                        self.model.symlog_max,
-                        self.model.num_bins).mean(where=~finished[t])
-
-            if self.model.predict_continues:
-                continue_loss = optax.sigmoid_binary_cross_entropy(
-                    continue_logits, 1 - terminated).mean()
-            else:
-                continue_loss = 0
-
-            consistency_loss = consistency_loss / self.horizon
-            reward_loss = reward_loss / self.horizon
-            value_loss = value_loss / self.horizon / self.model.num_value_nets
-            total_loss = (
-                    self.consistency_coef * consistency_loss +
-                    self.reward_coef * reward_loss +
-                    self.value_coef * value_loss +
-                    self.continue_coef * continue_loss
-            )
-
-            return total_loss, {
-                'consistency_loss': consistency_loss,
-                'reward_loss': reward_loss,
-                'value_loss': value_loss,
-                'continue_loss': continue_loss,
-                'total_loss': total_loss,
-                'zs': zs
-            }
-
-        # Update world model
-        (encoder_grads, dynamics_grads, value_grads, reward_grads, continue_grads), model_info = jax.grad(
-            world_model_loss_fn, argnums=(0, 1, 2, 3, 4), has_aux=True)(
-            self.model.encoder.params,
-            self.model.dynamics_model.params,
-            self.model.value_model.params,
-            self.model.reward_model.params,
-            self.model.continue_model.params if self.model.predict_continues else None)
-        zs = model_info.pop('zs')
-
-        new_encoder = self.model.encoder.apply_gradients(grads=encoder_grads)
-        new_dynamics_model = self.model.dynamics_model.apply_gradients(
-            grads=dynamics_grads)
-        new_reward_model = self.model.reward_model.apply_gradients(
-            grads=reward_grads)
-        new_value_model = self.model.value_model.apply_gradients(
-            grads=value_grads)
-        new_target_value_model = self.model.target_value_model.replace(
-            params=optax.incremental_update(
-                new_value_model.params,
-                self.model.target_value_model.params,
-                self.tau))
-        if self.model.predict_continues:
-            new_continue_model = self.model.continue_model.apply_gradients(
-                grads=continue_grads)
-        else:
-            new_continue_model = self.model.continue_model
-
-        # Update policy
-        def policy_loss_fn(params: Dict):
-            action_key, Q_key = jax.random.split(policy_key, 2)
-            actions, _, _, log_probs = self.model.sample_actions(
-                zs, params, key=action_key)
-
-            # Compute Q-values
-            Qs, _ = self.model.Q(zs, actions, new_value_model.params, key=Q_key)
-            Q = Qs.mean(axis=0)
-            # Update and apply scale
-            scale = percentile_normalization(Q[0], self.scale).clip(1, None)
-            Q = Q / sg(scale)
-
-            # Compute policy objective (equation 4)
-            rho = self.rho ** jnp.arange(self.horizon+1)
-            policy_loss = ((self.entropy_coef * log_probs -
-                            Q).mean(axis=1) * rho).mean()
-            return policy_loss, {'policy_loss': policy_loss, 'policy_scale': scale}
-        policy_grads, policy_info = jax.grad(policy_loss_fn, has_aux=True)(
-            self.model.policy_model.params)
-        new_policy = self.model.policy_model.apply_gradients(grads=policy_grads)
-
-        # Update model
-        new_agent = self.replace(model=self.model.replace(
-            encoder=new_encoder,
-            dynamics_model=new_dynamics_model,
-            reward_model=new_reward_model,
-            value_model=new_value_model,
-            policy_model=new_policy,
-            target_value_model=new_target_value_model,
-            continue_model=new_continue_model),
-            scale=policy_info['policy_scale'])
-        info = {**model_info, **policy_info}
-
-        return new_agent, info
-
-    @jax.jit
-    def estimate_value(self, z: jax.Array, actions: jax.Array, key: chex.PRNGKey) -> jax.Array:
-        G, discount = 0.0, 1.0
-        for t in range(self.horizon):
-            reward, _ = self.model.reward(
-                z, actions[t], self.model.reward_model.params)
-            z = self.model.next(z, actions[t], self.model.dynamics_model.params)
-            G += discount * reward.astype(jnp.float32)
-
-            if self.model.predict_continues:
-                continues = jax.nn.sigmoid(self.model.continue_model.apply_fn(
-                    {'params': self.model.continue_model.params}, z)).squeeze(-1) > 0.5
-            else:
-                continues = 1.0
-
-            discount *= self.discount * continues
-
-        action_key, Q_key = jax.random.split(key, 2)
-        next_action = self.model.sample_actions(
-            z, self.model.policy_model.params, key=action_key)[0]
-
-        Qs, _ = self.model.Q(
-            z, next_action, self.model.value_model.params, key=Q_key)
-        Q = Qs.mean(axis=0)
-        return sg(G + discount * Q)
-
-    @jax.jit
-    def td_target(self, next_z: jax.Array, reward: jax.Array, terminal: jax.Array,
-                  key: chex.PRNGKey) -> jax.Array:
-        action_key, ensemble_key, Q_key = jax.random.split(key, 3)
-        next_action = self.model.sample_actions(
-            next_z, self.model.policy_model.params, key=action_key)[0]
-
-        # Sample two Q-values from the target ensemble
-        inds = jax.random.choice(ensemble_key,
-                                 jnp.arange(0, self.model.num_value_nets),
-                                 shape=(2, ), replace=False)
-        Qs, _ = self.model.Q(
-            next_z, next_action, self.model.target_value_model.params, key=Q_key)
-        Q = Qs[inds].min(axis=0)
-        return sg(reward + (1 - terminal) * self.discount * Q)
+if __name__ == '__main__':
+    train()

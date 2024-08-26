@@ -15,7 +15,7 @@ import optax
 import orbax.checkpoint
 
 from pobax.config import PPOHyperparams
-from pobax.envs import get_env
+from pobax.envs import make_jax_env
 from pobax.envs.wrappers import LogEnvState
 from pobax.models import get_network_fn, ScannedRNN
 from pobax.utils.file_system import get_results_path
@@ -70,10 +70,10 @@ def make_train(config: dict, rand_key: jax.random.PRNGKey):
             config["NUM_ENVS"] * config["NUM_STEPS"] // config["NUM_MINIBATCHES"]
     )
     env_key, rand_key = jax.random.split(rand_key)
-    env, env_params = get_env(config['ENV_NAME'], env_key,
-                              gamma=config["GAMMA"],
-                              action_concat=config["ACTION_CONCAT"],
-                              perfect_memory=config["PERFECT_MEMORY"])
+    env, env_params = make_jax_env(config['ENV_NAME'], env_key,
+                                   gamma=config["GAMMA"],
+                                   action_concat=config["ACTION_CONCAT"],
+                                   perfect_memory=config["PERFECT_MEMORY"])
 
     if hasattr(env, 'gamma'):
         config['GAMMA'] = env.gamma

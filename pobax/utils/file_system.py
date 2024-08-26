@@ -15,7 +15,7 @@ from flax.training.train_state import TrainState
 import optax
 import orbax.checkpoint
 
-from pobax.envs import get_env
+from pobax.envs import make_jax_env
 from pobax.models import get_network_fn
 from pobax.config import Hyperparams
 
@@ -83,9 +83,9 @@ def load_train_state(key: jax.random.PRNGKey, fpath: Path):
     unpacked_ts = restored['out']['runner_state'][0]
 
 
-    env, env_params = get_env(args['env'], key,
-                              args['gamma'],
-                              action_concat=args['action_concat'])
+    env, env_params = make_jax_env(args['env'], key,
+                                   args['gamma'],
+                                   action_concat=args['action_concat'])
 
     network_fn, action_size = get_network_fn(env, env_params, memoryless=args['memoryless'])
 

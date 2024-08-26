@@ -5,15 +5,16 @@ import flax.linen as nn
 from flax.training.train_state import TrainState
 from flax import struct
 import numpy as np
-from numpy.typing import ArrayLike
-from tdmpc2_jax.networks import NormedLinear
-from tdmpc2_jax.common.activations import mish, simnorm
-from jaxtyping import PRNGKeyArray
+import chex
 import jax
 import jax.numpy as jnp
 import optax
-from tdmpc2_jax.networks import Ensemble
-from tdmpc2_jax.common.util import symlog, two_hot_inv
+
+from pobax.models.network import Ensemble
+from pobax.utils.dist import symlog, two_hot_inv
+from pobax.models.network import NormedLinear
+
+from pobax.utils.math import mish, simnorm
 
 
 class WorldModel(struct.PyTreeNode):
@@ -61,7 +62,7 @@ class WorldModel(struct.PyTreeNode):
                tabulate: bool = False,
                dtype: jnp.dtype = jnp.float32,
                *,
-               key: PRNGKeyArray,
+               key: chex.PRNGKey,
                ):
         dynamics_key, reward_key, value_key, policy_key, continue_key = jax.random.split(
             key, 5)
@@ -234,7 +235,7 @@ class WorldModel(struct.PyTreeNode):
                        min_log_std: float = -10,
                        max_log_std: float = 2,
                        *,
-                       key: PRNGKeyArray
+                       key: chex.PRNGKey
                        ) -> Tuple[jax.Array, ...]:
         # Chunk the policy model output to get mean and logstd
         mu, log_std = jnp.split(self.policy_model.apply_fn(
@@ -256,7 +257,7 @@ class WorldModel(struct.PyTreeNode):
         return action, mean, log_std, log_probs
 
     @jax.jit
-    def Q(self, z: jax.Array, a: jax.Array, params: Dict, key: PRNGKeyArray
+    def Q(self, z: jax.Array, a: jax.Array, params: Dict, key: chex.PRNGKey
           ) -> Tuple[jax.Array, jax.Array]:
         z = jnp.concatenate([z, a], axis=-1)
         logits = self.value_model.apply_fn(

@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import gymnax
+import gymnasium as gym
 from jax import random
 
 from definitions import ROOT_DIR
@@ -29,6 +30,8 @@ from .wrappers import (
     NormalizeVecObservation,
     ActionConcatWrapper
 )
+
+from .dmcontrol import make_dmc_env
 
 
 masked_gymnax_env_map = {
@@ -59,6 +62,7 @@ masked_gymnax_env_map = {
 
 brax_envs = ['ant', 'walker2d', 'halfcheetah', 'hopper']
 
+
 def load_brax_env(env_str: str,
                   gamma: float = 0.99):
     from gymnax import EnvParams
@@ -70,12 +74,12 @@ def load_brax_env(env_str: str,
     return env, env_params
 
 
-def get_env(env_name: str,
-            rand_key: random.PRNGKey,
-            normalize_env: bool = False,
-            gamma: float = 0.99,
-            perfect_memory: bool = False,
-            action_concat: bool = False):
+def make_jax_env(env_name: str,
+                 rand_key: random.PRNGKey,
+                 normalize_env: bool = False,
+                 gamma: float = 0.99,
+                 perfect_memory: bool = False,
+                 action_concat: bool = False):
 
     mask_dims = None
     if env_name in masked_gymnax_env_map:
@@ -174,3 +178,21 @@ def get_env(env_name: str,
 
 
 
+# Non-jitted envs
+# TODO: add dmlab environments
+def make_env(env_config, seed):
+    def make_gym_env(env_id, seed):
+        env = gym.make(env_id)
+        env = gym.wrappers.RescaleAction(env, min_action=-1, max_action=1)
+        env = gym.wrappers.RecordEpisodeStatistics(env)
+        env.action_space.seed(seed)
+        env.observation_space.seed(seed)
+        return env
+
+    if env_config.backend == "gymnasium":
+        return make_gym_env(env_config.env_id, seed)
+    elif env_config.backend == "dmc":
+        _env = make_dmc_env(env_config.env_id, seed, env_config.dmc.obs_type)
+        env = gym.wrappers.RecordEpisodeStatistics(_env)
+        return env
+    raise ValueError("Environment not supported:", env_config)
