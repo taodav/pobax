@@ -1,6 +1,7 @@
 import functools
 from typing import Callable, Optional
 
+import chex
 import flax.linen as nn
 import jax
 import jax.numpy as jnp
@@ -184,58 +185,99 @@ class Ensemble(nn.Module):
                            axis_size=self.num)
         return ensemble()(*args, **kwargs)
 
-class ShiftAug(nn.Module):
-    pad: int = 3
+def shift_aug(x: jnp.ndarray, rng_key: chex.PRNGKey,
+              pad: int = 3, rand_shift=None):
+    x = x.astype(float)
+    n, _, h, w = x.shape
+    assert h == w
+    padding = ((0, 0), (0, 0), (pad, pad), (pad, pad))
+    x = jnp.pad(x, padding, mode='edge')
+    eps = 1.0 / (h + 2 * pad)
+    arange = jnp.linspace(-1.0 + eps, 1.0 - eps, h + 2 * pad, dtype=x.dtype)[:h]
+    # arange = jnp.expand_dims(arange[None, ...].repeat(h, 1), 2)
+    # base_grid = jnp.concatenate([arange, jnp.swapaxes(arange, 1, 0)], axis=2)
+    # base_grid = base_grid[None, ...].repeat(n, 1, 1, 1)
+    arange = jnp.broadcast_to(arange[None, :, None], (h, h, 1))
+    base_grid = jnp.concatenate([arange, jnp.transpose(arange, (1, 0, 2))], axis=2)
 
-    @nn.compact
-    def __call__(self, x: jnp.ndarray, rng_key):
-        x = x.astype(float)
-        n, _, h, w = x.shape
-        assert h == w
-        padding = tuple([self.pad] * 4)
-        x = jnp.pad(x, padding, 'replicate')
-        eps = 1.0 / (h + 2 * self.pad)
-        arange = jnp.linspace(-1.0 + eps, 1.0 - eps, h + 2 * self.pad, dtype=x.dtype)[:h]
-        arange = arange.unsqueeze(0).repeat(h, 1).unsqueeze(2)
-        base_grid = jnp.cat([arange, arange.transpose(1, 0)], axis=2)
-        base_grid = base_grid.unsqueeze(0).repeat(n, 1, 1, 1)
-        shift = jax.random.randint(rng_key, shape=(n, 1, 1, 2), minval=0, maxval=2 * self.pad + 1).astype(x.dtype)
-        shift *= 2.0 / (h + 2 * self.pad)
-        grid = base_grid + shift
-        return grid_sample(x, grid)
+    shift = rand_shift
+    if shift is None:
+        shift = jax.random.randint(rng_key, shape=(n, 1, 1, 2), minval=0, maxval=2 * pad + 1).astype(x.dtype)
+    shift *= 2.0 / (h + 2 * pad)
+    grid = base_grid + shift
+
+    return grid_sample(x, grid)
+    # # Grid sample
+    # grid = grid.reshape(n, h * w, 2)
+    # x = jnp.transpose(x, (0, 2, 3, 1))
+    #
+    # ix = grid[..., 0]
+    # iy = grid[..., 1]
+    #
+    # ix = ((ix + 1) / 2) * (w + 2 * pad - 1)
+    # iy = ((iy + 1) / 2) * (h + 2 * pad - 1)
+    #
+    # ix0 = jnp.floor(ix).astype(int)
+    # iy0 = jnp.floor(iy).astype(int)
+    # ix1 = ix0 + 1
+    # iy1 = iy0 + 1
+    #
+    # ix0 = jnp.clip(ix0, 0, w + 2 * pad - 1)
+    # iy0 = jnp.clip(iy0, 0, h + 2 * pad - 1)
+    # ix1 = jnp.clip(ix1, 0, w + 2 * pad - 1)
+    # iy1 = jnp.clip(iy1, 0, h + 2 * pad - 1)
+    #
+    # wa = (ix1 - ix) * (iy1 - iy)
+    # wb = (ix1 - ix) * (iy - iy0)
+    # wc = (ix - ix0) * (iy1 - iy)
+    # wd = (ix - ix0) * (iy - iy0)
+    #
+    # x_idx = jnp.expand_dims(jnp.arange(n), axis=1)
+    # out = wa[..., None] * x[x_idx, iy0, ix0] + \
+    #       wb[..., None] * x[x_idx, iy1, ix0] + \
+    #       wc[..., None] * x[x_idx, iy0, ix1] + \
+    #       wd[..., None] * x[x_idx, iy1, ix1]
+    #
+    # return jnp.transpose(out, (0, 3, 1, 2))
 
 
 class TDMPC2ImageCNN(nn.Module):
+    num_channels: int = 32
     simnorm_dim: int = 8
 
     @nn.compact
     def __call__(self, x):
-        num_features = x.shape[-3]
-
         # preprocessing
         # TODO(?): random augmentations to images
         # https://github.com/nicklashansen/tdmpc2/blob/main/tdmpc2/common/layers.py#L27
+
+        # Get the number of dimensions
+        ndim = x.ndim
+
+        # Create the permutation tuple
+        perm = tuple(range(ndim - 3)) + (ndim - 2, ndim - 1, ndim - 3)
+        x = jnp.transpose(x, perm)
 
         # normalizing pixels
         x = x / 255 - 0.5
 
         # 64x64 2 dimensions
-        if x.shape[-2] == x.shape[-1] and x.shape[-2] == 64:
-            out1 = nn.Conv(features=num_features, kernel_size=7, strides=2, padding=0)(x)
+        if x.shape[-3] == x.shape[-2] and x.shape[-2] == 64:
+            out1 = nn.Conv(features=self.num_channels, kernel_size=(7, 7), strides=2, padding=0)(x)
             out1 = nn.relu(out1)
-            out2 = nn.Conv(features=num_features, kernel_size=5, strides=2, padding=0)(out1)
+            out2 = nn.Conv(features=self.num_channels, kernel_size=(5, 5), strides=2, padding=0)(out1)
             out2 = nn.relu(out2)
-            out3 = nn.Conv(features=num_features, kernel_size=3, strides=2, padding=0)(out2)
+            out3 = nn.Conv(features=self.num_channels, kernel_size=(3, 3), strides=2, padding=0)(out2)
             out3 = nn.relu(out3)
-            conv_out = nn.Conv(features=num_features, kernel_size=3, strides=1, padding=0)(out3)
-        elif x.shape[-2] == x.shape[-1] and x.shape[-2] == 32:
-            out1 = nn.Conv(features=num_features, kernel_size=4, strides=2, padding=0)(x)
+            conv_out = nn.Conv(features=self.num_channels, kernel_size=(3, 3), strides=1, padding=0)(out3)
+        elif x.shape[-3] == x.shape[-2] and x.shape[-2] == 32:
+            out1 = nn.Conv(features=self.num_channels, kernel_size=(4, 4), strides=2, padding=0)(x)
             out1 = nn.relu(out1)
-            out2 = nn.Conv(features=num_features, kernel_size=3, strides=2, padding=0)(out1)
+            out2 = nn.Conv(features=self.num_channels, kernel_size=(3, 3), strides=2, padding=0)(out1)
             out2 = nn.relu(out2)
-            out3 = nn.Conv(features=num_features, kernel_size=3, strides=1, padding=0)(out2)
+            out3 = nn.Conv(features=self.num_channels, kernel_size=(3, 3), strides=1, padding=0)(out2)
             out3 = nn.relu(out3)
-            conv_out = nn.Conv(features=num_features, kernel_size=2, strides=1, padding=0)(out3)
+            conv_out = nn.Conv(features=self.num_channels, kernel_size=(2, 2), strides=1, padding=0)(out3)
         else:
             raise NotImplementedError
 

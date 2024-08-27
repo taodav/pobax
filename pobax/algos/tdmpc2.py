@@ -61,7 +61,8 @@ def train(cfg: dict):
 
     encoder_module = vec_encoder(encoder_config, model_config, dtype)
     if 'dmc' in env_config and 'rgb' in env_config.dmc['obs_type']:
-        encoder_module = TDMPC2ImageCNN(simnorm_dim=model_config.simnorm_dim)
+        encoder_module = TDMPC2ImageCNN(simnorm_dim=model_config.simnorm_dim,
+                                        num_channels=encoder_config.num_channels)
 
     if encoder_config.tabulate:
         print("Encoder")

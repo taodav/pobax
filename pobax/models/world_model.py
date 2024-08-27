@@ -2,6 +2,8 @@ import copy
 from functools import partial
 from typing import Dict, Tuple, Callable
 import flax.linen as nn
+from brax.training.types import Policy
+from flax.linen import compact
 from flax.training.train_state import TrainState
 from flax import struct
 import numpy as np
@@ -27,6 +29,17 @@ def vec_encoder(encoder_config, model_config, dtype):
                                    ])
     return encoder_module
 
+class PolicyModel(nn.Module):
+    mlp_dim: int
+    action_dim: int
+
+    @compact
+    def __call__(self, x):
+        out1 = NormedLinear(self.mlp_dim, activation=mish, dtype=float)(x)
+        out2 = NormedLinear(self.mlp_dim, activation=mish, dtype=float)(out1)
+        output = nn.Dense(2*self.action_dim,
+                     kernel_init=nn.initializers.truncated_normal(0.02))(out2)
+        return output
 
 class WorldModel(struct.PyTreeNode):
     # Models
@@ -112,12 +125,7 @@ class WorldModel(struct.PyTreeNode):
             ))
 
         # Policy model
-        policy_module = nn.Sequential([
-            NormedLinear(mlp_dim, activation=mish, dtype=dtype),
-            NormedLinear(mlp_dim, activation=mish, dtype=dtype),
-            nn.Dense(2*action_dim,
-                     kernel_init=nn.initializers.truncated_normal(0.02))
-        ])
+        policy_module = PolicyModel(mlp_dim=mlp_dim, action_dim=action_dim)
         policy_model = TrainState.create(
             apply_fn=policy_module.apply,
             params=policy_module.init(policy_key, jnp.zeros(latent_dim))['params'],

@@ -21,12 +21,13 @@ env:
 encoder:
   encoder_dim: 256
   num_encoder_layers: 2
+  num_channels: 32
   learning_rate: 1e-4
   tabulate: False
 
 world_model:
-  mlp_dim: 256
-  latent_dim: 256
+  mlp_dim: 512
+  latent_dim: 512
   value_dropout: 0.01
   num_value_nets: 5
   num_bins: 101
