@@ -7,7 +7,7 @@ import jax.numpy as jnp
 from jax._src.nn.initializers import orthogonal, constant
 import numpy as np
 
-from pobax.utils.math import simnorm
+from pobax.utils.math import simnorm, grid_sample
 
 
 class ScannedRNN(nn.Module):
@@ -184,6 +184,26 @@ class Ensemble(nn.Module):
                            axis_size=self.num)
         return ensemble()(*args, **kwargs)
 
+class ShiftAug(nn.Module):
+    pad: int = 3
+
+    @nn.compact
+    def __call__(self, x: jnp.ndarray, rng_key):
+        x = x.astype(float)
+        n, _, h, w = x.shape
+        assert h == w
+        padding = tuple([self.pad] * 4)
+        x = jnp.pad(x, padding, 'replicate')
+        eps = 1.0 / (h + 2 * self.pad)
+        arange = jnp.linspace(-1.0 + eps, 1.0 - eps, h + 2 * self.pad, dtype=x.dtype)[:h]
+        arange = arange.unsqueeze(0).repeat(h, 1).unsqueeze(2)
+        base_grid = jnp.cat([arange, arange.transpose(1, 0)], axis=2)
+        base_grid = base_grid.unsqueeze(0).repeat(n, 1, 1, 1)
+        shift = jax.random.randint(rng_key, shape=(n, 1, 1, 2), minval=0, maxval=2 * self.pad + 1).astype(x.dtype)
+        shift *= 2.0 / (h + 2 * self.pad)
+        grid = base_grid + shift
+        return grid_sample(x, grid)
+
 
 class TDMPC2ImageCNN(nn.Module):
     simnorm_dim: int = 8
@@ -216,6 +236,8 @@ class TDMPC2ImageCNN(nn.Module):
             out3 = nn.Conv(features=num_features, kernel_size=3, strides=1, padding=0)(out2)
             out3 = nn.relu(out3)
             conv_out = nn.Conv(features=num_features, kernel_size=2, strides=1, padding=0)(out3)
+        else:
+            raise NotImplementedError
 
         # Convolutions "flatten" the last num_dims dimensions.
         flat_out = conv_out.reshape((*conv_out.shape[:-3], -1))  # Flatten
