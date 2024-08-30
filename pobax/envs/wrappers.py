@@ -99,6 +99,7 @@ class FlattenObservationWrapper(GymnaxWrapper):
     ) -> Tuple[chex.Array, environment.EnvState]:
         obs, state = self._env.reset(key, params)
         obs = jnp.reshape(obs, (-1,))
+        print('obs', obs.shape)
         return obs, state
 
     @partial(jax.jit, static_argnums=(0,))
@@ -224,7 +225,6 @@ class JumanjiGymnaxWrapper:
     def reset(self, key, params=None):
         state, timestep = self._env.reset(key)
         obs = jumanji_to_gymnax_obs(timestep.observation)
-        print('obs shape', type(timestep.observation))
         return obs, state
 
     def step(self, key, state, action, params=None):
@@ -533,8 +533,6 @@ class StackObservationWrapper(GymnaxWrapper):
         obs, state = self._env.reset(key, params)
         # Stack the initial observation num_stack times
         stacked_obs = jnp.stack([obs] * self.num_stack, axis=-1)
-        print(obs.shape)
-        print('stacked_obs', stacked_obs.shape)
         return stacked_obs, state
 
     @partial(jax.jit, static_argnums=(0,))
@@ -580,8 +578,6 @@ class ConcatRecentObservationsWrapper(GymnaxWrapper):
         state = ObservationEnvState(env_state, 0, 0, 0, 0, 0, 0, 0, initial_observations)
         # Reset the deque with the initial observation repeated
         # Return the concatenated observations
-        print(obs.shape)
-        print('initial_observations', initial_observations.shape)
         return initial_observations, state
 
     @partial(jax.jit, static_argnums=(0,))
@@ -602,7 +598,46 @@ class ConcatRecentObservationsWrapper(GymnaxWrapper):
         )
         
         # Return the concatenated observations along with other step information
-        print(new_observations.shape)
         return new_observations, state, reward, done, info
 
 
+class ReacherWrapper(GymnaxWrapper):
+    def __init__(self, env):
+        super().__init__(env)
+
+    def observation_space(self, params) -> spaces.Box:
+        base_space = self._env.observation_space(params)
+        assert isinstance(base_space, spaces.Box), "Base observation space must be a Box space."
+        new_shape = (base_space.shape[0] - 3,)
+        return spaces.Box(
+            low=-jnp.inf,
+            high=jnp.inf,
+            shape=new_shape,
+            dtype=base_space.dtype,
+        )
+
+    @partial(jax.jit, static_argnums=(0,))
+    def reset(self, key: chex.PRNGKey, params: Optional[environment.EnvParams] = None) -> Tuple[chex.Array, environment.EnvState]:
+        obs, state = self._env.reset(key, params)
+        return self.modify_angle(obs), state
+
+    @partial(jax.jit, static_argnums=(0,))
+    def step(self, key: chex.PRNGKey, state: environment.EnvState, action: Union[int, float, jnp.ndarray], params: Optional[environment.EnvParams] = None) -> Tuple[chex.Array, environment.EnvState, float, bool, dict]:
+        # from brax import math
+        obs, state, reward, done, info = self._env.step(key, state, action, params)
+        print('obs', obs.shape)
+        # reward = -math.safe_norm(obs[-3:])
+        tip_to_target = obs[-3:]
+        
+        # Calculate the revised reward as in step_env
+        reward = -1 * jnp.sum(tip_to_target ** 2, axis=-1)
+        print('reward', reward.shape)
+        # Stack the current observation num_stack times
+        return self.modify_angle(obs), state, reward, done, info
+    
+    def modify_angle(self, obs):
+        # first_angle = jnp.expand_dims(jnp.arccos(obs[0]), axis=0)
+        # second_angle = jnp.expand_dims(jnp.arccos(obs[1]), axis=0)
+        # modified_obs = jnp.concatenate([first_angle, second_angle, obs[4:8]])
+        modified_obs = obs[:8]
+        return modified_obs

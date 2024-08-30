@@ -1,12 +1,13 @@
 from pathlib import Path
+import numpy as np
 
 # Set up the experiment name based on the script filename
 file = __file__  # Use this in actual script to dynamically get the file name
 exp_name = Path(file).stem
 
 # Define various hyperparameter values
-lrs = [1e-2, 1e-3, 1e-4, 1e-5, 1e-6]  # Learning rates
-lambda0s = [0.95]  # GAE lambda values
+lrs = [2.5e-3, 2.5e-4, 2.5e-5]  # Learning rates
+lambda0s = np.linspace(0, 0.999, num=16)  # GAE lambda values
 vf_coeffs = [0.5]  # Value function coefficients
 entropy_coeffs = [0.01]  # Entropy coefficients
 
@@ -32,9 +33,9 @@ hparams = {
         'steps_log_freq': 4,
         'update_log_freq': 5,
         'update_epochs': 4,
-        'total_steps': int(3e7),
+        'total_steps': int(2e6),
         'seed': 2020,
-        'n_seeds': 5,
+        'n_seeds': 3,
         'platform': 'gpu',
         'debug': False,
         'study_name': exp_name

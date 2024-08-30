@@ -26,7 +26,7 @@ from .wrappers import (
     NormalizeVecObservation,
     ActionConcatWrapper,
     StackObservationWrapper,
-    ConcatRecentObservationsWrapper
+    ConcatRecentObservationsWrapper,
 )
 
 
@@ -54,9 +54,13 @@ masked_gymnax_env_map = {
     "HalfCheetah-P-v0": {'env_str': 'halfcheetah', 'mask_dims': [
         0, 1, 2, 3, 8, 9, 10, 11, 12]},
     "HalfCheetah-V-v0": {'env_str': 'halfcheetah', 'mask_dims': [4, 5, 6, 7, 13, 14, 15, 16]},
+    "Reacher-F-v0": {'env_str': 'reacher', 'mask_dims': list(range(11))},
+    "Humanoid-F-v0": {'env_str': 'humanoid', 'mask_dims': list(range(376))},
+    "Humanoidstandup-F-v0": {'env_str': 'humanoidstandup', 'mask_dims': list(range(376))},
+    "Pusher-F-v0": {'env_str': 'pusher', 'mask_dims': list(range(23))},
 }
 
-brax_envs = ['ant', 'walker2d', 'halfcheetah', 'hopper']
+brax_envs = ['ant', 'walker2d', 'halfcheetah', 'hopper', 'reacher', 'humanoid', 'humanoidstandup', 'pusher']
 
 jumanji_envs = [
     'Game2048-v1', 
@@ -99,10 +103,12 @@ jumanji_envs = [
 def load_brax_env(env_str: str,
                   gamma: float = 0.99):
     from gymnax import EnvParams
-    from .wrappers import BraxGymnaxWrapper, LogWrapper, ClipAction, VecEnv
+    from .wrappers import BraxGymnaxWrapper, LogWrapper, ClipAction, VecEnv, ReacherWrapper
     from .wrappers import NormalizeVecReward, NormalizeVecObservation
     env = BraxGymnaxWrapper(env_str)
     env_params = EnvParams(max_steps_in_episode=env.max_steps_in_episode)
+    if env_str == 'reacher':
+        env = ReacherWrapper(env)
     env = ClipAction(env)
     return env, env_params
 
@@ -200,7 +206,8 @@ def get_env(env_name: str,
 
     else:
         env, env_params = gymnax.make(env_name)
-        env = FlattenObservationWrapper(env)
+        if env_name != 'Breakout-MinAtar' and env_name != 'SpaceInvaders-MinAtar':
+            env = FlattenObservationWrapper(env)
 
     if hasattr(env, 'gamma'):
         print(f"Overwriting args gamma {gamma} with env gamma {env.gamma}.")

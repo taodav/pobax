@@ -1,3 +1,5 @@
+import os
+os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
 from typing import NamedTuple
 
 from collections import deque
@@ -20,7 +22,7 @@ import orbax.checkpoint
 from pobax.config import PPOHyperparams
 from pobax.envs import get_env, jumanji_envs
 from pobax.envs.wrappers import LogEnvState
-from pobax.models import get_network_fn, ScannedRNN, ContinuousActorCritic, DiscreteActorCritic
+from pobax.models import get_network_fn, ScannedRNN, ContinuousActorCritic, DiscreteActorCritic, JumanjiActorCritic, ImageDiscreteActorCritic, ImageDiscreteActorCriticRNN
 from pobax.utils.file_system import get_results_path, numpyify_and_save
 import csv
 from pathlib import Path
@@ -46,7 +48,7 @@ def env_step(runner_state, unused, network, env, env_params):
     else:
         last_observation = {key: val[np.newaxis, :] for key, val in last_obs.items()}
         ac_in = (last_observation, last_done[np.newaxis, :])
-    hstate, pi, value = network.apply(train_state.params, hstate, ac_in)
+    hstate, pi, value, _ = network.apply(train_state.params, hstate, ac_in)
     action = pi.sample(seed=_rng)
     log_prob = pi.log_prob(action)
     value, action, log_prob = (
@@ -98,17 +100,29 @@ def make_train(config: dict, rand_key: jax.random.PRNGKey):
     horizon = config["HORIZON"]
 
     network_fn, action_size = get_network_fn(env, env_params, memoryless=memoryless)
-    if network_fn is ContinuousActorCritic or network_fn is DiscreteActorCritic:
+    if network_fn is ContinuousActorCritic or network_fn is DiscreteActorCritic or network_fn is ImageDiscreteActorCritic:
         print(f"using depth {config['DEPTH']}, approximator={approximator}, horizon={horizon}")
         network = network_fn(action_size, 
                             double_critic=double_critic,
                             approximator=approximator,
+                            skip_connection=config["SKIP_CONNECTION"],
                             horizon=horizon,
+                            hidden_size=config['HIDDEN_SIZE'],
+                            depth=config['DEPTH'])
+    elif env.env_name in jumanji_envs:
+        if network_fn is JumanjiActorCritic:
+            print(f"jumanji env {env.env_name} + memoryless + approximator={approximator}, depth={config['DEPTH']} + horizon={horizon}")
+            network = network_fn(env.env_name, 
+                         action_size, 
+                         double_critic=double_critic,
+                         approximator=approximator,
+                         skip_connection=config["SKIP_CONNECTION"],
+                         horizon=horizon,
                          hidden_size=config['HIDDEN_SIZE'],
                          depth=config['DEPTH'])
-    elif env.env_name in jumanji_envs:
-        print(f"jumanji env {env.env_name}")
-        network = network_fn(env.env_name, 
+        else:
+            print(f"jumanji env {env.env_name} + RNN")
+            network = network_fn(env.env_name, 
                          action_size,
                          double_critic=double_critic,
                          hidden_size=config['HIDDEN_SIZE'])
@@ -230,7 +244,7 @@ def make_train(config: dict, rand_key: jax.random.PRNGKey):
                 last_observation = {key: val[np.newaxis, :] for key, val in last_obs.items()}
                 ac_in = (last_observation, last_done[np.newaxis, :])
             # ac_in = (last_obs[np.newaxis, :], last_done[np.newaxis, :])
-            _, _, last_val = network.apply(train_state.params, hstate, ac_in)
+            _, _, last_val, _ = network.apply(train_state.params, hstate, ac_in)
             last_val = last_val.squeeze(0)
             def _calculate_gae(traj_batch, last_val, last_done, gae_lambda):
                 def _get_advantages(carry, transition):
@@ -260,7 +274,7 @@ def make_train(config: dict, rand_key: jax.random.PRNGKey):
 
                     def _loss_fn(params, init_hstate, traj_batch, gae, targets):
                         # RERUN NETWORK
-                        _, pi, value = network.apply(
+                        _, pi, value, _ = network.apply(
                             params, init_hstate[0], (traj_batch.obs, traj_batch.done)
                         )
                         log_prob = pi.log_prob(traj_batch.action)
@@ -281,7 +295,7 @@ def make_train(config: dict, rand_key: jax.random.PRNGKey):
                                          (1 - ld_weight) * value_loss
                         # CALCULATE ACTOR LOSS
                         ratio = jnp.exp(log_prob - traj_batch.log_prob)
-                        
+
                         # which advantage do we use to update our policy?
                         if double_critic:
                             gae = (alpha * gae[..., 0] +
@@ -389,19 +403,6 @@ def make_train(config: dict, rand_key: jax.random.PRNGKey):
                         print(
                             f"timesteps={timesteps[0]} - {timesteps[-1]}, avg episodic return={avg_return_values:.2f}"
                         )
-                    # Save to CSV file
-                    file_type = 'MEMORYLESS' if config['MEMORYLESS'] else 'RNN'
-                    file_path = Path(f'plotting/results/{config["ENV_NAME"]}/{file_type}.csv')  # Corrected path
-                    file_path.parent.mkdir(parents=True, exist_ok=True)
-                    # Check if the file exists and open it accordingly
-                    with file_path.open('a', newline='') as file:
-                        writer = csv.writer(file)
-                        # If the file was empty, write the header
-                        if file.tell() == 0:
-                            writer.writerow(['Start Timestep', 'End Timestep', 'Average Episodic Return'])
-                        # Write data
-                        if len(timesteps) > 0:
-                            writer.writerow([timesteps[0], timesteps[-1], avg_return_values])
 
                 jax.debug.callback(callback, metric)
 
@@ -453,6 +454,7 @@ def make_train(config: dict, rand_key: jax.random.PRNGKey):
 if __name__ == "__main__":
     # jax.disable_jit(True)
     # okay some weirdness here. NUM_ENVS needs to match with NUM_MINIBATCHES
+
     args = PPOHyperparams().parse_args()
     jax.config.update('jax_platform_name', args.platform)
 
@@ -468,6 +470,7 @@ if __name__ == "__main__":
         "NUM_STACK": args.num_stack,
         "NUM_OBSERVATION": args.num_observation,
         "MEMORYLESS": args.memoryless,
+        "SKIP_CONNECTION": args.skip_connection,
         "DOUBLE_CRITIC": args.double_critic,
         "APPROXIMATOR": args.approximator,
         "HORIZON": args.horizon,
@@ -484,6 +487,7 @@ if __name__ == "__main__":
         "ANNEAL_LR": True,
         "DEBUG": args.debug,
     }
+    print(f'double critic: {config["DOUBLE_CRITIC"]}')
 
     rng = jax.random.PRNGKey(args.seed)
     make_train_rng, rng = jax.random.split(rng)
@@ -534,12 +538,12 @@ if __name__ == "__main__":
     }
 
     # Save all results with Orbax
-    # orbax_checkpointer = orbax.checkpoint.PyTreeCheckpointer()
-    # save_args = orbax_utils.save_args_from_target(all_results)
+    orbax_checkpointer = orbax.checkpoint.PyTreeCheckpointer()
+    save_args = orbax_utils.save_args_from_target(all_results)
 
     print(f"Saving results to {results_path}")
-    # orbax_checkpointer.save(results_path, all_results, save_args=save_args)
+    orbax_checkpointer.save(results_path, all_results, save_args=save_args)
     
-    numpyify_and_save(results_path, all_results)
+    # numpyify_and_save(results_path, all_results)
 
     print("Done.")

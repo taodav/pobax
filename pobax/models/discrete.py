@@ -4,7 +4,7 @@ import jax.numpy as jnp
 from jax._src.nn.initializers import orthogonal, constant
 import numpy as np
 
-from .network import SimpleNN, ScannedRNN, SmallImageCNN, RNNApproximator
+from .network import SimpleNN, ScannedRNN, SmallImageCNN, RNNApproximator, SimpleSkipNN
 from .value import Critic
 from .jumanji import *
 
@@ -63,6 +63,7 @@ class DiscreteActor(nn.Module):
 class DiscreteActorCritic(nn.Module):
     action_dim: int
     approximator: str = 'mlp'
+    skip_connection: bool = False
     horizon: int = 3
     hidden_size: int = 128
     depth: int = 3
@@ -77,7 +78,10 @@ class DiscreteActorCritic(nn.Module):
             rnn_in = (embedding, dones)
             hidden, embedding = RNNApproximator(hidden_size=self.hidden_size, horizon=self.horizon)(hidden, rnn_in)
         else:
-            embedding = SimpleNN(hidden_size=self.hidden_size, depth=self.depth)(obs)
+            if self.skip_connection:
+                embedding = SimpleSkipNN(hidden_size=self.hidden_size, depth=self.depth)(obs)
+            else:
+                embedding = SimpleNN(hidden_size=self.hidden_size, depth=self.depth)(obs)
 
         actor = DiscreteActor(self.action_dim, hidden_size=self.hidden_size)
         pi = actor(embedding)
@@ -91,9 +95,8 @@ class DiscreteActorCritic(nn.Module):
                              in_axes=None,
                              out_axes=2,
                              axis_size=2)(hidden_size=self.hidden_size)
-        print(f'embedding shape: {embedding.shape}')
         v = critic(embedding)
-        return hidden, pi, jnp.squeeze(v, axis=-1)
+        return hidden, pi, jnp.squeeze(v, axis=-1), embedding
 
 
 class DiscreteActorCriticRNN(nn.Module):
@@ -108,6 +111,14 @@ class DiscreteActorCriticRNN(nn.Module):
             self.hidden_size, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
         )(obs)
         embedding = nn.relu(embedding)
+        # embedding = nn.Dense(
+        #     self.hidden_size, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
+        # )(obs)
+        # embedding = nn.relu(embedding)
+        # embedding = nn.Dense(
+        #     self.hidden_size, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
+        # )(obs)
+        # embedding = nn.relu(embedding)
 
         rnn_in = (embedding, dones)
         hidden, embedding = ScannedRNN(hidden_size=self.hidden_size)(hidden, rnn_in)
@@ -125,23 +136,37 @@ class DiscreteActorCriticRNN(nn.Module):
                              out_axes=2,
                              axis_size=2)(hidden_size=self.hidden_size)
 
-        print(f'embeeding shape: {embedding.shape}')
         v = critic(embedding)
 
-        return hidden, pi, jnp.squeeze(v, axis=-1)
+        return hidden, pi, jnp.squeeze(v, axis=-1), embedding
 
 
 class ImageDiscreteActorCritic(nn.Module):
     action_dim: int
+    approximator: str = 'mlp'
+    skip_connection: bool = False
+    horizon: int = 3
     hidden_size: int = 128
+    depth: int = 3
     double_critic: bool = False
 
     @nn.compact
-    def __call__(self, _, x):
+    def __call__(self, hidden, x):
         obs, dones = x
 
         embedding = SmallImageCNN(hidden_size=self.hidden_size)(obs)
         embedding = nn.relu(embedding)
+
+        if self.approximator == 'rnn':
+            embedding = nn.Dense(self.hidden_size, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(embedding)
+            embedding = nn.relu(embedding)
+            rnn_in = (embedding, dones)
+            hidden, embedding = RNNApproximator(hidden_size=self.hidden_size, horizon=self.horizon)(hidden, rnn_in)
+        else:
+            if self.skip_connection:
+                embedding = SimpleSkipNN(hidden_size=self.hidden_size, depth=self.depth)(embedding)
+            else:
+                embedding = SimpleNN(hidden_size=self.hidden_size, depth=self.depth)(embedding)
 
         actor = DiscreteActor(self.action_dim, hidden_size=self.hidden_size)
         pi = actor(embedding)
@@ -158,7 +183,7 @@ class ImageDiscreteActorCritic(nn.Module):
 
         v = critic(embedding)
 
-        return _, pi, jnp.squeeze(v, axis=-1)
+        return hidden, pi, jnp.squeeze(v, axis=-1), embedding
 
 
 class ImageDiscreteActorCriticRNN(nn.Module):
@@ -191,7 +216,7 @@ class ImageDiscreteActorCriticRNN(nn.Module):
 
         v = critic(embedding)
 
-        return hidden, pi, jnp.squeeze(v, axis=-1)
+        return hidden, pi, jnp.squeeze(v, axis=-1), embedding
 
 
 class BattleShipActorCriticRNN(nn.Module):
@@ -247,7 +272,7 @@ class BattleShipActorCriticRNN(nn.Module):
 
         v = critic(embedding)
 
-        return hidden, pi, jnp.squeeze(v, axis=-1)
+        return hidden, pi, jnp.squeeze(v, axis=-1), embedding
 
 
 class BattleShipActorCritic(nn.Module):
@@ -305,7 +330,7 @@ class BattleShipActorCritic(nn.Module):
 
         v = critic(embedding)
 
-        return hidden, pi, jnp.squeeze(v, axis=-1)
+        return hidden, pi, jnp.squeeze(v, axis=-1), embedding
     
 jumanji_cnn_actor_dict = {
     "Game2048-v1": (Game2048CNN, Game2048Actor),
@@ -345,20 +370,35 @@ class JumanjiActorCriticRNN(nn.Module):
 
         v = critic(embedding)
 
-        return hidden, pi, jnp.squeeze(v, axis=-1)
+        return hidden, pi, jnp.squeeze(v, axis=-1), embedding
 
 class JumanjiActorCritic(nn.Module):
     env_name: str
     action_dim: int
+    approximator: str = 'mlp'
+    skip_connection: bool = False
+    horizon: int = 3
     hidden_size: int = 128
+    depth: int = 3
     double_critic: bool = False
 
     @nn.compact
-    def __call__(self, _, x):
+    def __call__(self, hidden, x):
         obs, dones = x
         cnn, Actor = jumanji_cnn_actor_dict[self.env_name]
         embedding = cnn(hidden_size=self.hidden_size)(obs)
         embedding = nn.relu(embedding)
+
+        if self.approximator == 'rnn':
+            embedding = nn.Dense(self.hidden_size, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(embedding)
+            embedding = nn.relu(embedding)
+            rnn_in = (embedding, dones)
+            hidden, embedding = RNNApproximator(hidden_size=self.hidden_size, horizon=self.horizon)(hidden, rnn_in)
+        else:
+            if self.skip_connection:
+                embedding = SimpleSkipNN(hidden_size=self.hidden_size, depth=self.depth)(embedding)
+            else:
+                embedding = SimpleNN(hidden_size=self.hidden_size, depth=self.depth)(embedding)
 
         actor = Actor(self.action_dim, hidden_size=self.hidden_size)
         pi = actor(embedding, obs)
@@ -373,4 +413,4 @@ class JumanjiActorCritic(nn.Module):
                              out_axes=2,
                              axis_size=2)(hidden_size=self.hidden_size)
         v = critic(embedding)
-        return _, pi, jnp.squeeze(v, axis=-1)
+        return hidden, pi, jnp.squeeze(v, axis=-1), embedding

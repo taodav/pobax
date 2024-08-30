@@ -82,7 +82,14 @@ def parse_exp_dir(study_path, study_hparam_path):
 
     scores, final_scores, envs, best_hyperparams = [], [], [], {}
     for results_path in tqdm(study_paths):
-        restored = load_info(results_path)
+        results_path = Path(results_path).resolve()
+        if results_path.name in {'dataset', 'probe'}:
+            continue     
+        if results_path.suffix == '.npy':
+            restored = load_info(results_path)
+        else:
+            orbax_checkpointer = orbax.checkpoint.PyTreeCheckpointer()
+            restored = orbax_checkpointer.restore(results_path)
 
         config, args = restored['config'], restored['args']
 
@@ -104,14 +111,13 @@ def parse_exp_dir(study_path, study_hparam_path):
         seeds_combined = combine_seeds_and_envs(online_disc_returns)
 
         final_seeds_combined = combine_seeds_and_envs(final_disc_returns)
-        scores.append(seeds_combined[0, 0, 0])
-        final_scores.append(final_seeds_combined[0, 0, 0])
+        scores.append(seeds_combined[0, 0, 0, 0, 0, 0])
+        final_scores.append(final_seeds_combined[0, 0, 0, 0, 0, 0])
         envs.append(args['env'])
         best_hyperparams[args['env']] = {k: args[k] for k in train_sign_hparams}
 
 
-    dim_ref = ['vf_coeff', 'lambda0', 'lr', 'num_update', 'num_steps', 'seeds', 'env']
-
+    dim_ref = ['vf_coeff', 'ld_weight', 'alpha', 'lambda1', 'lambda0', 'lr', 'num_update', 'num_steps', 'seeds', 'env']
     parsed_res = {
         'envs': envs,
         'scores': np.stack(scores, axis=-1),

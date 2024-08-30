@@ -5,8 +5,8 @@ file = __file__  # Use this in actual script to dynamically get the file name
 exp_name = Path(file).stem
 
 # Define various hyperparameter values
-lrs = [1e-2, 1e-3, 1e-4, 1e-5, 1e-6]  # Learning rates
-lambda0s = [0.95]  # GAE lambda values
+lrs = [2.5e-3, 2.5e-4, 2.5e-5]  # Learning rates
+lambda0s = [0.1, 0.5, 0.7, 0.9, 0.95]
 vf_coeffs = [0.5]  # Value function coefficients
 entropy_coeffs = [0.01]  # Entropy coefficients
 
@@ -15,8 +15,9 @@ hparams = {
     'file_name': f'runs_{exp_name}.txt',
     'entry': 'pobax.algos.ppo',
     'args': [{
-        'env': 'Reacher-misc',
+        'env': 'Reacher-F-v0',
         'memoryless': True,
+        'double_critic': False,
         'approximator': 'rnn',
         'horizon': 3,
         'num_stack': 1,
@@ -33,7 +34,7 @@ hparams = {
         'update_epochs': 4,
         'steps_log_freq': 4,
         'update_log_freq': 5,
-        'total_steps': int(1e7),
+        'total_steps': int(5e6),
         'seed': 2020,
         'n_seeds': 5,
         'platform': 'gpu',

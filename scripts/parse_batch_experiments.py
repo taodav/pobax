@@ -88,7 +88,7 @@ def get_final_eval(final_eval: dict):
 
 def parse_exp_dir(study_path, study_hparam_path):
     # TODO: refactor this to use the entry point and see the arguments to the `train` function.
-    train_sign_hparams = ['vf_coeff', 'lambda0', 'lr']
+    train_sign_hparams = ['vf_coeff', 'ld_weight', 'alpha', 'lambda1', 'lambda0', 'lr']
 
     spec = importlib.util.spec_from_file_location('temp', study_hparam_path)
     var_module = importlib.util.module_from_spec(spec)
@@ -143,12 +143,19 @@ def parse_exp_dir(study_path, study_hparam_path):
     scores_by_env = {}
 
     for results_path in tqdm(study_paths):
-        restored = load_info(results_path)
+        results_path = Path(results_path).resolve()
+        if results_path.name in {'dataset', 'probe', 'probe.npy'}:
+            continue     
+        if results_path.suffix == '.npy':
+            restored = load_info(results_path)
+        else:
+            orbax_checkpointer = orbax.checkpoint.PyTreeCheckpointer()
+            restored = orbax_checkpointer.restore(results_path)
         print(f'Loaded {results_path}')
         # Make sure the swept hypers are the same order as listed above.
         # Last argument is rng.
         swept_order = restored['argument_order']
-
+        print(f'swept_order: {swept_order}')
         if swept_order is not None:
             for i, k in enumerate(swept_order[:-1]):
                 assert k == train_sign_hparams[i]

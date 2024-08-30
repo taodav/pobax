@@ -24,7 +24,7 @@ def get_network_fn(env: environment.Environment, env_params: environment.EnvPara
         # Check whether we use image observations
         obs_space_shape = env.observation_space(env_params).shape
         if len(obs_space_shape) > 1:
-            assert jnp.all(jnp.array(obs_space_shape[:-1]) == 5)
+            assert jnp.all(jnp.array(obs_space_shape[:-1]) == 10)
             network_fn = ImageDiscreteActorCriticRNN
             if memoryless:
                 network_fn = ImageDiscreteActorCritic

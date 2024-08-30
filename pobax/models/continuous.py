@@ -4,7 +4,7 @@ import jax.numpy as jnp
 from jax._src.nn.initializers import orthogonal, constant
 import numpy as np
 
-from .network import SimpleNN, ScannedRNN, RNNApproximator
+from .network import SimpleNN, ScannedRNN, RNNApproximator, SimpleSkipNN
 from .value import Critic
 
 
@@ -35,6 +35,7 @@ class ContinuousActor(nn.Module):
 class ContinuousActorCritic(nn.Module):
     action_dim: int
     approximator: str = 'mlp'
+    skip_connection: bool = False
     horizon: int = 3
     hidden_size: int = 128
     depth: int = 3
@@ -50,7 +51,10 @@ class ContinuousActorCritic(nn.Module):
             rnn_in = (embedding, dones)
             hidden, embedding = RNNApproximator(hidden_size=self.hidden_size, horizon=self.horizon)(hidden, rnn_in)
         else:
-            embedding = SimpleNN(hidden_size=self.hidden_size, depth=self.depth)(obs)
+            if self.skip_connection:
+                embedding = SimpleSkipNN(hidden_size=self.hidden_size, depth=self.depth)(obs)
+            else:
+                embedding = SimpleNN(hidden_size=self.hidden_size, depth=self.depth)(obs)
 
         actor = ContinuousActor(self.action_dim, hidden_size=self.hidden_size,
                                 activation=self.activation)
@@ -68,7 +72,7 @@ class ContinuousActorCritic(nn.Module):
 
         v = critic(embedding)
 
-        return hidden, pi, jnp.squeeze(v, axis=-1)
+        return hidden, pi, jnp.squeeze(v, axis=-1), embedding
 
 
 class ContinuousActorCriticRNN(nn.Module):
@@ -104,4 +108,4 @@ class ContinuousActorCriticRNN(nn.Module):
 
         v = critic(embedding)
 
-        return hidden, pi, jnp.squeeze(v, axis=-1)
+        return hidden, pi, jnp.squeeze(v, axis=-1), embedding

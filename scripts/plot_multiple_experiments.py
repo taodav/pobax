@@ -74,6 +74,7 @@ def plot_reses(all_reses: list[tuple], n_rows: int = 2,
 
     for k, (study_name, res, color) in enumerate(all_reses):
         scores = res['scores']
+        print(scores.shape)
         if isinstance(scores, list):
             mean_over_steps = [score.mean(axis=1)[..., 0] for score in scores]
             mean = [m.mean(axis=-1) for m in mean_over_steps]
@@ -167,7 +168,7 @@ def find_file_in_dir(file_name: str, base_dir: Path) -> Path:
             return path
 
 if __name__ == "__main__":
-    env_names = ['atari', 'cartpole', 'mujoco', 'pong', 'reacher', 'swimmer']
+    env_names = ['atari', 'bsuite', 'cartpole', 'mujoco', 'reacher', 'swimmer']
     for env_name in env_names:
         # normal
         study_paths = [
@@ -250,17 +251,24 @@ if __name__ == "__main__":
             # ('Memoryless + Stack Observation 8', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_observation8_ppo'), 'yellow'),
 
             # Observation + RNN skip
-            ('PPO + RNN', Path(ROOT_DIR, 'results', f'{env_name}_rnn_ppo'), 'blue'),
-            ('RNN skip + Stack Observation 1', Path(ROOT_DIR, 'results', f'{env_name}_rnn_skip_observation1_ppo'), 'dark gray'),
-            ('RNN skip + Stack Observation 2', Path(ROOT_DIR, 'results', f'{env_name}_rnn_skip_observation2_ppo'), 'green'),
-            ('RNN skip + Stack Observation 4', Path(ROOT_DIR, 'results', f'{env_name}_rnn_skip_observation4_ppo'), 'red'),
-            ('RNN skip + Stack Observation 8', Path(ROOT_DIR, 'results', f'{env_name}_rnn_skip_observation8_ppo'), 'yellow'),
+            # ('PPO + RNN', Path(ROOT_DIR, 'results', f'{env_name}_rnn_ppo'), 'blue'),
+            # ('RNN skip + Stack Observation 1', Path(ROOT_DIR, 'results', f'{env_name}_rnn_skip_observation1_ppo'), 'dark gray'),
+            # ('RNN skip + Stack Observation 2', Path(ROOT_DIR, 'results', f'{env_name}_rnn_skip_observation2_ppo'), 'green'),
+            # ('RNN skip + Stack Observation 4', Path(ROOT_DIR, 'results', f'{env_name}_rnn_skip_observation4_ppo'), 'red'),
+            # ('RNN skip + Stack Observation 8', Path(ROOT_DIR, 'results', f'{env_name}_rnn_skip_observation8_ppo'), 'yellow'),
 
 
             # reacher
             # ('PPO + RNN', Path(ROOT_DIR, 'results', f'{env_name}_rnn_ppo'), 'blue'),
             # ('RNN skip', Path(ROOT_DIR, 'results', f'{env_name}_rnn_approximator_ppo'), 'red'),
             # ('Memoryless PPO', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_ppo'), 'dark gray'),
+
+            ('PPO + RNN + LD', Path(ROOT_DIR, 'results', f'{env_name}_rnn_ppo_LD_best'), 'blue'),
+            # ('PPO + RNN', Path(ROOT_DIR, 'results', f'{env_name}_rnn_ppo_best'), 'dark gray'),
+            ('PPO + Memoryless + LD', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_ppo_LD_best'), 'red'),
+            # ('PPO + Memoryless', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_ppo_best'), 'orange'),
+            ('PPO + RNN_skip + LD', Path(ROOT_DIR, 'results', f'{env_name}_rnn_skip_ppo_LD_best'), 'green'),
+            # ('PPO + RNN_skip', Path(ROOT_DIR, 'results', f'{env_name}_rnn_skip_ppo_best'), 'purple'),
         ]
 
         # fixedlambda
@@ -312,7 +320,7 @@ if __name__ == "__main__":
 
         fig, axes = plot_reses(all_reses, individual_runs=False, n_rows=2)
 
-        save_plot_to = Path(ROOT_DIR, 'graphs', f'{plot_name}_observation_rnn_skip.jpg')
+        save_plot_to = Path(ROOT_DIR, 'graphs', f'{plot_name}_RNN_Memoryless_RNNskip_LD.jpg')
 
         fig.savefig(save_plot_to, bbox_inches='tight')
         print(f"Saved figure to {save_plot_to}")

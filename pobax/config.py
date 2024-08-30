@@ -9,7 +9,7 @@ class Hyperparams(Tap):
     alg: Literal['ppo'] = 'ppo'
 
     default_max_steps_in_episode: int = 1000
-    total_steps: int = int(1e7)
+    total_steps: int = int(1e6)
     gamma: float = 0.99
 
     num_eval_envs: int = 10
@@ -32,11 +32,12 @@ class PPOHyperparams(Hyperparams):
     
     # fix rnn params
     approximator: Literal['mlp', 'rnn'] = 'mlp'
+    skip_connection: bool = False
     horizon: int = 3
     num_stack: int = 1
     num_observation: int = 1
 
-    lr: list[float] = [2.5e-4] # learning rate
+    lr: list[float] = [2.5e-3] # learning rate
     lambda0: list[float] = [0.95]  # GAE lambda_0
     lambda1: list[float] = [0.5]  # GAE lambda_1
     alpha: list[float] = [1.]  # adv = alpha * adv_lambda_0 + (1 - alpha) * adv_lambda_1

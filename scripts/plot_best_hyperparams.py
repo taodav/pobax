@@ -167,7 +167,7 @@ def find_file_in_dir(file_name: str, base_dir: Path) -> Path:
             return path
 
 if __name__ == "__main__":
-    env_name = 'game2048'
+    env_name = 'ant'
 
     # normal
     study_paths = [
@@ -196,9 +196,29 @@ if __name__ == "__main__":
         # ('Memoryless PPO', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_ppo_best'), 'dark gray'),
 
         # jumanji
-        ('PPO + RNN', Path(ROOT_DIR, 'results', f'game2048_rnn_ppo_best'), 'blue'),
-        ('PPO + Memoryless', Path(ROOT_DIR, 'results', f'game2048_memoryless_ppo_best'), 'dark gray'),
-    
+        # ('PPO + RNN + LD', Path(ROOT_DIR, 'results', f'{env_name}_rnn_reward_ppo_LD'), 'blue'),
+        # ('PPO + RNN', Path(ROOT_DIR, 'results', f'{env_name}_rnn_reward_ppo'), 'blue'),
+        # ('PPO + Memoryless + LD', Path(ROOT_DIR, 'results', f'reacher_memoryless_ppo_LD'), 'blue'),
+        # ('PPO + Memoryless', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_reward_ppo'), 'dark gray'),
+        # ('PPO + Memoryless', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_reward_ppo_LD'), 'green'),
+        # ('PPO + RNN + LD', Path(ROOT_DIR, 'results', f'cartpole_rnn_ppo_LD'), 'red'),
+        # ('PPO + RNN_skip + LD', Path(ROOT_DIR, 'results', f'cartpole_rnn_skip_ppo_LD'), 'yellow'),
+
+        # ('PPO + RNN + LD', Path(ROOT_DIR, 'results', f'{env_name}_rnn_ppo_LD'), 'blue'),
+        # ('PPO + RNN', Path(ROOT_DIR, 'results', f'{env_name}_rnn_ppo'), 'dark gray'),
+        # ('PPO + Memoryless + LD', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_ppo_LD'), 'red'),
+        # ('PPO + Memoryless', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_ppo'), 'orange'),
+        # ('PPO + RNN_skip', Path(ROOT_DIR, 'results', f'{env_name}_rnn_skip_ppo'), 'purple'),
+        # ('PPO + RNN_skip + LD', Path(ROOT_DIR, 'results', f'{env_name}_rnn_skip_ppo_LD'), 'green'),
+
+        # ('PPO + Memoryless', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_no_skip_ppo'), 'yellow'),
+        ('PPO + Memoryless + LD', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_no_skip_ppo_LD'), 'cyan'),
+        ('PPO + RNN + LD', Path(ROOT_DIR, 'results', f'{env_name}_rnn_ppo_LD'), 'blue'),
+        # ('PPO + RNN', Path(ROOT_DIR, 'results', f'{env_name}_rnn_ppo'), 'dark gray'),
+        ('PPO + Memoryless + LD + Skip connection', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_ppo_LD'), 'red'),
+        # ('PPO + Memoryless + Skip connection', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_ppo'), 'orange'),
+        # ('PPO + RNN_skip', Path(ROOT_DIR, 'results', f'{env_name}_rnn_skip_ppo'), 'purple'),
+        ('PPO + RNN_skip + LD', Path(ROOT_DIR, 'results', f'{env_name}_rnn_skip_ppo_LD'), 'green'),
     ]
 
     # fixedlambda
@@ -249,7 +269,7 @@ if __name__ == "__main__":
 
     fig, axes = plot_reses(all_reses, individual_runs=False, n_rows=2)
 
-    save_plot_to = Path(ROOT_DIR, 'graphs', f'{plot_name}_jumanji.jpg')
+    save_plot_to = Path(ROOT_DIR, 'graphs', f'{plot_name}_probe_training_LD.jpg')
 
     fig.savefig(save_plot_to, bbox_inches='tight')
     print(f"Saved figure to {save_plot_to}")

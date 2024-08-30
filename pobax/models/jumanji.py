@@ -121,8 +121,8 @@ class SokobanCNN(nn.Module):
         # MLP - Optional depending on further processing needs
         final_out = nn.Dense(features=self.hidden_size)(flat_out)
 
-        norm_step_count = jnp.expand_dims(step_count / time_limit, axis=-1)
-        final_out = jnp.concatenate([final_out, norm_step_count], axis=-1)
+        # norm_step_count = jnp.expand_dims(step_count / time_limit, axis=-1)
+        # final_out = jnp.concatenate([final_out, norm_step_count], axis=-1)
         final_out = nn.Dense(features=self.hidden_size)(final_out)
         final_out = nn.relu(final_out)
         return final_out
@@ -183,9 +183,9 @@ class SnakeCNN(nn.Module):
 
         # Flatten the output to prepare for dense layer processing
         flat_out = x.reshape((*x.shape[:-3], -1))  # Flatten preserving batch size
-        norm_step_count = jnp.expand_dims(step_count / time_limit, axis=-1)
-        final_out = jnp.concatenate([flat_out, norm_step_count], axis=-1)
-        final_out = nn.Dense(features=self.hidden_size)(final_out)
+        # norm_step_count = jnp.expand_dims(step_count / time_limit, axis=-1)
+        # final_out = jnp.concatenate([flat_out, norm_step_count], axis=-1)
+        final_out = nn.Dense(features=self.hidden_size)(flat_out)
         final_out = nn.relu(final_out)
         return final_out
 
