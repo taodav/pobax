@@ -124,7 +124,7 @@ if __name__ == "__main__":
 
     # TODO: we need to collect samples from the start of an episode
     # TODO: OR start with a single z, then go from there.
-    sample = replay_buffer.sample(batch_size, horizon)
+    # sample = replay_buffer.sample(batch_size, horizon)
     # we do rollouts here
     # _z = sample
     # for t in range(self.horizon - 1):
@@ -132,5 +132,21 @@ if __name__ == "__main__":
     #         self.model.sample_actions(_z, self.model.policy_model.params, key=prior_keys[t])[0])
     #     _z = self.model.next(
     #         _z, policy_actions[t], self.model.dynamics_model.params)
+
+    prev_plan = (
+        jnp.zeros((env_config.num_envs, agent.horizon, agent.model.action_dim)),
+        jnp.full((env_config.num_envs, agent.horizon,
+                  agent.model.action_dim), agent.max_plan_std)
+    )
+    observation, _ = env.reset(seed=cfg.seed)
+    for i in range(horizon):
+        rng, action_key = jax.random.split(rng)
+        prev_plan = (prev_plan[0],
+                     jnp.full_like(prev_plan[1], agent.max_plan_std))
+        action, prev_plan = agent.act(
+            observation, prev_plan=prev_plan, train=True, key=action_key)
+
+        next_observation, reward, terminated, truncated, info = env.step(action)
+
     print()
 
