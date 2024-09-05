@@ -1,13 +1,14 @@
 
+import gymnasium as gym
 from gymnax.environments import environment, spaces
-from pobax.envs.battleship import Battleship
+from pobax.envs.jax.battleship import Battleship
 
 from .continuous import *
 from .discrete import *
 
 
-def get_network_fn(env: environment.Environment, env_params: environment.EnvParams,
-                   memoryless: bool = False):
+def get_gymnax_network_fn(env: environment.Environment, env_params: environment.EnvParams,
+                          memoryless: bool = False):
     if isinstance(env, Battleship) or ((hasattr(env, '_unwrapped') and isinstance(env._unwrapped, Battleship))):
         network_fn = BattleShipActorCriticRNN
         if memoryless:
@@ -36,3 +37,9 @@ def get_network_fn(env: environment.Environment, env_params: environment.EnvPara
     else:
         raise NotImplementedError
     return network_fn, action_size
+
+
+def get_network_fn(env: gym.Env, memoryless: bool = False):
+    # TODO
+    pass
+

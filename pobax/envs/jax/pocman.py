@@ -12,7 +12,7 @@ from jumanji.environments.routing.pac_man import PacMan, State
 from jumanji.environments.routing.pac_man.generator import AsciiGenerator
 import numpy as np
 
-from .wrappers import GymnaxWrapper
+from pobax.envs.wrappers import GymnaxWrapper
 
 # It's important for [0, 0] to be an unreachable spot,
 # for pellet tracking.

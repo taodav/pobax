@@ -13,7 +13,7 @@ from jax import random, lax
 
 from definitions import ROOT_DIR
 
-from .wrappers import GymnaxWrapper
+from pobax.envs.wrappers import GymnaxWrapper
 
 
 def half_dist_prob(dist: float, max_dist: float, lb: float = 0.5):
@@ -97,7 +97,7 @@ class RockSample(Environment):
     def __init__(self,
                  key: chex.PRNGKey,
                  config_path: Path = Path(ROOT_DIR, 'pobax', 'envs',
-                                          'configs', 'rocksample_7_8_config.json')):
+                                          '../configs', 'rocksample_7_8_config.json')):
         """
         RockSample environment in Gymnax.
         Observations: position (2) and rock goodness/badness

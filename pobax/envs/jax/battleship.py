@@ -9,7 +9,7 @@ import gymnax
 from gymnax.environments.environment import Environment, EnvParams
 from gymnax.environments import environment, spaces
 
-from .wrappers import GymnaxWrapper
+from pobax.envs.wrappers import GymnaxWrapper
 
 
 @chex.dataclass

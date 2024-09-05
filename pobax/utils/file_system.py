@@ -16,7 +16,7 @@ import optax
 import orbax.checkpoint
 
 from pobax.envs import get_env
-from pobax.models import get_network_fn
+from pobax.models import get_gymnax_network_fn
 from pobax.config import Hyperparams
 
 from definitions import ROOT_DIR
@@ -87,7 +87,7 @@ def load_train_state(key: jax.random.PRNGKey, fpath: Path):
                               args['gamma'],
                               action_concat=args['action_concat'])
 
-    network_fn, action_size = get_network_fn(env, env_params, memoryless=args['memoryless'])
+    network_fn, action_size = get_gymnax_network_fn(env, env_params, memoryless=args['memoryless'])
 
     network = network_fn(action_size,
                          double_critic=args['double_critic'],

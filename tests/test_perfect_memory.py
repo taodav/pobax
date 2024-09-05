@@ -5,8 +5,8 @@ import jax.numpy as jnp
 
 from pobax.envs.battleship import Battleship, BattleShipState
 from pobax.envs.battleship import PerfectMemoryWrapper as BSPerfectMemoryWrapper
-from pobax.envs.rocksample import RockSample
-from pobax.envs.rocksample import PerfectMemoryWrapper as RSPerfectMemoryWrapper
+from pobax.envs.jax.rocksample import RockSample
+from pobax.envs.jax.rocksample import PerfectMemoryWrapper as RSPerfectMemoryWrapper
 from definitions import ROOT_DIR
 
 

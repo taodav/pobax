@@ -2,7 +2,7 @@ from pathlib import Path
 
 import jax
 
-from pobax.envs.rocksample import RockSample
+from pobax.envs.jax.rocksample import RockSample
 from definitions import ROOT_DIR
 
 def test_rocksample():
