@@ -1,6 +1,8 @@
 
 import gymnasium as gym
 from gymnax.environments import environment, spaces
+from sympy.physics.units import action
+
 from pobax.envs.jax.battleship import Battleship
 
 from .continuous import *
@@ -41,5 +43,19 @@ def get_gymnax_network_fn(env: environment.Environment, env_params: environment.
 
 def get_network_fn(env: gym.Env, memoryless: bool = False):
     # TODO
-    pass
+    if isinstance(env.action_space, gym.spaces.Box):
+        action_shape = env.action_space.shape
+        if len(action_shape) > 1:
+            # vec env
+            action_size = action_shape[-1]
+
+        # Check whether we use image observations
+        if isinstance(env.observation_space, gym.spaces.Dict):
+            network_fn = ImageContinuousActorCriticRNN
+            if memoryless:
+                network_fn = ImageContinuousActorCritic
+    else:
+        raise NotImplementedError
+
+    return network_fn, action_size
 
