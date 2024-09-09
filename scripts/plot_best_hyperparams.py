@@ -167,7 +167,7 @@ def find_file_in_dir(file_name: str, base_dir: Path) -> Path:
             return path
 
 if __name__ == "__main__":
-    env_name = 'ant'
+    env_name = 'reacher'
 
     # normal
     study_paths = [
@@ -180,9 +180,12 @@ if __name__ == "__main__":
         # depth
 
         # ('PPO + RNN', Path(ROOT_DIR, 'results', f'{env_name}_rnn_depth3_ppo_best'), 'blue'),
-        # ('Memoryless PPO + depth 3', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_depth3_ppo_best'), 'dark gray'),
-        # ('Memoryless PPO + depth 5', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_depth5_ppo_best'), 'red'),
-        # ('Memoryless PPO + depth 7', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_depth7_ppo_best'), 'yellow')
+        # ('Memoryless PPO + depth 3', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_no_skip_depth3_ppo'), 'dark gray'),
+        # ('Memoryless PPO + depth 3 + LD', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_no_skip_depth3_ppo_LD'), 'blue'),
+        # ('Memoryless PPO + depth 5', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_no_skip_depth5_ppo'), 'green'),
+        # ('Memoryless PPO + depth 5 + LD', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_no_skip_depth5_ppo_LD'), 'purple'),
+        # ('Memoryless PPO + depth 7', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_no_skip_depth7_ppo'), 'yellow'),
+        # ('Memoryless PPO + depth 7 + LD', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_no_skip_depth7_ppo_LD'), 'cyan'),
 
         # width
         # ('PPO + RNN', Path(ROOT_DIR, 'results', f'{env_name}_rnn_width128_ppo_best'), 'blue'),
@@ -211,13 +214,13 @@ if __name__ == "__main__":
         # ('PPO + RNN_skip', Path(ROOT_DIR, 'results', f'{env_name}_rnn_skip_ppo'), 'purple'),
         # ('PPO + RNN_skip + LD', Path(ROOT_DIR, 'results', f'{env_name}_rnn_skip_ppo_LD'), 'green'),
 
-        # ('PPO + Memoryless', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_no_skip_ppo'), 'yellow'),
+        ('PPO + Memoryless', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_no_skip_ppo'), 'yellow'),
         ('PPO + Memoryless + LD', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_no_skip_ppo_LD'), 'cyan'),
         ('PPO + RNN + LD', Path(ROOT_DIR, 'results', f'{env_name}_rnn_ppo_LD'), 'blue'),
-        # ('PPO + RNN', Path(ROOT_DIR, 'results', f'{env_name}_rnn_ppo'), 'dark gray'),
+        ('PPO + RNN', Path(ROOT_DIR, 'results', f'{env_name}_rnn_ppo'), 'dark gray'),
         ('PPO + Memoryless + LD + Skip connection', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_ppo_LD'), 'red'),
-        # ('PPO + Memoryless + Skip connection', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_ppo'), 'orange'),
-        # ('PPO + RNN_skip', Path(ROOT_DIR, 'results', f'{env_name}_rnn_skip_ppo'), 'purple'),
+        ('PPO + Memoryless + Skip connection', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_ppo'), 'orange'),
+        ('PPO + RNN_skip', Path(ROOT_DIR, 'results', f'{env_name}_rnn_skip_ppo'), 'purple'),
         ('PPO + RNN_skip + LD', Path(ROOT_DIR, 'results', f'{env_name}_rnn_skip_ppo_LD'), 'green'),
     ]
 
@@ -269,7 +272,7 @@ if __name__ == "__main__":
 
     fig, axes = plot_reses(all_reses, individual_runs=False, n_rows=2)
 
-    save_plot_to = Path(ROOT_DIR, 'graphs', f'{plot_name}_probe_training_LD.jpg')
+    save_plot_to = Path(ROOT_DIR, 'graphs', f'{plot_name}_LD.jpg')
 
     fig.savefig(save_plot_to, bbox_inches='tight')
     print(f"Saved figure to {save_plot_to}")

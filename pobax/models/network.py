@@ -136,7 +136,6 @@ class SmallImageCNN(nn.Module):
         final_out = nn.Dense(features=self.hidden_size)(flat_out)
         return final_out
 
-
 class SimpleNN(nn.Module):
     hidden_size: int
     depth: int = 3
@@ -147,14 +146,32 @@ class SimpleNN(nn.Module):
             x
         )
         out = nn.relu(out)
-        out = nn.Dense(
-            self.hidden_size, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
-        )(out) 
-        out = nn.relu(out)
+        for _ in range(self.depth - 2):
+            x = nn.Dense(self.hidden_size, kernel_init=orthogonal(0.01), bias_init=constant(0.0))(x)
+            x = nn.relu(x)
         out = nn.Dense(
             self.hidden_size, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
         )(out)
-        return out
+        return x
+
+# class SimpleNN(nn.Module):
+#     hidden_size: int
+#     depth: int = 3
+
+#     @nn.compact
+#     def __call__(self, x):
+#         out = nn.Dense(self.hidden_size, kernel_init=orthogonal(2), bias_init=constant(0.0))(
+#             x
+#         )
+#         out = nn.relu(out)
+#         out = nn.Dense(
+#             self.hidden_size, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
+#         )(out) 
+#         out = nn.relu(out)
+#         out = nn.Dense(
+#             self.hidden_size, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
+#         )(out)
+#         return out
 
 class ResidualBlock(nn.Module):
     hidden_size: int

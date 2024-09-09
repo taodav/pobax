@@ -23,7 +23,7 @@ from definitions import ROOT_DIR
 
 class ProbeHyperparams(Tap):
     dataset_path: Union[str, Path]
-    features_idx: int = 0
+    input_key: str = 'memoryless_embedding'  # Key in dataset that we set as input
     target_key: str = 'observation'  # Key in dataset that we set as target
 
     hidden_size: int = 512
@@ -31,7 +31,7 @@ class ProbeHyperparams(Tap):
     lr: float = 1e-4
 
     epochs: int = 100
-    train_steps: int = int(1e6)
+    train_steps: int = int(4e6)
     batch_size: int = 32
 
     study_name: str = 'test'
@@ -57,11 +57,9 @@ def make_train(args: ProbeHyperparams):
         restored = orbax_checkpointer.restore(args.dataset_path)
 
     dataset_args, dataset = restored['args'], restored['dataset']
-
     experience = jax.tree.map(lambda x: jnp.array(x), dataset)
     if 'x' not in experience:
-        experience['x'] = experience[f'x_{args.features_idx}']
-
+        experience['x'] = experience[f'x_{args.input_key}']
     for key in list(experience.keys()):
         if key.startswith('x_'):
             del experience[key]
@@ -71,7 +69,6 @@ def make_train(args: ProbeHyperparams):
 
     n_predictions = getattr(experience, args.target_key).shape[-1]
     args.n_predictions = n_predictions
-    args.study_name = dataset_args['study_name']
 
     network = ProbePredictorNN(hidden_size=args.hidden_size,
                                 n_outs=n_predictions,
@@ -121,6 +118,11 @@ def make_train(args: ProbeHyperparams):
 
                 def _loss_fn(params: dict):
                     _, logits = network.apply(params, batch.experience.first.x)
+                    # logits_mask = jnp.concatenate([logits[:, :4], logits[:, 6:]], axis=1)
+                    # target_mask = jnp.concatenate([target[:, :4], target[:, 6:]], axis=1)
+                    # loss = optax.l2_loss(logits_mask, target_mask).sum(axis=-1)
+                    # logits_mask = logits[:, :-2]
+                    # target_mask = target[:, :-2]
                     loss = optax.l2_loss(logits, target).sum(axis=-1)
                     return loss.mean()
 
@@ -181,7 +183,7 @@ if __name__ == '__main__':
                 path_to_str(v)
     path_to_str(out)
 
-    results_dir = Path(ROOT_DIR, 'results', args.study_name)
+    results_dir = Path(ROOT_DIR, 'results', f'{args.input_key}')
     results_dir.mkdir(exist_ok=True)
     results_path = results_dir / f"probe"
 

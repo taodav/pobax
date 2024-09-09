@@ -168,7 +168,7 @@ def find_file_in_dir(file_name: str, base_dir: Path) -> Path:
             return path
 
 if __name__ == "__main__":
-    env_names = ['atari', 'bsuite', 'cartpole', 'mujoco', 'reacher', 'swimmer']
+    env_names = ['cartpole', 'mujoco', 'swimmer']
     for env_name in env_names:
         # normal
         study_paths = [
@@ -181,9 +181,9 @@ if __name__ == "__main__":
             # depth
 
             # ('PPO + RNN', Path(ROOT_DIR, 'results', f'{env_name}_rnn_depth3_ppo_best'), 'blue'),
-            # ('Memoryless PPO + depth 3', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_depth3_ppo_best'), 'dark gray'),
-            # ('Memoryless PPO + depth 5', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_depth5_ppo_best'), 'red'),
-            # ('Memoryless PPO + depth 7', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_depth7_ppo_best'), 'yellow')
+            # ('Memoryless PPO + depth 3', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_depth3_ppo'), 'dark gray'),
+            # ('Memoryless PPO + depth 5', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_depth5_ppo'), 'red'),
+            # ('Memoryless PPO + depth 7', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_depth7_ppo'), 'yellow')
 
             # width
             # ('PPO + RNN', Path(ROOT_DIR, 'results', f'{env_name}_rnn_width128_ppo_best'), 'blue'),
@@ -263,11 +263,11 @@ if __name__ == "__main__":
             # ('RNN skip', Path(ROOT_DIR, 'results', f'{env_name}_rnn_approximator_ppo'), 'red'),
             # ('Memoryless PPO', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_ppo'), 'dark gray'),
 
-            ('PPO + RNN + LD', Path(ROOT_DIR, 'results', f'{env_name}_rnn_ppo_LD_best'), 'blue'),
+            # ('PPO + RNN + LD', Path(ROOT_DIR, 'results', f'{env_name}_rnn_ppo_LD_best'), 'blue'),
             # ('PPO + RNN', Path(ROOT_DIR, 'results', f'{env_name}_rnn_ppo_best'), 'dark gray'),
-            ('PPO + Memoryless + LD', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_ppo_LD_best'), 'red'),
-            # ('PPO + Memoryless', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_ppo_best'), 'orange'),
-            ('PPO + RNN_skip + LD', Path(ROOT_DIR, 'results', f'{env_name}_rnn_skip_ppo_LD_best'), 'green'),
+            ('PPO + Memoryless + LD', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_no_skip_ppo_LD'), 'red'),
+            ('PPO + Memoryless', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_no_skip_ppo'), 'orange'),
+            # ('PPO + RNN_skip + LD', Path(ROOT_DIR, 'results', f'{env_name}_rnn_skip_ppo_LD_best'), 'green'),
             # ('PPO + RNN_skip', Path(ROOT_DIR, 'results', f'{env_name}_rnn_skip_ppo_best'), 'purple'),
         ]
 
@@ -320,7 +320,7 @@ if __name__ == "__main__":
 
         fig, axes = plot_reses(all_reses, individual_runs=False, n_rows=2)
 
-        save_plot_to = Path(ROOT_DIR, 'graphs', f'{plot_name}_RNN_Memoryless_RNNskip_LD.jpg')
+        save_plot_to = Path(ROOT_DIR, 'graphs', f'{plot_name}_Memoryless_no_skip.jpg')
 
         fig.savefig(save_plot_to, bbox_inches='tight')
         print(f"Saved figure to {save_plot_to}")

@@ -43,7 +43,7 @@ def plot_epoch_losses(study_path, env_name):
 
     # Save the plot
     parent_dir = Path(ROOT_DIR, 'graphs')
-    plot_path = parent_dir / f'{env_name}_epoch_losses_LD.png'
+    plot_path = parent_dir / f'{env_name}_epoch_losses_LD_1e7.png'
     plt.savefig(plot_path)
     print(f"Epoch loss plot saved to {plot_path}")
 
@@ -54,15 +54,30 @@ if __name__ == "__main__":
     env_name = 'reacher'
     fname = 'probe.npy'
     study_path =[
-        # ('PPO + Memoryless', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_ppo', fname), 'orange'),
         # ('PPO + Memoryless', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_no_skip_ppo', fname), 'yellow'),
-        ('PPO + Memoryless + LD', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_no_skip_ppo_LD', fname), 'cyan'),
+        # ('PPO + Memoryless + LD', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_no_skip_ppo_LD', fname), 'cyan'),
         # ('PPO + Memoryless + Skip connection', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_ppo', fname), 'orange'),
-        ('PPO + Memoryless + Skip connection + LD', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_ppo_LD', fname), 'red'),
+        # ('PPO + Memoryless + Skip connection + LD', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_ppo_LD', fname), 'red'),
         # ('PPO + RNN', Path(ROOT_DIR, 'results', f'{env_name}_rnn_ppo', fname), 'dark gray'),
-        ('PPO + RNN + LD', Path(ROOT_DIR, 'results', f'{env_name}_rnn_ppo_LD', fname), 'blue'),
+        # ('PPO + RNN + LD', Path(ROOT_DIR, 'results', f'{env_name}_rnn_ppo_LD', fname), 'blue'),
         # ('PPO + RNN Skip', Path(ROOT_DIR, 'results', f'{env_name}_rnn_skip_ppo', fname), 'purple'),
-        ('PPO + RNN Skip + LD', Path(ROOT_DIR, 'results', f'{env_name}_rnn_skip_ppo_LD', fname), 'green'),
+        # ('PPO + RNN Skip + LD', Path(ROOT_DIR, 'results', f'{env_name}_rnn_skip_ppo_LD', fname), 'green'),
+
+        ('PPO + Memoryless', Path(ROOT_DIR, 'results', f'memoryless_embedding', fname), 'yellow'),
+        ('PPO + Memoryless + LD', Path(ROOT_DIR, 'results', f'memoryless_LD_embedding', fname), 'cyan'),
+        ('PPO + Memoryless + Skip connection', Path(ROOT_DIR, 'results', f'memoryless_skip_embedding', fname), 'orange'),
+        ('PPO + Memoryless + Skip connection + LD', Path(ROOT_DIR, 'results', f'memoryless_skip_LD_embedding', fname), 'red'),
+        ('PPO + RNN', Path(ROOT_DIR, 'results', f'rnn_embedding', fname), 'dark gray'),
+        ('PPO + RNN + LD', Path(ROOT_DIR, 'results', f'rnn_LD_embedding', fname), 'blue'),
+        ('PPO + RNN Skip', Path(ROOT_DIR, 'results', f'rnn_skip_embedding', fname), 'purple'),
+        ('PPO + RNN Skip + LD', Path(ROOT_DIR, 'results', f'rnn_skip_LD_embedding', fname), 'green'),
+
+        # ('Memoryless PPO + depth 3', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_no_skip_depth3_ppo', fname), 'dark gray'),
+        # ('Memoryless PPO + depth 3 + LD', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_no_skip_depth3_ppo_LD', fname), 'blue'),
+        # ('Memoryless PPO + depth 5', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_no_skip_depth5_ppo', fname), 'green'),
+        # ('Memoryless PPO + depth 5 + LD', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_no_skip_depth5_ppo_LD', fname), 'purple'),
+        # ('Memoryless PPO + depth 7', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_no_skip_depth7_ppo', fname), 'yellow'),
+        # ('Memoryless PPO + depth 7 + LD', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_no_skip_depth7_ppo_LD', fname), 'cyan'),
     ]
 
     plot_epoch_losses(study_path, env_name)
