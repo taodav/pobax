@@ -61,7 +61,7 @@ class PPO:
             action.squeeze(0),
             log_prob.squeeze(0),
         )
-        return value, action, log_prob
+        return value, action, log_prob, hstate
 
     def loss(self, params, init_hstate, traj_batch, gae, targets):
         # RERUN NETWORK
@@ -116,7 +116,7 @@ class PPO:
 def env_step(runner_state, unused, agent: PPO, env, env_params):
     train_state, env_state, last_obs, last_done, hstate, rng = runner_state
     rng, _rng = jax.random.split(rng)
-    value, action, log_prob = agent.act(_rng, train_state, hstate, last_obs, last_done)
+    value, action, log_prob, hstate = agent.act(_rng, train_state, hstate, last_obs, last_done)
 
     # STEP ENV
     rng, _rng = jax.random.split(rng)
