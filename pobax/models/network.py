@@ -136,6 +136,7 @@ class SimpleNN(nn.Module):
 
 
 class FullImageCNN(nn.Module):
+    hidden_size: int
     num_channels: int = 32
 
     @nn.compact
@@ -151,4 +152,8 @@ class FullImageCNN(nn.Module):
         out4 = nn.Conv(features=self.num_channels, kernel_size=(3, 3), strides=1)(out3)
 
         flat_out = out4.reshape((*out4.shape[:-num_dims], -1))  # Flatten
+        flat_out = nn.relu(flat_out)
+
+        final_out = nn.Dense(features=self.hidden_size)(flat_out)
+        return final_out
 

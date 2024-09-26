@@ -4,7 +4,7 @@ import jax.numpy as jnp
 from jax._src.nn.initializers import orthogonal, constant
 import numpy as np
 
-from .network import SimpleNN, ScannedRNN, SmallImageCNN
+from .network import SimpleNN, ScannedRNN, SmallImageCNN, FullImageCNN
 from .value import Critic
 
 
@@ -130,6 +130,10 @@ class ContinuousActorCriticRNN(nn.Module):
 
 
 class ImageContinuousActorCriticRNN(nn.Module):
+    """
+    Image Continuous Actor Critic RNN uses a different class of CNNs!
+    (for larger RGB images)
+    """
     action_dim: int
     hidden_size: int = 128
     activation: str = "tanh"
@@ -138,7 +142,7 @@ class ImageContinuousActorCriticRNN(nn.Module):
     @nn.compact
     def __call__(self, hidden, x):
         obs, dones = x
-        embedding = SmallImageCNN(hidden_size=self.hidden_size)(obs)
+        embedding = FullImageCNN(hidden_size=self.hidden_size)(obs)
         embedding = nn.relu(embedding)
 
         rnn_in = (embedding, dones)
