@@ -129,12 +129,12 @@ def env_step(runner_state, unused, agent: PPO, env, env_params):
     return runner_state, transition
 
 
-def calculate_gae(traj_batch, last_val, last_done, gae_lambda):
+def calculate_gae(traj_batch, last_val, last_done, gae_lambda, gamma):
     def _get_advantages(carry, transition):
         gae, next_value, next_done, gae_lambda = carry
         done, value, reward = transition.done, transition.value, transition.reward
-        delta = reward + args.gamma * next_value * (1 - next_done) - value
-        gae = delta + args.gamma * gae_lambda * (1 - next_done) * gae
+        delta = reward + gamma * next_value * (1 - next_done) - value
+        gae = delta + gamma * gae_lambda * (1 - next_done) * gae
         return (gae, value, done, gae_lambda), gae
 
     _, advantages = jax.lax.scan(_get_advantages,
@@ -280,7 +280,7 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
             _, _, last_val = network.apply(train_state.params, hstate, ac_in)
             last_val = last_val.squeeze(0)
 
-            advantages, targets = calculate_gae(traj_batch, last_val, last_done, gae_lambda)
+            advantages, targets = calculate_gae(traj_batch, last_val, last_done, gae_lambda, args.gamma)
 
             # UPDATE NETWORK
             def _update_epoch(update_state, unused):

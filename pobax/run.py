@@ -6,7 +6,6 @@ from functools import partial
 import chex
 from flax.training.train_state import TrainState
 import gymnasium as gym
-from gymnasium import ObservationWrapper
 from gymnasium.wrappers import PixelObservationWrapper, NormalizeObservation, ResizeObservation
 import jax
 import jax.numpy as jnp
@@ -23,6 +22,10 @@ class PixelOnlyObservationWrapper(PixelObservationWrapper):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.observation_space = self.observation_space['pixels']
+
+    def observation(self, observation):
+        dict_observations = super().observation(observation)
+        return dict_observations['pixels']
 
 
 def make_train(args: PPOHyperparams, rand_key: chex.PRNGKey):
@@ -101,14 +104,14 @@ def make_train(args: PPOHyperparams, rand_key: chex.PRNGKey):
 
     # TODO: logging
 
-    pbar = tqdm(total=args.num_steps)
+    pbar = tqdm(total=args.total_steps)
 
     # COLLECT MINIBATCH
     last_obs, info = env.reset()
-    last_done = jnp.zeros_like(init_x[-1], dtype=bool)
+    last_done = jnp.zeros(args.num_envs, dtype=bool)
     hstate = ScannedRNN.initialize_carry(last_obs.shape[0], args.hidden_size)
 
-    step = 0
+    step, updates = 0, 0
     while step < args.total_steps:
 
         transitions = []
@@ -132,7 +135,7 @@ def make_train(args: PPOHyperparams, rand_key: chex.PRNGKey):
             _, _, last_val = network.apply(train_state.params, hstate, ac_in)
             last_val = last_val.squeeze(0)
 
-            advantages, targets = calculate_gae(traj_batch, last_val, last_done, gae_lambda)
+            advantages, targets = calculate_gae(traj_batch, last_val, last_done, gae_lambda, args.gamma)
 
             # UPDATE NETWORK
             def _update_minbatch(train_state, batch_info):
@@ -173,7 +176,9 @@ def make_train(args: PPOHyperparams, rand_key: chex.PRNGKey):
             )
             return train_state, total_loss
 
-        train_state, step_loss = _update_step()
+        update_rng, rng = jax.random.split(rng)
+        train_state, step_loss = _update_step(rng, transitions, last_obs, last_done, hstate, train_state)
+        updates += 1
 
         pbar.update(args.num_steps)
 

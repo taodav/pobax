@@ -31,7 +31,6 @@ from .wrappers import (
 )
 
 
-
 masked_gymnax_env_map = {
     'Pendulum-F-v0': {'env_str': 'Pendulum-v1', 'mask_dims': [0, 1, 2]},
     'Pendulum-P-v0': {'env_str': 'Pendulum-v1', 'mask_dims': [0, 1]},
@@ -87,13 +86,16 @@ def is_jax_env(env_name: str):
 
 
 def load_brax_env(env_str: str,
+                  pixels: bool = False,
                   gamma: float = 0.99):
     from gymnax import EnvParams
     from .wrappers import BraxGymnaxWrapper, LogWrapper, ClipAction, VecEnv
     from .wrappers import NormalizeVecReward, NormalizeVecObservation
     env = BraxGymnaxWrapper(env_str)
     env_params = EnvParams(max_steps_in_episode=env.max_steps_in_episode)
+
     env = ClipAction(env)
+
     return env, env_params
 
 
@@ -198,6 +200,5 @@ def get_env(env_name: str,
     elif 'rocksample' in env_name:
         env = NormalizeVecReward(env, gamma)
     return env, env_params
-
 
 
