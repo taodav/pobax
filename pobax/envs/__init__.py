@@ -17,7 +17,7 @@ from pobax.envs.jax.rocksample import RockSample
 from pobax.envs.jax.rocksample import PerfectMemoryWrapper as RSPerfectMemoryWrapper
 from pobax.envs.jax.reacher_pomdp import ReacherPOMDP
 from pobax.envs.jax.tmaze import TMaze
-from .wrappers import (
+from .wrappers.gymnax import (
     FlattenObservationWrapper,
     LogWrapper,
     MaskObservationWrapper,
@@ -89,8 +89,8 @@ def load_brax_env(env_str: str,
                   pixels: bool = False,
                   gamma: float = 0.99):
     from gymnax import EnvParams
-    from .wrappers import BraxGymnaxWrapper, LogWrapper, ClipAction, VecEnv
-    from .wrappers import NormalizeVecReward, NormalizeVecObservation
+    from pobax.envs.wrappers.gymnax import BraxGymnaxWrapper, LogWrapper, ClipAction, VecEnv
+    from pobax.envs.wrappers.gymnax import NormalizeVecReward, NormalizeVecObservation
     env = BraxGymnaxWrapper(env_str)
     env_params = EnvParams(max_steps_in_episode=env.max_steps_in_episode)
 

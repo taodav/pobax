@@ -17,7 +17,7 @@ import orbax.checkpoint
 
 from pobax.config import PPOHyperparams
 from pobax.envs import get_env
-from pobax.envs.wrappers import LogEnvState
+from pobax.envs.wrappers.gymnax import LogEnvState
 from pobax.models import get_gymnax_network_fn, ScannedRNN
 from pobax.utils.file_system import get_results_path
 
@@ -29,7 +29,7 @@ class Transition(NamedTuple):
     reward: jnp.ndarray
     log_prob: jnp.ndarray
     obs: jnp.ndarray
-    info: jnp.ndarray
+    info: jnp.ndarray = None
 
 
 class PPO:
@@ -37,12 +37,16 @@ class PPO:
                  double_critic: bool = False,
                  ld_weight: float = 0.,
                  alpha: float = 0.,
-                 vf_coeff: float = 0.):
+                 vf_coeff: float = 0.,
+                 entropy_coeff: float = 0.01,
+                 clip_eps: float = 0.2):
         self.network = network
         self.double_critic = double_critic
         self.ld_weight = ld_weight
         self.alpha = alpha
         self.vf_coeff = vf_coeff
+        self.entropy_coeff = entropy_coeff
+        self.clip_eps = clip_eps
         self.act = jax.jit(self.act)
         self.loss = jax.jit(self.loss)
 
@@ -73,7 +77,7 @@ class PPO:
         # CALCULATE VALUE LOSS
         value_pred_clipped = traj_batch.value + (
                 value - traj_batch.value
-        ).clip(-args.clip_eps, args.clip_eps)
+        ).clip(-self.clip_eps, self.clip_eps)
         value_losses = jnp.square(value - targets)
         value_losses_clipped = jnp.square(value_pred_clipped - targets)
         value_loss = (
@@ -96,8 +100,8 @@ class PPO:
         loss_actor2 = (
                 jnp.clip(
                     ratio,
-                    1.0 - args.clip_eps,
-                    1.0 + args.clip_eps,
+                    1.0 - self.clip_eps,
+                    1.0 + self.clip_eps,
                     )
                 * gae
         )
@@ -108,7 +112,7 @@ class PPO:
         total_loss = (
                 loss_actor
                 + self.vf_coeff * value_loss
-                - args.entropy_coeff * entropy
+                - self.entropy_coeff * entropy
         )
         return total_loss, (value_loss, loss_actor, entropy)
 
@@ -183,18 +187,22 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
         None, None, 2, None, None, None, None
     )
 
+    _calculate_gae = calculate_gae
+    if double_critic:
+        # last_val is index 1 here b/c we squeezed earlier.
+        _calculate_gae = jax.vmap(calculate_gae,
+                                 in_axes=[transition_axes_map, 1, None, 0],
+                                 out_axes=2)
+
     def train(vf_coeff, ld_weight, alpha, lambda1, lambda0, lr, rng):
-        agent = PPO(network, double_critic=double_critic, ld_weight=ld_weight, alpha=alpha, vf_coeff=vf_coeff)
+        agent = PPO(network, double_critic=double_critic, ld_weight=ld_weight, alpha=alpha, vf_coeff=vf_coeff,
+                    clip_eps=args.clip_eps, entropy_coeff=args.entropy_coeff)
 
         # initialize functions
         _env_step = partial(env_step, agent=agent, env=env, env_params=env_params)
 
         gae_lambda = jnp.array(lambda0)
         if double_critic:
-            # last_val is index 1 here b/c we squeezed earlier.
-            calculate_gae = jax.vmap(calculate_gae,
-                                     in_axes=[transition_axes_map, 1, None, 0],
-                                     out_axes=2)
             gae_lambda = jnp.array([lambda0, lambda1])
 
         def linear_schedule(count):
@@ -280,7 +288,7 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
             _, _, last_val = network.apply(train_state.params, hstate, ac_in)
             last_val = last_val.squeeze(0)
 
-            advantages, targets = calculate_gae(traj_batch, last_val, last_done, gae_lambda, args.gamma)
+            advantages, targets = _calculate_gae(traj_batch, last_val, last_done, gae_lambda, args.gamma)
 
             # UPDATE NETWORK
             def _update_epoch(update_state, unused):

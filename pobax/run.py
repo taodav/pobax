@@ -6,34 +6,30 @@ from functools import partial
 import chex
 from flax.training.train_state import TrainState
 import gymnasium as gym
-from gymnasium.wrappers import PixelObservationWrapper, NormalizeObservation, ResizeObservation
+from gymnasium.wrappers import NormalizeObservation, ResizeObservation
 import jax
 import jax.numpy as jnp
 import numpy as np
 import optax
-from tqdm import tqdm
+from tqdm import trange
 
 from pobax.config import PPOHyperparams
+from pobax.envs.wrappers.gymnasium import PixelOnlyObservationWrapper, OnlineReturnsLogWrapper
 from pobax.models import get_network_fn, ScannedRNN
 from pobax.algos.ppo import PPO, calculate_gae, Transition
 
 
-class PixelOnlyObservationWrapper(PixelObservationWrapper):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.observation_space = self.observation_space['pixels']
-
-    def observation(self, observation):
-        dict_observations = super().observation(observation)
-        return dict_observations['pixels']
-
-
 def make_train(args: PPOHyperparams, rand_key: chex.PRNGKey):
     wrappers = [
+        gym.wrappers.AutoResetWrapper,
         PixelOnlyObservationWrapper,
         partial(ResizeObservation, shape=64),
-        NormalizeObservation
+        NormalizeObservation,
+        OnlineReturnsLogWrapper
     ]
+
+    steps_per_update = (args.num_envs * args.num_steps)
+    num_updates = args.total_steps // steps_per_update
 
     env = gym.vector.make(args.env, num_envs=args.num_envs, wrappers=wrappers, render_mode='rgb_array')
 
@@ -42,7 +38,9 @@ def make_train(args: PPOHyperparams, rand_key: chex.PRNGKey):
     network = network_fn(action_size,
                          double_critic=args.double_critic,
                          hidden_size=args.hidden_size)
-    agent = PPO(network, args.double_critic, args.ld_weight, args.alpha, args.vf_coeff)
+    agent = PPO(network, args.double_critic,
+                ld_weight=args.ld_weight, alpha=args.alpha, vf_coeff=args.vf_coeff,
+                clip_eps=args.clip_eps, entropy_coeff=args.entropy_coeff)
 
     # Calculate num updates and minibatch size
     num_updates = (
@@ -101,49 +99,50 @@ def make_train(args: PPOHyperparams, rand_key: chex.PRNGKey):
         tx=tx,
     )
 
-
     # TODO: logging
-
-    pbar = tqdm(total=args.total_steps)
 
     # COLLECT MINIBATCH
     last_obs, info = env.reset()
     last_done = jnp.zeros(args.num_envs, dtype=bool)
-    hstate = ScannedRNN.initialize_carry(last_obs.shape[0], args.hidden_size)
+    hstate = ScannedRNN.initialize_carry(args.num_envs, args.hidden_size)
 
-    step, updates = 0, 0
-    while step < args.total_steps:
-
+    for update_num in range(num_updates):
         transitions = []
+        infos = []
+        init_hstate = hstate
+
         for i in range(args.num_steps):
             act_rng, rng = jax.random.split(rng)
             value, action, log_prob, hstate = agent.act(act_rng, train_state, hstate, last_obs, last_done)
-            obs, reward, dones, _, info = env.step(action)
+            obs, reward, dones, trunc, info = env.step(action)
+            # TODO: RNN needs to reset when trunc is True as well.
             transitions.append(Transition(
-                last_done, action, value, reward, log_prob, last_obs, info
+                last_done, action, value, reward, log_prob, last_obs
             ))
+            infos.append(info)
             last_obs, last_done = obs, dones
 
         # UPDATE FROM MINIBATCH
         @jax.jit
-        def _update_step(rng, transitions, last_obs, last_done, hstate, train_state):
+        def _update_step(rng, transitions, last_obs, last_done, starting_hstate, train_state):
             # here we do everything post collecting
             traj_batch = jax.tree.map(lambda *leaves: jnp.stack(leaves, axis=0), *transitions)
 
             # CALCULATE ADVANTAGE AND TARGETS
             ac_in = (last_obs[np.newaxis, :], last_done[np.newaxis, :])
-            _, _, last_val = network.apply(train_state.params, hstate, ac_in)
+            _, _, last_val = network.apply(train_state.params, starting_hstate, ac_in)
             last_val = last_val.squeeze(0)
 
             advantages, targets = calculate_gae(traj_batch, last_val, last_done, gae_lambda, args.gamma)
 
             # UPDATE NETWORK
             def _update_minbatch(train_state, batch_info):
-                init_hstate, traj_batch, advantages, targets = batch_info
+                starting_hstate, traj_batch, advantages, targets = batch_info
 
+                starting_hstate = starting_hstate[None, :]  # TBH
                 grad_fn = jax.value_and_grad(agent.loss, has_aux=True)
                 total_loss, grads = grad_fn(
-                    train_state.params, init_hstate, traj_batch, advantages, targets
+                    train_state.params, starting_hstate, traj_batch, advantages, targets
                 )
                 train_state = train_state.apply_gradients(grads=grads)
                 return train_state, total_loss
@@ -152,7 +151,8 @@ def make_train(args: PPOHyperparams, rand_key: chex.PRNGKey):
             # SHUFFLE COLLECTED BATCH
             rng, _rng = jax.random.split(rng)
             permutation = jax.random.permutation(_rng, args.num_envs)
-            batch = (init_hstate, traj_batch, advantages, targets)
+            starting_hstate = starting_hstate[None, ...]
+            batch = (starting_hstate, traj_batch, advantages, targets)
 
             shuffled_batch = jax.tree.map(
                 lambda x: jnp.take(x, permutation, axis=1), batch
@@ -177,13 +177,15 @@ def make_train(args: PPOHyperparams, rand_key: chex.PRNGKey):
             return train_state, total_loss
 
         update_rng, rng = jax.random.split(rng)
-        train_state, step_loss = _update_step(rng, transitions, last_obs, last_done, hstate, train_state)
-        updates += 1
+        train_state, step_loss = _update_step(rng, transitions, last_obs, last_done, init_hstate, train_state)
 
-        pbar.update(args.num_steps)
-
-        # maybe calculate episode statistics here?
-        # we should have a jitted function that does that here.
+        finished_timestep_infos = [jax.tree.map(lambda *leaves: np.stack(leaves), *[ffinfo for ffinfo in finfo])
+                                for finfo in
+                                    [inf['final_info'] for inf in infos if 'final_info' in inf]
+                              ]
+        if finished_timestep_infos:
+            returns = jnp.array([inf['returned_episode_return'] for inf in finished_timestep_infos])
+            print(f"Mean returns for step {update_num * steps_per_update}/{args.total_steps}: {returns.mean()}, total loss: {step_loss[0].mean()}")
 
 
         # # save metrics only every steps_log_freq
@@ -210,14 +212,14 @@ def make_train(args: PPOHyperparams, rand_key: chex.PRNGKey):
         # return runner_state, metric
 
 
-
 if __name__ == "__main__":
+    # jax.disable_jit(True)
     args = PPOHyperparams().parse_args()
     jax.config.update('jax_platform_name', args.platform)
 
     # Check that we're not trying to vmap over hyperparams
     for k, v in args.as_dict().items():
-        if isinstance(v, list):
+        if isinstance(v, list) or isinstance(v, np.ndarray) or isinstance(v, jnp.ndarray):
             assert len(v) == 1, "Can't run with multiple hyperparams."
             setattr(args, k, v[0])
 

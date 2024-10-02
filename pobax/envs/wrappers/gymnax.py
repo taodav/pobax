@@ -1,14 +1,16 @@
 # taken from https://github.com/luchris429/purejaxrl/blob/main/purejaxrl/wrappers.py
-import jax
-import jax.numpy as jnp
-import chex
-import numpy as np
-from flax import struct
-from functools import partial
 from typing import Optional, Tuple, Union, Any
-from gymnax.environments import environment, spaces
+
 from brax import envs
 from brax.envs.wrappers.training import EpisodeWrapper, AutoResetWrapper
+import chex
+from flax import struct
+from functools import partial
+import gymnasium as gym
+from gymnax.environments import environment, spaces
+import jax
+import jax.numpy as jnp
+import numpy as np
 
 
 class GymnaxWrapper(object):
@@ -152,7 +154,7 @@ class LogWrapper(GymnaxWrapper):
         new_episode_return = state.episode_returns + reward
         new_discounted_episode_return = state.discounted_episode_returns + (self.gamma ** state.episode_lengths) * reward
         new_episode_length = state.episode_lengths + 1
-        # TODO: add discounted_episode_returns here.
+
         state = LogEnvState(
             env_state=env_state,
             episode_returns=new_episode_return * (1 - done),

@@ -13,7 +13,7 @@ from jax import random, lax
 
 from definitions import ROOT_DIR
 
-from pobax.envs.wrappers import GymnaxWrapper
+from pobax.envs.wrappers.gymnax import GymnaxWrapper
 
 
 def half_dist_prob(dist: float, max_dist: float, lb: float = 0.5):
