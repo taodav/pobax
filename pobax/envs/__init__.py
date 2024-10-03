@@ -1,3 +1,4 @@
+from functools import partial
 from pathlib import Path
 
 import gymnasium as gym
@@ -17,7 +18,7 @@ from pobax.envs.jax.rocksample import RockSample
 from pobax.envs.jax.rocksample import PerfectMemoryWrapper as RSPerfectMemoryWrapper
 from pobax.envs.jax.reacher_pomdp import ReacherPOMDP
 from pobax.envs.jax.tmaze import TMaze
-from .wrappers.gymnax import (
+from pobax.envs.wrappers.gymnax import (
     FlattenObservationWrapper,
     LogWrapper,
     MaskObservationWrapper,
@@ -27,8 +28,10 @@ from .wrappers.gymnax import (
     VecEnv,
     NormalizeVecReward,
     NormalizeVecObservation,
-    ActionConcatWrapper
+    ActionConcatWrapper,
+    VisualBraxVecEnv
 )
+from pobax.envs.wrappers.gymnasium import PixelOnlyObservationWrapper, OnlineReturnsLogWrapper
 
 
 masked_gymnax_env_map = {
@@ -201,4 +204,24 @@ def get_env(env_name: str,
         env = NormalizeVecReward(env, gamma)
     return env, env_params
 
+
+def get_visual_env(env_name: str):
+    # wrappers = [
+    #     # gym.wrappers.AutoResetWrapper,
+    #     PixelOnlyObservationWrapper,
+    #     partial(ResizeObservation, shape=64),
+    #     NormalizeObservation,
+    #     OnlineReturnsLogWrapper
+    # ]
+    #
+    #
+    # """
+    # TODO: THIS DOESN'T WORK WITH GPU
+    # for some reason, gym.vector.make goes into deadlock with JAX using GPU.
+    # """
+    # env = gym.vector.make(args.env, num_envs=args.num_envs, wrappers=wrappers, render_mode='rgb_array')
+
+    env, env_params = load_brax_env(env_name)
+    env = VisualBraxVecEnv(env)
+    return env, env_params
 
