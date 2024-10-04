@@ -3,10 +3,10 @@ from typing import Optional, Tuple, Union, Any
 
 from brax import envs
 from brax.envs.wrappers.training import EpisodeWrapper, AutoResetWrapper
+from brax.io.image import render_array
 import chex
 from flax import struct
 from functools import partial
-import gymnasium as gym
 from gymnax.environments import environment, spaces
 import jax
 import jax.numpy as jnp

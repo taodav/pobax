@@ -1,3 +1,4 @@
+from typing import Union
 
 import gymnasium as gym
 from gymnax.environments import environment, spaces
@@ -40,20 +41,26 @@ def get_gymnax_network_fn(env: environment.Environment, env_params: environment.
     return network_fn, action_size
 
 
-def get_network_fn(env: gym.Env, memoryless: bool = False):
-    if isinstance(env.action_space, gym.spaces.Box):
-        action_shape = env.action_space.shape
-        if len(action_shape) > 1:
-            # vec env
-            action_size = action_shape[-1]
+def get_network_fn(env: Union[gym.Env, environment.Environment], env_params: environment.EnvParams = None,
+                   memoryless: bool = False):
+    # if isinstance(env.action_space, gym.spaces.Box):
+    # if isinstance(env, environment.Environment):
+    obs_shape = env.observation_space(env_params).shape
+    action_shape = env.action_space(env_params).shape
+    action_size = action_shape[0]
+    # else:
+    #     obs_shape = env.observation_space.shape
+    #     action_shape = env.action_space.shape
+    #     if len(action_shape) > 1:
+    #         # vec env
+    #         action_size = action_shape[-1]
 
-        obs_shape = env.observation_space.shape
-        # Check whether we use image observations
-        network_fn = ImageContinuousActorCriticRNN
-        if memoryless:
-            network_fn = ImageContinuousActorCritic
-    else:
-        raise NotImplementedError
-
+    # Check whether we use image observations
+    network_fn = ImageContinuousActorCriticRNN
+    if memoryless:
+        network_fn = ImageContinuousActorCritic
+    # else:
+    #     raise NotImplementedError
+    #
     return network_fn, obs_shape, action_size
 

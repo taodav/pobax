@@ -11,27 +11,18 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import optax
-from tqdm import trange
 
 from pobax.config import PPOHyperparams
-from pobax.envs.wrappers.gymnasium import PixelOnlyObservationWrapper, OnlineReturnsLogWrapper
+from pobax.envs import get_visual_env
 from pobax.models import get_network_fn, ScannedRNN
 from pobax.algos.ppo import PPO, calculate_gae, Transition
 
 
 def make_train(args: PPOHyperparams, rand_key: chex.PRNGKey):
-    wrappers = [
-        gym.wrappers.AutoResetWrapper,
-        PixelOnlyObservationWrapper,
-        partial(ResizeObservation, shape=64),
-        NormalizeObservation,
-        OnlineReturnsLogWrapper
-    ]
-
     steps_per_update = (args.num_envs * args.num_steps)
     num_updates = args.total_steps // steps_per_update
 
-    env = gym.vector.make(args.env, num_envs=args.num_envs, wrappers=wrappers, render_mode='rgb_array')
+    env, env_params = get_visual_env(args.env)
 
     network_fn, obs_shape, action_size = get_network_fn(env, memoryless=args.memoryless)
 
