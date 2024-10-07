@@ -29,9 +29,8 @@ from pobax.envs.wrappers.gymnax import (
     NormalizeVecReward,
     NormalizeVecObservation,
     ActionConcatWrapper,
-    VisualBraxVecEnv
+    PixelBraxVecEnvWrapper
 )
-from pobax.envs.wrappers.gymnasium import PixelOnlyObservationWrapper, OnlineReturnsLogWrapper
 
 
 masked_gymnax_env_map = {
@@ -89,7 +88,6 @@ def is_jax_env(env_name: str):
 
 
 def load_brax_env(env_str: str,
-                  pixels: bool = False,
                   gamma: float = 0.99):
     from gymnax import EnvParams
     from pobax.envs.wrappers.gymnax import BraxGymnaxWrapper, LogWrapper, ClipAction, VecEnv
@@ -205,8 +203,18 @@ def get_env(env_name: str,
     return env, env_params
 
 
-def get_viz_env(env_name: str,
-                image_size: int = 128):
+def get_pixel_env(env_name: str,
+                  gamma: float = 0.99,
+                  image_size: int = 128,
+                  normalize_image: bool = True):
+
+    env, env_params = load_brax_env(env_name)
+    env = LogWrapper(env, gamma=gamma)
+    env = VecEnv(env)
+
+    env = PixelBraxVecEnvWrapper(env, size=image_size, normalize=normalize_image)
+    return env, env_params
+
 
 
 

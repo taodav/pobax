@@ -1,19 +1,16 @@
 """
 Runs without a jax environment
 """
-from functools import partial
 
 import chex
 from flax.training.train_state import TrainState
-import gymnasium as gym
-from gymnasium.wrappers import NormalizeObservation, ResizeObservation
 import jax
 import jax.numpy as jnp
 import numpy as np
 import optax
 
 from pobax.config import PPOHyperparams
-from pobax.envs import get_visual_env
+from pobax.envs import get_pixel_env
 from pobax.models import get_network_fn, ScannedRNN
 from pobax.algos.ppo import PPO, calculate_gae, Transition
 
@@ -23,7 +20,7 @@ def make_train(args: PPOHyperparams, rand_key: chex.PRNGKey):
     steps_per_update = (args.num_envs * args.num_steps)
     num_updates = args.total_steps // steps_per_update
 
-    env, env_params = get_visual_env(args.env)
+    env, env_params = get_pixel_env(args.env, gamma=args.gamma)
 
     network_fn, obs_shape, action_size = get_network_fn(env, memoryless=args.memoryless)
 
@@ -69,9 +66,9 @@ def make_train(args: PPOHyperparams, rand_key: chex.PRNGKey):
     rng, _rng = jax.random.split(rand_key)
     init_x = (
         jnp.zeros(
-            (1, *obs_shape)
+            (1, args.num_envs, *obs_shape)
         ),
-        jnp.zeros((1, obs_shape[0])),
+        jnp.zeros((1, args.num_envs)),
     )
     init_hstate = ScannedRNN.initialize_carry(args.num_envs, args.hidden_size)
     network_params = agent.network.init(_rng, init_hstate, init_x)
@@ -94,8 +91,12 @@ def make_train(args: PPOHyperparams, rand_key: chex.PRNGKey):
     # TODO: logging
 
     # COLLECT MINIBATCH
-    last_obs, info = env.reset()
+    # last_obs, info = env.reset()
+    rng, _rng = jax.random.split(rng)
+    reset_keys = jax.random.split(_rng, args.num_envs)
+    last_obs, env_state = env.reset(reset_keys, env_params)
     last_done = jnp.zeros(args.num_envs, dtype=bool)
+
     hstate = ScannedRNN.initialize_carry(args.num_envs, args.hidden_size)
 
     for update_num in range(num_updates):
@@ -104,10 +105,10 @@ def make_train(args: PPOHyperparams, rand_key: chex.PRNGKey):
         init_hstate = hstate
 
         for i in range(args.num_steps):
-            act_rng, rng = jax.random.split(rng)
+            act_rng, step_rng, rng = jax.random.split(rng, 3)
             value, action, log_prob, hstate = agent.act(act_rng, train_state, hstate, last_obs, last_done)
-            obs, reward, dones, trunc, info = env.step(action)
-            # TODO: RNN needs to reset when trunc is True as well.
+            step_rngs = jax.random.split(step_rng, args.num_envs)
+            obs, env_state, reward, dones, info = env.step(step_rngs, env_state, action, env_params)
             transitions.append(Transition(
                 last_done, action, value, reward, log_prob, last_obs
             ))
@@ -171,13 +172,20 @@ def make_train(args: PPOHyperparams, rand_key: chex.PRNGKey):
         update_rng, rng = jax.random.split(rng)
         train_state, step_loss = _update_step(rng, transitions, last_obs, last_done, init_hstate, train_state)
 
-        finished_timestep_infos = [jax.tree.map(lambda *leaves: np.stack(leaves), *[ffinfo for ffinfo in finfo])
-                                for finfo in
-                                    [inf['final_info'] for inf in infos if 'final_info' in inf]
-                              ]
-        if finished_timestep_infos:
-            returns = jnp.array([inf['returned_episode_return'] for inf in finished_timestep_infos])
-            print(f"Mean returns for step {update_num * steps_per_update}/{args.total_steps}: {returns.mean()}, total loss: {step_loss[0].mean()}")
+        metrics = jax.tree.map(lambda *leaves: jnp.stack(leaves), *infos)
+        if args.debug:
+            print(
+                f"Mean return for step {update_num * steps_per_update}/{args.total_steps}, "
+                f"avg episodic return={metrics['returned_episode_returns'].mean():.2f}, total_loss={step_loss[0].mean()}"
+            )
+
+        # finished_timestep_infos = [jax.tree.map(lambda *leaves: np.stack(leaves), *[ffinfo for ffinfo in finfo])
+        #                         for finfo in
+        #                             [inf['final_info'] for inf in infos if 'final_info' in inf]
+        #                       ]
+        # if finished_timestep_infos:
+        #     returns = jnp.array([inf['returned_episode_return'] for inf in finished_timestep_infos])
+        #     print(f"Mean returns for step {update_num * steps_per_update}/{args.total_steps}: {returns.mean()}, total loss: {step_loss[0].mean()}")
 
 
         # # save metrics only every steps_log_freq

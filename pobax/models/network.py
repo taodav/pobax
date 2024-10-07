@@ -149,7 +149,7 @@ class FullImageCNN(nn.Module):
         out2 = nn.relu(out2)
         out3 = nn.Conv(features=self.num_channels, kernel_size=(3, 3), strides=2)(out2)
         out3 = nn.relu(out3)
-        out4 = nn.Conv(features=self.num_channels, kernel_size=(3, 3), strides=1)(out3)
+        out4 = nn.Conv(features=self.num_channels, kernel_size=(3, 3), strides=2)(out3)
 
         flat_out = out4.reshape((*out4.shape[:-num_dims], -1))  # Flatten
         flat_out = nn.relu(flat_out)

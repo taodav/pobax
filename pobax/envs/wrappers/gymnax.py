@@ -254,27 +254,6 @@ class VecEnv(GymnaxWrapper):
         self.step = jax.vmap(self._env.step, in_axes=(0, 0, 0, None))
 
 
-class VisualBraxVecEnv(GymnaxWrapper):
-    """
-    Visual Vector Environment for the Brax API.
-    Isn't fully JIT-able, since rendering requires non-JITable functions.
-    """
-    def __init__(self, env, n_frame_stack: int = 1,
-                 size: int = 64):
-        super().__init__(env)
-        self.vmap_reset = jax.jit(jax.vmap(self._env.reset, in_axes=(0, None)))
-        self.vmap_step = jax.jit(jax.vmap(self._env.step, in_axes=(0, 0, 0, None)))
-        self.n_frame_stack = n_frame_stack
-        self.size = size
-
-    def reset(self, key, params=None):
-        obs, state = self.vmap_reset(key, params)
-        #TODO: RENDER THINGS!
-
-    def step(self, key, state, action, params=None):
-        obs, state, reward, done, info = self.vmap_step(key, state, action, params=params)
-
-
 @struct.dataclass
 class NormalizeVecObsEnvState:
     mean: jnp.ndarray
