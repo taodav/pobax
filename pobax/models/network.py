@@ -143,7 +143,7 @@ class FullImageCNN(nn.Module):
     def __call__(self, x):
         num_dims = len(x.shape) - 2  # b x num_envs
 
-        out1 = nn.Conv(features=self.num_channels, kernel_size=(7, 7), strides=2)(x)
+        out1 = nn.Conv(features=self.num_channels, kernel_size=(7, 7), strides=4)(x)
         out1 = nn.relu(out1)
         out2 = nn.Conv(features=self.num_channels, kernel_size=(5, 5), strides=2)(out1)
         out2 = nn.relu(out2)

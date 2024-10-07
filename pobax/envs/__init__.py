@@ -205,23 +205,8 @@ def get_env(env_name: str,
     return env, env_params
 
 
-def get_visual_env(env_name: str):
-    # wrappers = [
-    #     # gym.wrappers.AutoResetWrapper,
-    #     PixelOnlyObservationWrapper,
-    #     partial(ResizeObservation, shape=64),
-    #     NormalizeObservation,
-    #     OnlineReturnsLogWrapper
-    # ]
-    #
-    #
-    # """
-    # TODO: THIS DOESN'T WORK WITH GPU
-    # for some reason, gym.vector.make goes into deadlock with JAX using GPU.
-    # """
-    # env = gym.vector.make(args.env, num_envs=args.num_envs, wrappers=wrappers, render_mode='rgb_array')
+def get_viz_env(env_name: str,
+                image_size: int = 128):
 
-    env, env_params = load_brax_env(env_name)
-    env = VisualBraxVecEnv(env)
-    return env, env_params
+
 
