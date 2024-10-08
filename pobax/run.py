@@ -1,6 +1,8 @@
 """
 Runs without a jax environment
 """
+from functools import partial
+from time import time
 
 import chex
 from flax.training.train_state import TrainState
@@ -98,6 +100,8 @@ def make_train(args: PPOHyperparams, rand_key: chex.PRNGKey):
     last_done = jnp.zeros(args.num_envs, dtype=bool)
 
     hstate = ScannedRNN.initialize_carry(args.num_envs, args.hidden_size)
+    t = time()
+    new_t = t
 
     for update_num in range(num_updates):
         transitions = []
@@ -172,12 +176,21 @@ def make_train(args: PPOHyperparams, rand_key: chex.PRNGKey):
         update_rng, rng = jax.random.split(rng)
         train_state, step_loss = _update_step(rng, transitions, last_obs, last_done, init_hstate, train_state)
 
-        metrics = jax.tree.map(lambda *leaves: jnp.stack(leaves), *infos)
         if args.debug:
+            def mean_map_metrics(i, key: str):
+                metrics = jax.tree.map(lambda *leaves: jnp.stack(leaves), *i)
+                return metrics[key].mean()
+
+            map_metrics = jax.jit(partial(mean_map_metrics, key='returned_episode_returns'))
+            metric = map_metrics(infos)
+            new_t = time()
+            time_per_step = (new_t - t)
             print(
                 f"Mean return for step {update_num * steps_per_update}/{args.total_steps}, "
-                f"avg episodic return={metrics['returned_episode_returns'].mean():.2f}, total_loss={step_loss[0].mean()}"
+                f"avg episodic return={metric:.2f}, total_loss={step_loss[0].mean():.2f}, "
+                f"Time per update: {time_per_step:.2f}"
             )
+            t = new_t
 
         # finished_timestep_infos = [jax.tree.map(lambda *leaves: np.stack(leaves), *[ffinfo for ffinfo in finfo])
         #                         for finfo in

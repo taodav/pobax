@@ -28,10 +28,9 @@ from pobax.envs.wrappers.gymnax import (
     VecEnv,
     NormalizeVecReward,
     NormalizeVecObservation,
-    ActionConcatWrapper,
-    PixelBraxVecEnvWrapper
+    ActionConcatWrapper
 )
-
+from pobax.envs.wrappers.pixel import PixelBraxVecEnvWrapper
 
 masked_gymnax_env_map = {
     'Pendulum-F-v0': {'env_str': 'Pendulum-v1', 'mask_dims': [0, 1, 2]},

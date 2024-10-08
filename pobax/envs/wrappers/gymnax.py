@@ -1,9 +1,8 @@
 # taken from https://github.com/luchris429/purejaxrl/blob/main/purejaxrl/wrappers.py
-from typing import Optional, Tuple, Union, Any
+from typing import Optional, Tuple, Union
 
 from brax import envs
 from brax.envs.wrappers.training import EpisodeWrapper, AutoResetWrapper
-from brax.io import image
 import chex
 from flax import struct
 from functools import partial
@@ -440,74 +439,6 @@ class ActionConcatWrapper(GymnaxWrapper):
         return obs, state, reward, done, info
 
 
-def unwrap_env_state(s):
-    if hasattr(s, 'env_state'):
-        return unwrap_env_state(s.env_state)
-    return s
-
-
-class PixelBraxVecEnvWrapper(GymnaxWrapper):
-    def __init__(self, env: VecEnv,
-                 size: int = 128,
-                 normalize: bool = False):
-        super().__init__(env)
-        self._env.reset = jax.jit(self._env.reset)
-        self._env.step = jax.jit(self._env.step)
-
-        self.normalize = normalize
-        self.size = size
-
-    def observation_space(self, params):
-        low, high = 0, 255
-        if self.normalize:
-            high = 1
-        return spaces.Box(
-            low=low,
-            high=high,
-            shape=(self.size, self.size, 3),
-        )
-
-    def reset(
-            self, key: chex.PRNGKey, params: Optional[environment.EnvParams] = None
-    ) -> Tuple[chex.Array, environment.EnvState]:
-        _, env_state = self._env.reset(key, params)
-        image_obs = self.render(env_state)
-        if self.normalize:
-            image_obs /= 255.
-        return image_obs, env_state
-
-    def step(
-            self,
-            key: chex.PRNGKey,
-            state: environment.EnvState,
-            action: Union[int, float],
-            params: Optional[environment.EnvParams] = None,
-    ) -> Tuple[chex.Array, environment.EnvState, float, bool, dict]:
-        _, env_state, reward, done, info = self._env.step(
-            key, state, action, params
-        )
-        image_obs = self.render(env_state)
-        if self.normalize:
-            image_obs /= 255.
-        return image_obs, env_state, reward, done, info
-
-    def render(self, states, mode='rgb_array'):
-        states = unwrap_env_state(states)
-        def unpack(s):
-            n = jax.tree.leaves(s)[0].shape[0]
-
-            def slice_at_index(leaf, i):
-                return jax.lax.dynamic_slice_in_dim(leaf, i, 1, axis=0).squeeze(0)
-
-            unpacked = [
-                jax.tree.map(lambda leaf: slice_at_index(leaf, i), s)
-                for i in range(n)
-            ]
-            return unpacked
-
-        sys = self._unwrapped._env.sys
-        list_states = unpack(states.pipeline_state)
-        return jnp.stack(image.render_array(sys, list_states, self.size, self.size))
 
 
 
