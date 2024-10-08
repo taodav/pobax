@@ -6,7 +6,7 @@ from jax import random
 from definitions import ROOT_DIR
 
 from .battleship import Battleship
-from .classic import load_pomdp, load_pomdp
+from .classic import load_pomdp, load_jax_pomdp
 from .compass_world import CompassWorld
 from .fishing import Fishing
 from .pocman import PocMan
@@ -156,7 +156,7 @@ def get_env(env_name: str,
         env_params = env.default_params
 
     elif env_name in pomdp_files:
-        env = load_pomdp(env_name, fully_observable=fo_pomdp)
+        env = load_jax_pomdp(env_name, fully_observable=fo_pomdp)
         if hasattr(env, 'gamma'):
             gamma = env.gamma
         env_params = env.default_params

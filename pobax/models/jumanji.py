@@ -154,7 +154,7 @@ class SokobanActor(nn.Module):
         )
         actor_mean = nn.relu(actor_mean)
         actor_mean = nn.Dense(self.hidden_size, kernel_init=orthogonal(2), bias_init=constant(0.0))(
-            x
+            actor_mean
         )
         actor_mean = nn.relu(actor_mean)
         actor_mean = nn.Dense(

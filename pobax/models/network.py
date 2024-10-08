@@ -86,9 +86,9 @@ class RNNApproximator(ScannedRNN):
         rnn_state = self.initialize_carry(ins.shape[0], ins.shape[1])
         
         for _ in range(self.horizon):
-            rnn_state, y = nn.GRUCell(features=self.hidden_size)(rnn_state, ins)
+            rnn_state, ins = nn.GRUCell(features=self.hidden_size)(rnn_state, ins)
         
-        return rnn_state, y
+        return rnn_state, ins
 
 
 class SmallImageCNN(nn.Module):
@@ -147,12 +147,12 @@ class SimpleNN(nn.Module):
         )
         out = nn.relu(out)
         for _ in range(self.depth - 2):
-            x = nn.Dense(self.hidden_size, kernel_init=orthogonal(0.01), bias_init=constant(0.0))(x)
-            x = nn.relu(x)
+            out = nn.Dense(self.hidden_size, kernel_init=orthogonal(0.01), bias_init=constant(0.0))(out)
+            out = nn.relu(out)
         out = nn.Dense(
             self.hidden_size, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
         )(out)
-        return x
+        return out
 
 # class SimpleNN(nn.Module):
 #     hidden_size: int
@@ -220,7 +220,7 @@ class ProbePredictorNN(nn.Module):
         for i in range(self.n_hidden_layers):
             out = nn.Dense(
                 self.hidden_size, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
-            )(x)
+            )(out)
             out = nn.relu(out)
 
         logits = nn.Dense(

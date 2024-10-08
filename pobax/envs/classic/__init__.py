@@ -6,6 +6,7 @@ from gymnasium import spaces
 from jax.tree_util import register_pytree_node_class
 import numpy as np
 
+from .pomdp import POMDP as JAXPOMDP
 from definitions import ROOT_DIR
 
 
@@ -731,8 +732,16 @@ def load_spec(name: str, **kwargs):
     return spec
 
 
-def load_pomdp(name: str, fully_observable: bool = False):
+def load_pomdp(name: str, rand_key: np.random.RandomState = None, **kwargs) -> tuple[POMDP, dict]:
+    """
+    Wraps a MDP/POMDP specification in a POMDP
+    """
+    spec = load_spec(name, rand_key=rand_key, **kwargs)
+    pomdp = POMDP(spec['T'], spec['R'], spec['p0'], spec['gamma'], phi=spec['phi'], rand_key=rand_key)
+    return pomdp, {'Pi_phi': spec['pi_phi']}
+
+def load_jax_pomdp(name: str, fully_observable: bool = False):
     spec = load_spec(name)
-    pomdp = POMDP(spec['T'], spec['R'], spec['p0'], spec['gamma'], spec['phi'],
+    pomdp = JAXPOMDP(spec['T'], spec['R'], spec['p0'], spec['gamma'], spec['phi'],
                      fully_observable=fully_observable)
     return pomdp

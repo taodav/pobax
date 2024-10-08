@@ -7,66 +7,90 @@ from dataclasses import replace
 from functools import partial
 import inspect
 
-import gymnax
-import jumanji
 from flax.training.train_state import TrainState
 from flax.training import orbax_utils
 import jax
 import jax.numpy as jnp
-import jumanji.environments
 import jumanji.specs
 import numpy as np
 import optax
 import orbax.checkpoint
+import flax.linen as nn
 
-from pobax.config import PPOHyperparams
+from pobax.config import Hyperparams
 from pobax.envs import get_env, jumanji_envs
 from pobax.envs.wrappers import LogEnvState
-from pobax.models import get_network_fn, ScannedRNN, ContinuousActorCritic, DiscreteActorCritic, JumanjiActorCritic, ImageDiscreteActorCritic, ImageDiscreteActorCriticRNN
+from pobax.models import get_network_fn, ScannedRNN
 from pobax.utils.file_system import get_results_path, numpyify_and_save
-import csv
 from pathlib import Path
+from jax._src.nn.initializers import orthogonal, constant
 
+class QNetwork(nn.Module):
+    n_actions: int
+    hidden_size: int = 8
+    depth: int = 1
+
+    @nn.compact
+    def __call__(self, hidden, x):
+        obs, dones = x
+        features = obs
+        for _ in range(self.depth):
+            features = nn.Dense(self.hidden_size, kernel_init=orthogonal(2), bias_init=constant(0.0))(
+                features
+            )
+            features = nn.relu(features)
+        q_vals = nn.Dense(self.n_actions, kernel_init=orthogonal(1.0), bias_init=constant(0.0))(
+            features
+        )
+        return hidden, q_vals, features
 
 class Transition(NamedTuple):
     done: jnp.ndarray
     action: jnp.ndarray
     value: jnp.ndarray
     reward: jnp.ndarray
-    log_prob: jnp.ndarray
     obs: jnp.ndarray
+    features: jnp.ndarray
     info: jnp.ndarray
+
+def eps_greedy_exploration(rng, q_vals):
+    rng_a, rng_e = jax.random.split(
+        rng
+    )  # a key for sampling random actions and one for picking
+    greedy_actions = jnp.argmax(q_vals, axis=-1)
+    chosed_actions = jnp.where(
+        jax.random.uniform(rng_e, greedy_actions.shape) < 0.1,  # pick the actions that should be random
+        jax.random.randint(
+            rng_a, shape=greedy_actions.shape, minval=0, maxval=q_vals.shape[-1]
+        ),  # sample random actions,
+        greedy_actions,
+        )
+    return chosed_actions
 
 
 def env_step(runner_state, unused, network, env, env_params):
     train_state, env_state, last_obs, last_done, hstate, rng = runner_state
-    rng, _rng = jax.random.split(rng)
+    rng, rng_a = jax.random.split(rng)
 
     # SELECT ACTION
-    if isinstance(last_obs, jnp.ndarray):
-        ac_in = (last_obs[np.newaxis, :], last_done[np.newaxis, :])
-    else:
-        last_observation = {key: val[np.newaxis, :] for key, val in last_obs.items()}
-        ac_in = (last_observation, last_done[np.newaxis, :])
-    hstate, pi, value, _ = network.apply(train_state.params, hstate, ac_in)
-    action = pi.sample(seed=_rng)
-    log_prob = pi.log_prob(action)
-    value, action, log_prob = (
-        value.squeeze(0),
-        action.squeeze(0),
-        log_prob.squeeze(0),
-    )
-
+    ac_in = (last_obs[np.newaxis, :], last_done[np.newaxis, :])
+    # network output q_values of shape (action_size,)
+    hstate, q_values, features = network.apply(train_state.params, hstate, ac_in)
+    value = q_values.squeeze(0)
+    features = features.squeeze(0)
+    # epsilon-greedy
+    _rngs = jax.random.split(rng_a, hstate.shape[0])
+    action = jax.vmap(eps_greedy_exploration)(_rngs, value)
+    
     # STEP ENV
     rng, _rng = jax.random.split(rng)
     rng_step = jax.random.split(_rng, hstate.shape[0])
     obsv, env_state, reward, done, info = env.step(rng_step, env_state, action, env_params)
     transition = Transition(
-        last_done, action, value, reward, log_prob, last_obs, info
+        last_done, action, value, reward, last_obs, features, info
     )
     runner_state = (train_state, env_state, obsv, done, hstate, rng)
     return runner_state, transition
-
 
 
 def filter_period_first_dim(x, n: int):
@@ -84,9 +108,7 @@ def make_train(config: dict, rand_key: jax.random.PRNGKey):
     env_key, rand_key = jax.random.split(rand_key)
     env, env_params = get_env(config['ENV_NAME'], env_key,
                                      gamma=config["GAMMA"],
-                                     action_concat=config["ACTION_CONCAT"],
-                                     num_stacks=config["NUM_STACK"],
-                                     num_observations=config["NUM_OBSERVATION"],)
+                                     )
     
     if hasattr(env, 'gamma'):
         config['GAMMA'] = env.gamma
@@ -94,55 +116,17 @@ def make_train(config: dict, rand_key: jax.random.PRNGKey):
     assert hasattr(env_params, 'max_steps_in_episode')
 
     memoryless = config["MEMORYLESS"]
-    if memoryless:
-        approximator = config["APPROXIMATOR"]
-    double_critic = config["DOUBLE_CRITIC"]
-    horizon = config["HORIZON"]
 
-    network_fn, action_size = get_network_fn(env, env_params, memoryless=memoryless)
-    if network_fn is ContinuousActorCritic or network_fn is DiscreteActorCritic or network_fn is ImageDiscreteActorCritic:
-        print(f"using depth {config['DEPTH']}, approximator={approximator}, horizon={horizon}")
-        network = network_fn(action_size, 
-                            double_critic=double_critic,
-                            approximator=approximator,
-                            skip_connection=config["SKIP_CONNECTION"],
-                            horizon=horizon,
-                            hidden_size=config['HIDDEN_SIZE'],
-                            depth=config['DEPTH'])
-    elif env.env_name in jumanji_envs:
-        if network_fn is JumanjiActorCritic:
-            print(f"jumanji env {env.env_name} + memoryless + approximator={approximator}, depth={config['DEPTH']} + horizon={horizon}")
-            network = network_fn(env.env_name, 
-                         action_size, 
-                         double_critic=double_critic,
-                         approximator=approximator,
-                         skip_connection=config["SKIP_CONNECTION"],
-                         horizon=horizon,
-                         hidden_size=config['HIDDEN_SIZE'],
-                         depth=config['DEPTH'])
-        else:
-            print(f"jumanji env {env.env_name} + RNN")
-            network = network_fn(env.env_name, 
-                         action_size,
-                         double_critic=double_critic,
-                         hidden_size=config['HIDDEN_SIZE'])
-    else:
-        print(f"not ussing depth {config['DEPTH']}")
-        network = network_fn(action_size,
-                         double_critic=double_critic,
-                         hidden_size=config['HIDDEN_SIZE'])
+    action_size = env.action_space(env_params).n
+    network_fn = QNetwork
+    network = network_fn(action_size, hidden_size=config['HIDDEN_SIZE'], depth = config['DEPTH'])
 
     steps_filter = partial(filter_period_first_dim, n=config['STEPS_LOG_FREQ'])
     update_filter = partial(filter_period_first_dim, n=config['UPDATE_LOG_FREQ'])
 
-    # Used for vmapping over our double critic.
-    transition_axes_map = Transition(
-        None, None, 2, None, None, None, None
-    )
-
     _env_step = partial(env_step, network=network, env=env, env_params=env_params)
 
-    def train(vf_coeff, ld_weight, alpha, lambda1, lambda0, lr, rng):
+    def train(lr, rng):
         def linear_schedule(count):
             frac = (
                     1.0
@@ -154,28 +138,12 @@ def make_train(config: dict, rand_key: jax.random.PRNGKey):
 
         # INIT NETWORK
         rng, _rng = jax.random.split(rng)
-        observation_space = env.observation_space(env_params)
-        def initialize_observation_space(observation_space, num_envs):
-            """
-            Recursively initializes observation space where each space can potentially be another Dict.
-
-            Args:
-            observation_space (Dict or Space): The observation space which might be nested.
-            num_envs (int): The number of environments to initialize states for.
-
-            Returns:
-            dict: A dictionary with the same structure as observation_space, where each leaf is replaced by a zero-initialized array.
-            """
-            if isinstance(observation_space, gymnax.environments.spaces.Dict):
-                # If the observation space is a Dict, recursively initialize each sub-space
-                return {
-                    key: initialize_observation_space(subspace, num_envs)
-                    for key, subspace in observation_space.spaces.items()
-                }
-            else:
-                # Base case: observation_space is not a Dict, so initialize an array based on its shape
-                return jnp.zeros((1, num_envs, *observation_space.shape))
-        init_x = (initialize_observation_space(observation_space, config["NUM_ENVS"]), jnp.zeros((1, config["NUM_ENVS"])))
+        init_x = (
+            jnp.zeros(
+                (1, config["NUM_ENVS"], *env.observation_space(env_params).shape)
+            ),
+            jnp.zeros((1, config["NUM_ENVS"])),
+        )
         init_hstate = ScannedRNN.initialize_carry(config["NUM_ENVS"], config['HIDDEN_SIZE'])
         network_params = network.init(_rng, init_hstate, init_x)
         if config["ANNEAL_LR"]:
@@ -235,112 +203,69 @@ def make_train(config: dict, rand_key: jax.random.PRNGKey):
             runner_state, traj_batch = jax.lax.scan(
                 _env_step, runner_state, jnp.arange(config["NUM_STEPS"]), config["NUM_STEPS"]
             )
-
-            # CALCULATE ADVANTAGE
             train_state, env_state, last_obs, last_done, hstate, rng = runner_state
-            if isinstance(last_obs, jnp.ndarray):
-                ac_in = (last_obs[np.newaxis, :], last_done[np.newaxis, :])
-            else:
-                last_observation = {key: val[np.newaxis, :] for key, val in last_obs.items()}
-                ac_in = (last_observation, last_done[np.newaxis, :])
-            # ac_in = (last_obs[np.newaxis, :], last_done[np.newaxis, :])
-            _, _, last_val, _ = network.apply(train_state.params, hstate, ac_in)
-            last_val = last_val.squeeze(0)
-            def _calculate_gae(traj_batch, last_val, last_done, gae_lambda):
-                def _get_advantages(carry, transition):
-                    gae, next_value, next_done, gae_lambda = carry
-                    done, value, reward = transition.done, transition.value, transition.reward
-                    delta = reward + config["GAMMA"] * next_value * (1 - next_done) - value
-                    gae = delta + config["GAMMA"] * gae_lambda * (1 - next_done) * gae
-                    return (gae, value, done, gae_lambda), gae
-                _, advantages = jax.lax.scan(_get_advantages,
-                                             (jnp.zeros_like(last_val), last_val, last_done, gae_lambda),
-                                             traj_batch, reverse=True, unroll=16)
-                return advantages, advantages + traj_batch.value
 
-            gae_lambda = jnp.array(lambda0)
-            if double_critic:
-                # last_val is index 1 here b/c we squeezed earlier.
-                _calculate_gae = jax.vmap(_calculate_gae,
-                                          in_axes=[transition_axes_map, 1, None, 0],
-                                          out_axes=2)
-                gae_lambda = jnp.array([lambda0, lambda1])
-            advantages, targets = _calculate_gae(traj_batch, last_val, last_done, gae_lambda)
+            def _learn_epoch(update_state, _):
+                def _learn_minibatch(update_state, minibatch):
+                    init_hstate, minibatch = minibatch
+                    def _compute_targets(q_vals, reward, done):
+                        # q_vals: [num_steps, batch_size, num_actions]
+                        # reward, done: [num_steps, batch_size]
 
-            # UPDATE NETWORK
-            def _update_epoch(update_state, unused):
-                def _update_minbatch(train_state, batch_info):
-                    init_hstate, traj_batch, advantages, targets = batch_info
+                        # Compute max Q-values for next states
+                        max_next_q_vals = jnp.max(q_vals[1:], axis=-1)  # Shape: [num_steps - 1, batch_size]
 
-                    def _loss_fn(params, init_hstate, traj_batch, gae, targets):
-                        # RERUN NETWORK
-                        _, pi, value, _ = network.apply(
-                            params, init_hstate[0], (traj_batch.obs, traj_batch.done)
-                        )
-                        log_prob = pi.log_prob(traj_batch.action)
+                        # Compute targets using the standard Q-learning update
+                        targets = reward[:-1] + config["GAMMA"] * (1 - done[:-1]) * max_next_q_vals
 
-                        # CALCULATE VALUE LOSS
-                        value_pred_clipped = traj_batch.value + (
-                                value - traj_batch.value
-                        ).clip(-config["CLIP_EPS"], config["CLIP_EPS"])
-                        value_losses = jnp.square(value - targets)
-                        value_losses_clipped = jnp.square(value_pred_clipped - targets)
-                        value_loss = (
-                            jnp.maximum(value_losses, value_losses_clipped).mean()
-                        )
+                        # For terminal steps where done[t] = 1, target is just reward[t]
+                        targets = jnp.where(done[:-1], reward[:-1], targets)
 
-                        # Lambda discrepancy loss
-                        if double_critic:
-                            value_loss = ld_weight * (jnp.square(value[..., 0] - value[..., 1])).mean() + \
-                                         (1 - ld_weight) * value_loss
-                        # CALCULATE ACTOR LOSS
-                        ratio = jnp.exp(log_prob - traj_batch.log_prob)
+                        return targets  # Shape: [num_steps - 1, batch_size]
+                    
+                    def _loss_fn(params):
+                        _, q_vals, _ = network.apply(params, initial_hstate, (minibatch.obs, minibatch.done))
+                        target_q_vals = jax.lax.stop_gradient(q_vals)
+                        # last_q = target_q_vals[-1].max(axis=-1)
 
-                        # which advantage do we use to update our policy?
-                        if double_critic:
-                            gae = (alpha * gae[..., 0] +
-                                   (1 - alpha) * gae[..., 1])
+                        compute_targets = _compute_targets
+                        target = compute_targets(
+                            # last_q,  # q_vals at t=NUM_STEPS-1
+                            target_q_vals,
+                            minibatch.reward,
+                            minibatch.done,
+                        ).reshape(
+                            -1
+                        )  # (num_steps-1*batch_size,)
+                        selected_actions = jnp.expand_dims(minibatch.action, axis=-1)
 
-                        gae = (gae - gae.mean()) / (gae.std() + 1e-8)
-                        loss_actor1 = ratio * gae
-                        loss_actor2 = (
-                                jnp.clip(
-                                    ratio,
-                                    1.0 - config["CLIP_EPS"],
-                                    1.0 + config["CLIP_EPS"],
-                                    )
-                                * gae
-                        )
-                        loss_actor = -jnp.minimum(loss_actor1, loss_actor2)
-                        loss_actor = loss_actor.mean()
-                        entropy = pi.entropy().mean()
+                        chosen_action_qvals = jnp.take_along_axis(
+                            q_vals,
+                            selected_actions,
+                            axis=-1,
+                        ).squeeze(axis=-1)  # (num_steps, num_agents, batch_size,)
+                        chosen_action_qvals = chosen_action_qvals[:-1].reshape(-1)  # (num_steps-1*batch_size,)
 
-                        total_loss = (
-                                loss_actor
-                                + vf_coeff * value_loss
-                                - config["ENT_COEF"] * entropy
-                        )
-                        return total_loss, (value_loss, loss_actor, entropy)
+                        loss = 0.5 * jnp.square(chosen_action_qvals - target).mean()
 
-                    grad_fn = jax.value_and_grad(_loss_fn, has_aux=True)
-                    total_loss, grads = grad_fn(
-                        train_state.params, init_hstate, traj_batch, advantages, targets
-                    )
+                        return loss,  chosen_action_qvals
+                    
+                    (train_state, rng) = update_state
+                    (loss, chosen_action_qvals), grads = jax.value_and_grad(
+                        _loss_fn, has_aux=True
+                    )(train_state.params)
                     train_state = train_state.apply_gradients(grads=grads)
-                    return train_state, total_loss
-
+                    return (train_state, rng), (loss, chosen_action_qvals)
+                    
                 (
                     train_state,
-                    init_hstate,
-                    traj_batch,
-                    advantages,
-                    targets,
                     rng,
                 ) = update_state
 
+                # SHUFFLE MINIBATCHES
                 rng, _rng = jax.random.split(rng)
                 permutation = jax.random.permutation(_rng, config["NUM_ENVS"])
-                batch = (init_hstate, traj_batch, advantages, targets)
+                batch = (init_hstate, traj_batch)
 
                 shuffled_batch = jax.tree.map(
                     lambda x: jnp.take(x, permutation, axis=1), batch
@@ -358,39 +283,31 @@ def make_train(config: dict, rand_key: jax.random.PRNGKey):
                     ),
                     shuffled_batch,
                 )
-
-                train_state, total_loss = jax.lax.scan(
-                    _update_minbatch, train_state, minibatches
+                update_state, (loss, chosen_action_qvals) = jax.lax.scan(
+                    _learn_minibatch, (train_state, rng), minibatches
                 )
-                update_state = (
-                    train_state,
-                    init_hstate,
-                    traj_batch,
-                    advantages,
-                    targets,
-                    rng,
-                )
-                return update_state, total_loss
+                
+                return update_state, (loss, chosen_action_qvals)
 
-            init_hstate = initial_hstate[None, :]  # TBH
             update_state = (
                 train_state,
-                init_hstate,
-                traj_batch,
-                advantages,
-                targets,
                 rng,
             )
             update_state, loss_info = jax.lax.scan(
-                _update_epoch, update_state, None, config["UPDATE_EPOCHS"]
+                _learn_epoch, update_state, None, config["UPDATE_EPOCHS"]
             )
             train_state = update_state[0]
 
             # save metrics only every steps_log_freq
             metric = traj_batch.info
             metric = jax.tree.map(steps_filter, metric)
-
+            metric.update({"loss": loss_info[0]})
+            metric.update({"chosen_action_qvals": loss_info[1]})
             rng = update_state[-1]
+            if config.get("SAVE_FEATURES"):
+                features = traj_batch.features
+                metric.update({"features": features}) 
+
             if config.get("DEBUG"):
 
                 def callback(info):
@@ -449,12 +366,41 @@ def make_train(config: dict, rand_key: jax.random.PRNGKey):
 
     return train
 
+class QlearningHyperparams(Hyperparams):
+    env: str = 'fully_observable_4x3'
+    memoryless: bool = False
+    save_features: bool = False
+
+    lr: list[float] = [2.5e-3] # learning rate
+    vf_coeff: list[float] = [0.5]
+
+    entropy_coeff: float = 0.01
+    clip_eps: float = 0.2  # PPO log grad clipping
+    max_grad_norm: float = 0.5
+
+    not_anneal_lr: bool = True
+    hidden_size: int = 8
+    depth: int = 1
+    num_minibatches: int = 4
+    num_envs: int = 4
+    num_steps: int = 128
+    update_epochs: int = 4
+
+    def process_args(self) -> None:
+        self.vf_coeff = jnp.array(self.vf_coeff)
+        self.lr = jnp.array(self.lr)
+        self.entropy_coeff = jnp.array(self.entropy_coeff)
+        self.clip_eps = jnp.array(self.clip_eps)
+        self.max_grad_norm = jnp.array(self.max_grad_norm)
+
+        self.num_updates = self.total_steps // self.num_steps // self.num_envs
+        self.minibatch_size = self.num_envs * self.num_steps // self.num_minibatches
 
 if __name__ == "__main__":
     # jax.disable_jit(True)
     # okay some weirdness here. NUM_ENVS needs to match with NUM_MINIBATCHES
 
-    args = PPOHyperparams().parse_args()
+    args = QlearningHyperparams().parse_args()
     jax.config.update('jax_platform_name', args.platform)
 
     config = {
@@ -462,18 +408,12 @@ if __name__ == "__main__":
         "NUM_EVAL_ENVS": 10,
         "NUM_STEPS": args.num_steps,
         "TOTAL_TIMESTEPS": args.total_steps,
+        "SAVE_FEATURES": args.save_features,
         "DEFAULT_MAX_STEPS_IN_EPISODE": args.default_max_steps_in_episode,
         "UPDATE_EPOCHS": 4,
         "NUM_MINIBATCHES": 4,
         "GAMMA": 0.99,
-        "NUM_STACK": args.num_stack,
-        "NUM_OBSERVATION": args.num_observation,
         "MEMORYLESS": args.memoryless,
-        "SKIP_CONNECTION": args.skip_connection,
-        "DOUBLE_CRITIC": args.double_critic,
-        "APPROXIMATOR": args.approximator,
-        "HORIZON": args.horizon,
-        "ACTION_CONCAT": args.action_concat,
         "CLIP_EPS": 0.2,
         "ENT_COEF": args.entropy_coeff,
         "VF_COEF": args.vf_coeff,
@@ -486,7 +426,6 @@ if __name__ == "__main__":
         "ANNEAL_LR": True,
         "DEBUG": args.debug,
     }
-    print(f'double critic: {config["DOUBLE_CRITIC"]}')
 
     rng = jax.random.PRNGKey(args.seed)
     make_train_rng, rng = jax.random.split(rng)
@@ -535,6 +474,8 @@ if __name__ == "__main__":
         'config': config,
         'args': args.as_dict()
     }
+    ##
+    # all_results['out']['metric']['features'] should have shape ['num_lr', 'num_update', 'num_steps', 'seeds', 'env', 'num_features']
 
     # Save all results with Orbax
     orbax_checkpointer = orbax.checkpoint.PyTreeCheckpointer()

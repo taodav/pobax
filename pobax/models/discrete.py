@@ -111,14 +111,6 @@ class DiscreteActorCriticRNN(nn.Module):
             self.hidden_size, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
         )(obs)
         embedding = nn.relu(embedding)
-        # embedding = nn.Dense(
-        #     self.hidden_size, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
-        # )(obs)
-        # embedding = nn.relu(embedding)
-        # embedding = nn.Dense(
-        #     self.hidden_size, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
-        # )(obs)
-        # embedding = nn.relu(embedding)
 
         rnn_in = (embedding, dones)
         hidden, embedding = ScannedRNN(hidden_size=self.hidden_size)(hidden, rnn_in)
@@ -414,3 +406,22 @@ class JumanjiActorCritic(nn.Module):
                              axis_size=2)(hidden_size=self.hidden_size)
         v = critic(embedding)
         return hidden, pi, jnp.squeeze(v, axis=-1), embedding
+    
+
+class SmallNN(nn.Module):
+    hidden_size: int
+    n_outs: int
+    depth: int = 1
+
+    @nn.compact
+    def __call__(self, hidden, x):
+        obs, dones = x
+        features = nn.Dense(self.hidden_size, kernel_init=orthogonal(2), bias_init=constant(0.0))(
+            obs
+        )
+        # Do we relu here?
+        features = nn.relu(features)
+        q_values = nn.Dense(
+            self.n_outs, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
+        )(features)
+        return hidden, q_values, features
