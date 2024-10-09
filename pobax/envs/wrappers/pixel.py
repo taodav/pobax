@@ -69,27 +69,29 @@ class PixelBraxVecEnvWrapper(GymnaxWrapper):
 
     def render(self, states, mode='rgb_array'):
         states = unwrap_env_state(states)
-
-        @jax.jit
-        def unpack(s):
-            n = jax.tree.leaves(s)[0].shape[0]
-
-            unpacked = [
-                jax.tree.map(lambda leaf: leaf[i], s)
-                for i in range(n)
-            ]
-            return unpacked
+        # @jax.jit
+        # def unpack(s):
+        #
+        #     n = len(self.renderer)
+        #
+        #     unpacked = [
+        #         jax.tree.map(lambda leaf: leaf[i], s)
+        #         for i in range(n)
+        #     ]
+        #     return unpacked
+        #
+        # sys = self._unwrapped._env.sys
+        # list_states = unpack(states.pipeline_state)
 
         sys = self._unwrapped._env.sys
-        list_states = unpack(states.pipeline_state)
-
+        n = len(self.renderer)
         def get_image(state: base.State, i: int):
             d = mujoco.MjData(sys.mj_model)
-            d.qpos, d.qvel = state.q, state.qd
+            d.qpos, d.qvel = state.q[i], state.qd[i]
             mujoco.mj_forward(sys.mj_model, d)
             self.renderer[i].update_scene(d, camera=-1)
             return self.renderer[i].render()
 
-        images = jnp.stack([get_image(s, i) for i, s in enumerate(list_states)])
+        images = jnp.stack([get_image(states.pipeline_state, i) for i in range(n)])
 
         return images
