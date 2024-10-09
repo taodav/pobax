@@ -248,7 +248,7 @@ def make_train(config: dict, rand_key: jax.random.PRNGKey):
 
                         loss = 0.5 * jnp.square(chosen_action_qvals - target).mean()
 
-                        return loss,  chosen_action_qvals
+                        return loss, chosen_action_qvals
                     
                     (train_state, rng) = update_state
                     (loss, chosen_action_qvals), grads = jax.value_and_grad(
@@ -370,6 +370,7 @@ class QlearningHyperparams(Hyperparams):
     env: str = 'fully_observable_4x3'
     memoryless: bool = False
     save_features: bool = False
+    save_runner_state: bool = False
 
     lr: list[float] = [2.5e-3] # learning rate
     vf_coeff: list[float] = [0.5]
