@@ -1,23 +1,24 @@
+from functools import partial
 from pathlib import Path
 
+import gymnasium as gym
 import gymnax
 from jax import random
 
 from definitions import ROOT_DIR
 
-from .battleship import Battleship
-from .battleship import PerfectMemoryWrapper as BSPerfectMemoryWrapper
-from .classic import load_pomdp, load_pomdp
-from .compass_world import CompassWorld
-from .fishing import Fishing
-from .pocman import PocMan
-from .pocman import PerfectMemoryWrapper as PMPerfectMemoryWrapper
-from .rocksample import RockSample
-from .rocksample import PerfectMemoryWrapper as RSPerfectMemoryWrapper
-from .reacher_pomdp import ReacherPOMDP
-from .simple_chain import SimpleChain, FullyObservableSimpleChain
-from .tmaze import TMaze
-from .wrappers import (
+from pobax.envs.jax.battleship import Battleship
+from pobax.envs.jax.battleship import PerfectMemoryWrapper as BSPerfectMemoryWrapper
+from pobax.envs.classic import load_pomdp, load_pomdp
+from pobax.envs.jax.compass_world import CompassWorld
+from pobax.envs.jax.fishing import Fishing
+from pobax.envs.jax.pocman import PocMan
+from pobax.envs.jax.pocman import PerfectMemoryWrapper as PMPerfectMemoryWrapper
+from pobax.envs.jax.rocksample import RockSample
+from pobax.envs.jax.rocksample import PerfectMemoryWrapper as RSPerfectMemoryWrapper
+from pobax.envs.jax.reacher_pomdp import ReacherPOMDP
+from pobax.envs.jax.tmaze import TMaze
+from pobax.envs.wrappers.gymnax import (
     FlattenObservationWrapper,
     LogWrapper,
     MaskObservationWrapper,
@@ -29,7 +30,7 @@ from .wrappers import (
     NormalizeVecObservation,
     ActionConcatWrapper
 )
-
+from pobax.envs.wrappers.pixel import PixelBraxVecEnvWrapper
 
 masked_gymnax_env_map = {
     'Pendulum-F-v0': {'env_str': 'Pendulum-v1', 'mask_dims': [0, 1, 2]},
@@ -57,16 +58,44 @@ masked_gymnax_env_map = {
     "HalfCheetah-V-v0": {'env_str': 'halfcheetah', 'mask_dims': [4, 5, 6, 7, 13, 14, 15, 16]},
 }
 
+
 brax_envs = ['ant', 'walker2d', 'halfcheetah', 'hopper']
+
+
+def is_jax_env(env_name: str):
+    from brax.envs import _envs as brax_envs
+    is_masked_gymnax_env = env_name in masked_gymnax_env_map
+    is_brax_env = env_name in brax_envs
+
+    envs_dir = Path(ROOT_DIR) / 'pobax' / 'envs'
+    pomdp_dir = envs_dir / 'classic' / 'POMDP'
+    pomdp_files = [pd.stem for pd in pomdp_dir.iterdir()]
+    is_pomdp_env = env_name in pomdp_files
+
+    is_implemented_env = env_name.startswith('battleship') or env_name == 'pocman' or env_name == 'ReacherPOMDP' \
+                            or 'fishing' in env_name or 'rocksample' in env_name
+
+    is_gymnax_env = True
+    try:
+        gymnax.make(env_name)
+    except ValueError as e:
+        is_gymnax_env = False
+
+    all_bools = [is_masked_gymnax_env, is_gymnax_env, is_pomdp_env, is_implemented_env, is_brax_env]
+
+    return any(all_bools)
+
 
 def load_brax_env(env_str: str,
                   gamma: float = 0.99):
     from gymnax import EnvParams
-    from .wrappers import BraxGymnaxWrapper, LogWrapper, ClipAction, VecEnv
-    from .wrappers import NormalizeVecReward, NormalizeVecObservation
+    from pobax.envs.wrappers.gymnax import BraxGymnaxWrapper, LogWrapper, ClipAction, VecEnv
+    from pobax.envs.wrappers.gymnax import NormalizeVecReward, NormalizeVecObservation
     env = BraxGymnaxWrapper(env_str)
     env_params = EnvParams(max_steps_in_episode=env.max_steps_in_episode)
+
     env = ClipAction(env)
+
     return env, env_params
 
 
@@ -171,6 +200,20 @@ def get_env(env_name: str,
     elif 'rocksample' in env_name:
         env = NormalizeVecReward(env, gamma)
     return env, env_params
+
+
+def get_pixel_env(env_name: str,
+                  gamma: float = 0.99,
+                  image_size: int = 128,
+                  normalize_image: bool = True):
+
+    env, env_params = load_brax_env(env_name)
+    env = LogWrapper(env, gamma=gamma)
+    env = VecEnv(env)
+
+    env = PixelBraxVecEnvWrapper(env, size=image_size, normalize=normalize_image)
+    return env, env_params
+
 
 
 
