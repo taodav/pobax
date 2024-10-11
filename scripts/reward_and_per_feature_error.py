@@ -4,7 +4,9 @@ import flax.linen as nn
 import gymnax
 import jax
 import jax.numpy as jnp
+import matplotlib.pyplot as plt
 import orbax.checkpoint
+import scipy as scp
 
 
 from pobax.algos.dqn import QNetwork, TimeStep
@@ -22,7 +24,7 @@ class FeatureQNetwork(QNetwork):
 
 
 def load_data_from_dict(dict_bstate: dict) -> TimeStep:
-    dict_exp = jax.tree.map(lambda x: jnp.array(x)[0], dict_bstate['experience'])
+    dict_exp = jax.tree.map(lambda x: jnp.array(x)[:, 0], dict_bstate['experience'])
     tstep = TimeStep(**dict_exp)
     return tstep
 
@@ -96,7 +98,7 @@ def make_calculate(config: dict):
 
 
 if __name__ == "__main__":
-    dataset_path = Path('/Users/ruoyutao/Documents/pobax/results/CartPole-v1_0_4a6d3f8e2b768f4a96c5077e60774023_buffer_2024')
+    dataset_path = Path('/Users/ruoyutao/Documents/pobax/results/Acrobot-v1_2024_37b0becb6279b2b7e878de87971959e9_buffer_2024')
     seed = 2024
     epsilon = 1e-7
 
@@ -112,13 +114,35 @@ if __name__ == "__main__":
 
     get_errors_fn = make_calculate(config)
 
-    # TODO: Debugging, remove.
-    # We first try to do "the thing" with the last checkpoint.
-    params = jax.tree.map(lambda x: x[-1], paramses)
-    dataset = jax.tree.map(lambda x: x[-1], datasets)
+    # # TODO: Debugging, remove later.
+    # # We first try to do "the thing" with the last checkpoint.
+    # params = jax.tree.map(lambda x: x[-1], paramses)
+    # dataset = jax.tree.map(lambda x: x[-1], datasets)
+    #
+    # error_dict = get_errors_fn(params, dataset)
 
-    error_dict = get_errors_fn(params, dataset)
+    # vmap the get errors fn
+    vmap_get_errors = jax.jit(jax.vmap(get_errors_fn, in_axes=0))
+    error_dict = vmap_get_errors(paramses, datasets)
 
-    # # vmap the get errors fn
-    # vmap_get_errors = jax.jit(jax.vmap(get_errors_fn, in_axes=0))
-    # error_dict = vmap_get_errors(paramses, datasets)
+    fig, ax = plt.subplots(1, 1)
+
+    diff_per_feat_err = (error_dict['val_err'] - error_dict['R_err'])
+    mean_diff_per_feat_err = diff_per_feat_err.mean(axis=-1)
+    std_err_diff_per_feat_err = scp.stats.sem(diff_per_feat_err, axis=-1)
+
+    x = jnp.arange(mean_diff_per_feat_err.shape[0])
+    ax.plot(x, mean_diff_per_feat_err, color='blue', label='val_err - R_err')
+    ax.fill_between(x, mean_diff_per_feat_err - std_err_diff_per_feat_err, mean_diff_per_feat_err + std_err_diff_per_feat_err,
+                      color='blue', alpha=0.35)
+
+    mean_reward_err = error_dict['R_err'].mean(axis=-1)
+    std_err_reward_err = scp.stats.sem(error_dict['R_err'], axis=-1)
+    ax.plot(x, mean_reward_err, color='orange', label='R_err')
+    ax.fill_between(x, mean_reward_err - std_err_reward_err, mean_reward_err + std_err_reward_err,
+                    color='orange', alpha=0.35)
+
+    plt.legend(loc='lower right')
+    plt.show()
+
+    print()

@@ -102,7 +102,7 @@ def make_collect(config: dict, n_samples: int, debug: bool = True):
 
 
 if __name__ == "__main__":
-    results_path = Path('/Users/ruoyutao/Documents/pobax/results/CartPole-v1_0_4a6d3f8e2b768f4a96c5077e60774023')
+    results_path = Path('/Users/ruoyutao/Documents/pobax/results/Acrobot-v1_2024_37b0becb6279b2b7e878de87971959e9')
     n_samples = int(5e5)
     seed = 2024
 

@@ -74,3 +74,36 @@ class PPOHyperparams(Tap):
         self.lambda1 = jnp.array(self.lambda1)
         self.alpha = jnp.array(self.alpha)
         self.ld_weight = jnp.array(self.ld_weight)
+
+
+class DQNHyperparams(Tap):
+    env: str = 'CartPole-v1'
+    num_envs: int = 4
+    gamma: float = 0.99  # will be replaced if env has gamma property.
+
+    buffer_size: int = 10000
+    buffer_batch_size: int = 128
+    epsilon_start: float = 1.
+    epsilon_finish: float = 0.05
+    epsilon_anneal_time: int = int(25e4)
+    training_interval: int = 10
+    target_update_interval: int = 500
+    learning_starts: int = 10000
+    lr_linear_decay: bool = False
+
+    num_epochs: int = 10
+
+    lr: float = 2.5e-4
+    hidden_size: int = 32
+    total_steps: int = int(1e6)
+    tau: float = 1.
+
+    save_ckpt_per_epoch: bool = False
+    seed: int = 2024
+    num_seeds: int = 1
+    wandb_mode: Literal['disabled', 'online'] = 'disabled'
+    debug: bool = False
+    platform: Literal['cpu', 'gpu'] = 'cpu'
+    study_name: str = 'dqn_test'
+
+

@@ -17,6 +17,10 @@ import optax
 import orbax.checkpoint
 import wandb
 
+from pobax.config import DQNHyperparams
+from pobax.utils.file_system import make_hash_md5
+
+from definitions import ROOT_DIR
 
 class QNetwork(nn.Module):
     action_dim: int
@@ -267,33 +271,32 @@ def make_train(config):
 
 
 def main():
-    from definitions import ROOT_DIR
-
-    from pobax.utils.file_system import make_hash_md5
+    args = DQNHyperparams().parse_args()
+    jax.config.update('jax_platform_name', args.platform)
 
     config = {
-        "NUM_ENVS": 10,
-        "BUFFER_SIZE": 10000,
-        "BUFFER_BATCH_SIZE": 128,
-        "TOTAL_TIMESTEPS": 1e6,
-        "EPSILON_START": 1.0,
-        "EPSILON_FINISH": 0.05,
-        "EPSILON_ANNEAL_TIME": 25e4,
-        "TARGET_UPDATE_INTERVAL": 500,
-        "LR": 2.5e-4,
-        "HIDDEN_SIZE": 32,
-        "LEARNING_STARTS": 10000,
-        "TRAINING_INTERVAL": 10,
-        "LR_LINEAR_DECAY": False,
-        "GAMMA": 0.99,
-        "TAU": 1.0,
-        "ENV_NAME": "CartPole-v1",
-        "NUM_EPOCHS": 10,
-        "SAVE_CKPT_PER_EPOCH": True,
-        "SEED": 0,
-        "NUM_SEEDS": 1,
-        "WANDB_MODE": "disabled",  # set to online to activate wandb
-        "DEBUG": True,
+        "NUM_ENVS": args.num_envs,
+        "BUFFER_SIZE": args.buffer_size,
+        "BUFFER_BATCH_SIZE": args.buffer_batch_size,
+        "TOTAL_TIMESTEPS": args.total_steps,
+        "EPSILON_START": args.epsilon_start,
+        "EPSILON_FINISH": args.epsilon_finish,
+        "EPSILON_ANNEAL_TIME": args.epsilon_anneal_time,
+        "TARGET_UPDATE_INTERVAL": args.target_update_interval,
+        "LR": args.lr,
+        "HIDDEN_SIZE": args.hidden_size,
+        "LEARNING_STARTS": args.learning_starts,
+        "TRAINING_INTERVAL": args.training_interval,
+        "LR_LINEAR_DECAY": args.lr_linear_decay,
+        "GAMMA": args.gamma,
+        "TAU": args.tau,
+        "ENV_NAME": args.env,
+        "NUM_EPOCHS": args.num_epochs,
+        "SAVE_CKPT_PER_EPOCH": args.save_ckpt_per_epoch,
+        "SEED": args.seed,
+        "NUM_SEEDS": args.num_seeds,
+        "WANDB_MODE": args.wandb_mode,  # set to online to activate wandb
+        "DEBUG": args.debug,
         "ENTITY": "",
         "PROJECT": "",
     }
