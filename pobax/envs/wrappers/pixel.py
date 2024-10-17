@@ -95,3 +95,30 @@ class PixelBraxVecEnvWrapper(GymnaxWrapper):
         images = jnp.stack([get_image(states.pipeline_state, i) for i in range(n)])
 
         return images
+
+
+class PixelTMazeVecEnvWrapper(PixelBraxVecEnvWrapper):
+
+    def render(self, states, mode='rgb_array'):
+        n = len(self.renderer)
+        # here we need to check grid_idx, and make a size x size x 4
+        # one-hot representation of which observation we're seeing.
+        def get_tmaze_image(state):
+            in_start = state.grid_idx == 0
+            in_junction = state.grid_idx == (self._env.hallway_length + 1)
+            in_hallway = (1 - in_start) * (1 - in_junction)
+
+            obs = jnp.zeros((self.size, self.size, 3))
+
+            # First we set our start obs
+            obs = obs.at[:, :, 0].set(state.goal_dir * in_start)
+
+            # now our hallway obs
+            obs = obs.at[:, :, 2].set(in_hallway)
+
+            # finally our junction
+            obs = obs.at[:, :, -2].set(in_junction)
+
+            return obs
+        images = jnp.stack([get_tmaze_image(jax.tree.map(lambda x: x[i], states)) for i in range(n)])
+        return images

@@ -43,6 +43,7 @@ def get_gymnax_network_fn(env: environment.Environment, env_params: environment.
 
 def get_network_fn(env: Union[gym.Env, environment.Environment], env_params: environment.EnvParams = None,
                    memoryless: bool = False):
+    # TODO: Add ImageDiscreteACtorACriticRNN
     # if isinstance(env.action_space, gym.spaces.Box):
     # if isinstance(env, environment.Environment):
     obs_shape = env.observation_space(env_params).shape

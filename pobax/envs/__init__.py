@@ -30,7 +30,7 @@ from pobax.envs.wrappers.gymnax import (
     NormalizeVecObservation,
     ActionConcatWrapper
 )
-from pobax.envs.wrappers.pixel import PixelBraxVecEnvWrapper
+from pobax.envs.wrappers.pixel import PixelBraxVecEnvWrapper, PixelTMazeVecEnvWrapper
 
 masked_gymnax_env_map = {
     'Pendulum-F-v0': {'env_str': 'Pendulum-v1', 'mask_dims': [0, 1, 2]},
@@ -206,6 +206,16 @@ def get_pixel_env(env_name: str,
                   gamma: float = 0.99,
                   image_size: int = 128,
                   normalize_image: bool = True):
+    # For testing purposes
+    if env_name == 'tmaze':
+        hallway_length = int(env_name.split('_')[-1])
+        env = TMaze(hallway_length=hallway_length)
+        env_params = env.default_params
+
+        env = LogWrapper(env, gamma=gamma)
+        env = VecEnv(env)
+        env = PixelTMazeVecEnvWrapper(env, size=image_size, normalize=normalize_image)
+        return env, env_params
 
     env, env_params = load_brax_env(env_name)
     env = LogWrapper(env, gamma=gamma)
