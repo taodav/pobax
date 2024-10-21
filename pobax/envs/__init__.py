@@ -208,8 +208,8 @@ def get_pixel_env(env_name: str,
                   normalize_image: bool = True):
     # For testing purposes
     if env_name == 'tmaze':
-        hallway_length = int(env_name.split('_')[-1])
-        env = TMaze(hallway_length=hallway_length)
+        # hallway_length = int(env_name.split('_')[-1])
+        env = TMaze(hallway_length=5)
         env_params = env.default_params
 
         env = LogWrapper(env, gamma=gamma)

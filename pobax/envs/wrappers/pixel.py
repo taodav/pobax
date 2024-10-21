@@ -98,27 +98,48 @@ class PixelBraxVecEnvWrapper(GymnaxWrapper):
 
 
 class PixelTMazeVecEnvWrapper(PixelBraxVecEnvWrapper):
+    def __init__(self, env: VecEnv,
+                 size: int = 128,
+                 normalize: bool = False):
+        super().__init__(env, size=size, normalize=False)
+
+    def reset(
+            self, key: chex.PRNGKey, params: Optional[environment.EnvParams] = None
+    ) -> Tuple[chex.Array, environment.EnvState]:
+        _, env_state = self._env.reset(key, params)
+        image_obs = self.render(env_state)
+        if self.normalize:
+            image_obs /= 255.
+        return image_obs, env_state
 
     def render(self, states, mode='rgb_array'):
-        n = len(self.renderer)
-        # here we need to check grid_idx, and make a size x size x 4
-        # one-hot representation of which observation we're seeing.
-        def get_tmaze_image(state):
-            in_start = state.grid_idx == 0
-            in_junction = state.grid_idx == (self._env.hallway_length + 1)
-            in_hallway = (1 - in_start) * (1 - in_junction)
+        states = states.env_state
+        flattened, _ = jax.tree.flatten(states)
 
-            obs = jnp.zeros((self.size, self.size, 3))
+        hallway_length = self._env.hallway_length
+        size = self.size
 
-            # First we set our start obs
-            obs = obs.at[:, :, 0].set(state.goal_dir * in_start)
+        def get_tmaze_images(states):
+            # here we need to check grid_idx, and make a size x size x 4
+            # one-hot representation of which observation we're seeing.
+            def get_tmaze_image(state):
+                in_start = state.grid_idx == 0
+                in_junction = state.grid_idx == (hallway_length + 1)
+                in_hallway = (1 - in_start) * (1 - in_junction)
 
-            # now our hallway obs
-            obs = obs.at[:, :, 2].set(in_hallway)
+                obs = jnp.zeros((size, size, 3))
 
-            # finally our junction
-            obs = obs.at[:, :, -2].set(in_junction)
+                # First we set our start obs
+                obs = obs.at[:, :, 0].set(state.goal_dir * in_start)
 
-            return obs
-        images = jnp.stack([get_tmaze_image(jax.tree.map(lambda x: x[i], states)) for i in range(n)])
+                # now our hallway obs
+                obs = obs.at[:, :, 1].set(in_hallway)
+
+                # finally our junction
+                obs = obs.at[:, :, 2].set(in_junction)
+
+                return obs
+            return jax.lax.map(get_tmaze_image, states)
+        jitted_get_tmaze_image = jax.jit(get_tmaze_images)
+        images = jitted_get_tmaze_image(states)
         return images

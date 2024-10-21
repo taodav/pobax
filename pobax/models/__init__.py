@@ -1,6 +1,7 @@
 from typing import Union
 
 import gymnasium as gym
+import gymnax.environments.spaces
 from gymnax.environments import environment, spaces
 
 from pobax.envs.jax.battleship import Battleship
@@ -43,25 +44,24 @@ def get_gymnax_network_fn(env: environment.Environment, env_params: environment.
 
 def get_network_fn(env: Union[gym.Env, environment.Environment], env_params: environment.EnvParams = None,
                    memoryless: bool = False):
-    # TODO: Add ImageDiscreteACtorACriticRNN
-    # if isinstance(env.action_space, gym.spaces.Box):
-    # if isinstance(env, environment.Environment):
-    obs_shape = env.observation_space(env_params).shape
-    action_shape = env.action_space(env_params).shape
-    action_size = action_shape[0]
-    # else:
-    #     obs_shape = env.observation_space.shape
-    #     action_shape = env.action_space.shape
-    #     if len(action_shape) > 1:
-    #         # vec env
-    #         action_size = action_shape[-1]
+    obs_space = env.observation_space(env_params)
+    action_space = env.action_space(env_params)
 
-    # Check whether we use image observations
-    network_fn = ImageContinuousActorCriticRNN
-    if memoryless:
-        network_fn = ImageContinuousActorCritic
-    # else:
-    #     raise NotImplementedError
-    #
+    obs_shape = obs_space.shape
+    if isinstance(action_space, gymnax.environments.spaces.Discrete):
+        network_fn = ImageDiscreteActorCriticRNN
+        if memoryless:
+            network_fn = ImageDiscreteActorCritic
+        action_size = action_space.n
+
+    else:
+        action_shape = action_space.shape
+        action_size = action_shape[0]
+
+        # Check whether we use image observations
+        network_fn = ImageContinuousActorCriticRNN
+        if memoryless:
+            network_fn = ImageContinuousActorCritic
+
     return network_fn, obs_shape, action_size
 
