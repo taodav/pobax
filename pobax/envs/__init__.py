@@ -9,7 +9,7 @@ from definitions import ROOT_DIR
 
 from pobax.envs.jax.battleship import Battleship
 from pobax.envs.jax.battleship import PerfectMemoryWrapper as BSPerfectMemoryWrapper
-from pobax.envs.classic import load_pomdp, load_pomdp
+from pobax.envs.classic import load_pomdp
 from pobax.envs.jax.compass_world import CompassWorld
 from pobax.envs.jax.fishing import Fishing
 from pobax.envs.jax.pocman import PocMan
