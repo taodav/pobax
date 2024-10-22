@@ -107,11 +107,12 @@ def get_tmaze_image(state: TMazeState, hallway_length: int, size: int):
     in_hallway = (1 - in_start) * (1 - in_junction)
 
     obs = jnp.ones((size, size))
-    start_obs = obs * (state.goal_dir * in_start)
+    start_obs_0 = obs * (state.goal_dir * in_start)
+    start_obs_1 = obs * ((1 - state.goal_dir) * in_start)
     hallway_obs = obs * in_hallway
     junction_obs = obs * in_junction
-    # start_obs = hallway_obs = junction_obs = obs
-    return jnp.stack((start_obs, hallway_obs, junction_obs), axis=-1)
+    # return jnp.stack((start_obs, hallway_obs, junction_obs), axis=-1)
+    return jnp.stack((start_obs_0, start_obs_1, hallway_obs, junction_obs), axis=-1)
 
 
 class PixelTMazeVecEnvWrapper(PixelBraxVecEnvWrapper):
@@ -121,6 +122,14 @@ class PixelTMazeVecEnvWrapper(PixelBraxVecEnvWrapper):
         super().__init__(env, size=size, normalize=False)
         p_get_tmaze_image = partial(get_tmaze_image, hallway_length=self._env.hallway_length, size=size)
         self.get_tmaze_images = jax.jit(jax.vmap(p_get_tmaze_image))
+
+    def observation_space(self, params):
+        low, high = 0, 1
+        return spaces.Box(
+            low=low,
+            high=high,
+            shape=(self.size, self.size, 4),
+        )
 
     def reset(
             self, key: chex.PRNGKey, params: Optional[environment.EnvParams] = None

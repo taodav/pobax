@@ -167,6 +167,7 @@ def make_train(args: PPOHyperparams, rand_key: chex.PRNGKey):
             act_rng, step_rng, rng = jax.random.split(rng, 3)
             value, action, log_prob, hstate = agent.act(act_rng, train_state, hstate, last_obs, last_done)
             step_rngs = jax.random.split(step_rng, args.num_envs)
+
             obs, env_state, reward, dones, info = env.step(step_rngs, env_state, action, env_params)
             transitions.append(Transition(
                 last_done, action, value, reward, log_prob, last_obs
