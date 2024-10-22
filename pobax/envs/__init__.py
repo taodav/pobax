@@ -204,7 +204,7 @@ def get_env(env_name: str,
 
 def get_pixel_env(env_name: str,
                   gamma: float = 0.99,
-                  image_size: int = 128,
+                  image_size: int = 64,
                   normalize_image: bool = True):
     # For testing purposes
     if env_name == 'tmaze':

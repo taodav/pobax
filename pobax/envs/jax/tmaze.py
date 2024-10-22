@@ -11,8 +11,8 @@ from typing import Tuple
 
 @chex.dataclass
 class TMazeState:
-    grid_idx: int
-    goal_dir: int
+    grid_idx: chex.Array
+    goal_dir: chex.Array
 
 
 class TMaze(Environment):
@@ -35,8 +35,8 @@ class TMaze(Environment):
         self.slip_prob = slip_prob
 
     def observation_space(self, env_params: EnvParams):
-        # Good reward, bad reward, hallway, junction and terminal.
-        return gymnax.environments.spaces.Box(0, 1, (5, ))
+        # goal direction, hallway, junction and terminal.
+        return gymnax.environments.spaces.Box(0, 1, (4, ))
 
     def action_space(self, env_params: EnvParams):
         """
@@ -49,10 +49,10 @@ class TMaze(Environment):
         return EnvParams(max_steps_in_episode=1000)
 
     def get_obs(self, state: TMazeState) -> jnp.ndarray:
-        obs = jnp.zeros(5)
-        start_obs = obs.at[state.goal_dir].set(1)
-        hallway_obs = obs.at[2].set(1)
-        junction_obs = obs.at[-2].set(1)
+        obs = jnp.zeros(4)
+        start_obs = obs.at[0].set(state.goal_dir)
+        hallway_obs = obs.at[1].set(1)
+        junction_obs = obs.at[2].set(1)
 
         in_start = state.grid_idx == 0
         in_junction = state.grid_idx == (self.hallway_length + 1)
@@ -62,7 +62,7 @@ class TMaze(Environment):
 
     @partial(jax.jit, static_argnums=(0,))
     def reset_env(self, key: chex.PRNGKey, params: EnvParams) -> Tuple[jnp.ndarray, TMazeState]:
-        state = TMazeState(grid_idx=0,
+        state = TMazeState(grid_idx=jnp.array(0),
                            goal_dir=random.bernoulli(key).astype(int))
         return self.get_obs(state), state
 

@@ -1,3 +1,4 @@
+from functools import partial
 from typing import Optional, Tuple, Union
 
 import chex
@@ -9,6 +10,7 @@ from gymnax.environments import spaces, environment
 from jax import numpy as jnp
 
 from pobax.envs import VecEnv
+from pobax.envs.jax.tmaze import TMazeState
 from pobax.envs.wrappers.gymnax import GymnaxWrapper
 
 def unwrap_env_state(s):
@@ -97,11 +99,28 @@ class PixelBraxVecEnvWrapper(GymnaxWrapper):
         return images
 
 
+
+
+def get_tmaze_image(state: TMazeState, hallway_length: int, size: int):
+    in_start = state.grid_idx == 0
+    in_junction = state.grid_idx == (hallway_length + 1)
+    in_hallway = (1 - in_start) * (1 - in_junction)
+
+    obs = jnp.ones((size, size))
+    start_obs = obs * (state.goal_dir * in_start)
+    hallway_obs = obs * in_hallway
+    junction_obs = obs * in_junction
+    # start_obs = hallway_obs = junction_obs = obs
+    return jnp.stack((start_obs, hallway_obs, junction_obs), axis=-1)
+
+
 class PixelTMazeVecEnvWrapper(PixelBraxVecEnvWrapper):
     def __init__(self, env: VecEnv,
                  size: int = 128,
                  normalize: bool = False):
         super().__init__(env, size=size, normalize=False)
+        p_get_tmaze_image = partial(get_tmaze_image, hallway_length=self._env.hallway_length, size=size)
+        self.get_tmaze_images = jax.jit(jax.vmap(p_get_tmaze_image))
 
     def reset(
             self, key: chex.PRNGKey, params: Optional[environment.EnvParams] = None
@@ -116,30 +135,6 @@ class PixelTMazeVecEnvWrapper(PixelBraxVecEnvWrapper):
         states = states.env_state
         flattened, _ = jax.tree.flatten(states)
 
-        hallway_length = self._env.hallway_length
-        size = self.size
-
-        def get_tmaze_images(states):
-            # here we need to check grid_idx, and make a size x size x 4
-            # one-hot representation of which observation we're seeing.
-            def get_tmaze_image(state):
-                in_start = state.grid_idx == 0
-                in_junction = state.grid_idx == (hallway_length + 1)
-                in_hallway = (1 - in_start) * (1 - in_junction)
-
-                obs = jnp.zeros((size, size, 3))
-
-                # First we set our start obs
-                obs = obs.at[:, :, 0].set(state.goal_dir * in_start)
-
-                # now our hallway obs
-                obs = obs.at[:, :, 1].set(in_hallway)
-
-                # finally our junction
-                obs = obs.at[:, :, 2].set(in_junction)
-
-                return obs
-            return jax.lax.map(get_tmaze_image, states)
-        jitted_get_tmaze_image = jax.jit(get_tmaze_images)
-        images = jitted_get_tmaze_image(states)
+        images = self.get_tmaze_images(states)
+        # images = jnp.zeros((4, size, size, 3)) + states.grid_idx[0]
         return images

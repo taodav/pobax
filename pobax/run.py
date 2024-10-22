@@ -22,6 +22,12 @@ def make_train(args: PPOHyperparams, rand_key: chex.PRNGKey):
     steps_per_update = (args.num_envs * args.num_steps)
     num_updates = args.total_steps // steps_per_update
 
+    def mean_map_metrics(i, key: str):
+        metrics = jax.tree.map(lambda *leaves: jnp.stack(leaves), *i)
+        return metrics[key].mean()
+
+    map_metrics = jax.jit(partial(mean_map_metrics, key='returned_episode_returns'))
+
     env, env_params = get_pixel_env(args.env, gamma=args.gamma)
 
     network_fn, obs_shape, action_size = get_network_fn(env, memoryless=args.memoryless)
@@ -90,7 +96,57 @@ def make_train(args: PPOHyperparams, rand_key: chex.PRNGKey):
         tx=tx,
     )
 
-    # TODO: logging
+    @jax.jit
+    def _update_step(rng, transitions, last_obs, last_done, starting_hstate, train_state):
+        # here we do everything post collecting
+        traj_batch = jax.tree.map(lambda *leaves: jnp.stack(leaves, axis=0), *transitions)
+
+        # CALCULATE ADVANTAGE AND TARGETS
+        ac_in = (last_obs[np.newaxis, :], last_done[np.newaxis, :])
+        _, _, last_val = network.apply(train_state.params, starting_hstate, ac_in)
+        last_val = last_val.squeeze(0)
+
+        advantages, targets = calculate_gae(traj_batch, last_val, last_done, gae_lambda, args.gamma)
+
+        # UPDATE NETWORK
+        def _update_minbatch(train_state, batch_info):
+            starting_hstate, traj_batch, advantages, targets = batch_info
+
+            starting_hstate = starting_hstate[None, :]  # TBH
+            grad_fn = jax.value_and_grad(agent.loss, has_aux=True)
+            total_loss, grads = grad_fn(
+                train_state.params, starting_hstate, traj_batch, advantages, targets
+            )
+            train_state = train_state.apply_gradients(grads=grads)
+            return train_state, total_loss
+
+        # SHUFFLE COLLECTED BATCH
+        rng, _rng = jax.random.split(rng)
+        permutation = jax.random.permutation(_rng, args.num_envs)
+        starting_hstate = starting_hstate[None, ...]
+        batch = (starting_hstate, traj_batch, advantages, targets)
+
+        shuffled_batch = jax.tree.map(
+            lambda x: jnp.take(x, permutation, axis=1), batch
+        )
+
+        minibatches = jax.tree.map(
+            lambda x: jnp.swapaxes(
+                jnp.reshape(
+                    x,
+                    [x.shape[0], args.num_minibatches, -1]
+                    + list(x.shape[2:]),
+                    ),
+                1,
+                0,
+            ),
+            shuffled_batch,
+        )
+
+        train_state, total_loss = jax.lax.scan(
+            _update_minbatch, train_state, minibatches
+        )
+        return train_state, total_loss
 
     # COLLECT MINIBATCH
     # last_obs, info = env.reset()
@@ -101,7 +157,6 @@ def make_train(args: PPOHyperparams, rand_key: chex.PRNGKey):
 
     hstate = ScannedRNN.initialize_carry(args.num_envs, args.hidden_size)
     t = time()
-    new_t = t
 
     for update_num in range(num_updates):
         transitions = []
@@ -120,68 +175,10 @@ def make_train(args: PPOHyperparams, rand_key: chex.PRNGKey):
             last_obs, last_done = obs, dones
 
         # UPDATE FROM MINIBATCH
-        @jax.jit
-        def _update_step(rng, transitions, last_obs, last_done, starting_hstate, train_state):
-            # here we do everything post collecting
-            traj_batch = jax.tree.map(lambda *leaves: jnp.stack(leaves, axis=0), *transitions)
-
-            # CALCULATE ADVANTAGE AND TARGETS
-            ac_in = (last_obs[np.newaxis, :], last_done[np.newaxis, :])
-            _, _, last_val = network.apply(train_state.params, starting_hstate, ac_in)
-            last_val = last_val.squeeze(0)
-
-            advantages, targets = calculate_gae(traj_batch, last_val, last_done, gae_lambda, args.gamma)
-
-            # UPDATE NETWORK
-            def _update_minbatch(train_state, batch_info):
-                starting_hstate, traj_batch, advantages, targets = batch_info
-
-                starting_hstate = starting_hstate[None, :]  # TBH
-                grad_fn = jax.value_and_grad(agent.loss, has_aux=True)
-                total_loss, grads = grad_fn(
-                    train_state.params, starting_hstate, traj_batch, advantages, targets
-                )
-                train_state = train_state.apply_gradients(grads=grads)
-                return train_state, total_loss
-
-
-            # SHUFFLE COLLECTED BATCH
-            rng, _rng = jax.random.split(rng)
-            permutation = jax.random.permutation(_rng, args.num_envs)
-            starting_hstate = starting_hstate[None, ...]
-            batch = (starting_hstate, traj_batch, advantages, targets)
-
-            shuffled_batch = jax.tree.map(
-                lambda x: jnp.take(x, permutation, axis=1), batch
-            )
-
-            minibatches = jax.tree.map(
-                lambda x: jnp.swapaxes(
-                    jnp.reshape(
-                        x,
-                        [x.shape[0], args.num_minibatches, -1]
-                        + list(x.shape[2:]),
-                        ),
-                    1,
-                    0,
-                ),
-                shuffled_batch,
-            )
-
-            train_state, total_loss = jax.lax.scan(
-                _update_minbatch, train_state, minibatches
-            )
-            return train_state, total_loss
-
         update_rng, rng = jax.random.split(rng)
         train_state, step_loss = _update_step(rng, transitions, last_obs, last_done, init_hstate, train_state)
 
         if args.debug:
-            def mean_map_metrics(i, key: str):
-                metrics = jax.tree.map(lambda *leaves: jnp.stack(leaves), *i)
-                return metrics[key].mean()
-
-            map_metrics = jax.jit(partial(mean_map_metrics, key='returned_episode_returns'))
             metric = map_metrics(infos)
             new_t = time()
             time_per_step = (new_t - t)
@@ -191,38 +188,6 @@ def make_train(args: PPOHyperparams, rand_key: chex.PRNGKey):
                 f"Time per update: {time_per_step:.2f}"
             )
             t = new_t
-
-        # finished_timestep_infos = [jax.tree.map(lambda *leaves: np.stack(leaves), *[ffinfo for ffinfo in finfo])
-        #                         for finfo in
-        #                             [inf['final_info'] for inf in infos if 'final_info' in inf]
-        #                       ]
-        # if finished_timestep_infos:
-        #     returns = jnp.array([inf['returned_episode_return'] for inf in finished_timestep_infos])
-        #     print(f"Mean returns for step {update_num * steps_per_update}/{args.total_steps}: {returns.mean()}, total loss: {step_loss[0].mean()}")
-
-
-        # # save metrics only every steps_log_freq
-        # metric = traj_batch.info
-        # metric = jax.tree.map(steps_filter, metric)
-        #
-        # rng = update_state[-1]
-        # if args.debug:
-        #
-        #     def callback(info):
-        #         timesteps = (
-        #                 info["timestep"][info["returned_episode"]] * args.num_envs
-        #         )
-        #         avg_return_values = jnp.mean(info["returned_episode_returns"][info["returned_episode"]])
-        #         if len(timesteps) > 0:
-        #             print(
-        #                 f"timesteps={timesteps[0]} - {timesteps[-1]}, avg episodic return={avg_return_values:.2f}"
-        #             )
-        #
-        #     jax.debug.callback(callback, metric)
-        #
-        # runner_state = (train_state, env_state, last_obs, last_done, hstate, rng)
-        #
-        # return runner_state, metric
 
 
 if __name__ == "__main__":
