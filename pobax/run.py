@@ -12,8 +12,8 @@ import numpy as np
 import optax
 
 from pobax.config import PPOHyperparams
-from pobax.envs import get_pixel_env
-from pobax.models import get_network_fn, ScannedRNN
+from pobax.envs import get_pixel_env, get_env
+from pobax.models import get_network_fn, ScannedRNN, get_gymnax_network_fn
 from pobax.algos.ppo import PPO, calculate_gae, Transition
 
 
@@ -28,9 +28,19 @@ def make_train(args: PPOHyperparams, rand_key: chex.PRNGKey):
 
     map_metrics = jax.jit(partial(mean_map_metrics, key='returned_episode_returns'))
 
-    env, env_params = get_pixel_env(args.env, gamma=args.gamma)
+    # env, env_params = get_pixel_env(args.env, gamma=args.gamma)
+    #
 
-    network_fn, obs_shape, action_size = get_network_fn(env, memoryless=args.memoryless)
+    # network_fn, obs_shape, action_size = get_network_fn(env, memoryless=args.memoryless)
+
+    # DEBUG
+    env_key, rand_key = jax.random.split(rand_key)
+    env, env_params = get_env(args.env, env_key,
+                              gamma=args.gamma,
+                              action_concat=args.action_concat)
+
+    network_fn, action_size = get_gymnax_network_fn(env, env_params)
+    obs_shape = env.observation_space(env_params).shape
 
     network = network_fn(action_size,
                          double_critic=args.double_critic,
@@ -112,7 +122,6 @@ def make_train(args: PPOHyperparams, rand_key: chex.PRNGKey):
         def _update_minbatch(train_state, batch_info):
             starting_hstate, traj_batch, advantages, targets = batch_info
 
-            starting_hstate = starting_hstate[None, :]  # TBH
             grad_fn = jax.value_and_grad(agent.loss, has_aux=True)
             total_loss, grads = grad_fn(
                 train_state.params, starting_hstate, traj_batch, advantages, targets
@@ -176,11 +185,9 @@ def make_train(args: PPOHyperparams, rand_key: chex.PRNGKey):
             infos.append(info)
             last_obs, last_done = obs, dones
 
-        final_hstate = hstate
-
         # UPDATE FROM MINIBATCH
         update_rng, rng = jax.random.split(rng)
-        train_state, step_loss = _update_step(rng, transitions, last_obs, last_done, init_hstate, final_hstate, train_state)
+        train_state, step_loss = _update_step(rng, transitions, last_obs, last_done, init_hstate, hstate, train_state)
 
         if args.debug:
             metric = map_metrics(infos)
