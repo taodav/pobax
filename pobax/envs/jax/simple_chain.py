@@ -1,13 +1,24 @@
-import numpy as np
-import gymnasium as gym
+from functools import partial
 from typing import Any
 
+import chex
+import jax
+import jax.numpy as jnp
+from gymnax.environments.environment import Environment, EnvParams
+from gymnax.environments import environment, spaces
+import numpy as np
 
-class SimpleChain(gym.Env):
+from pobax.envs.wrappers.gymnax import GymnaxWrapper
+
+@chex.dataclass
+class SimpleChainState:
+    pos_idx: chex.Array
+
+
+class SimpleChain(Environment):
     def __init__(self,
                  n: int = 10,
-                 reward_in_obs: bool = False,
-                 continuous_actions: bool = False,
+                 reward_in_obs: bool = False
                  ):
         """
         Simple func. approx single chain. Always returns an observation of 1.
@@ -15,70 +26,60 @@ class SimpleChain(gym.Env):
         """
         self.n = n
         self.reward_in_obs = reward_in_obs
-        self.continuous_actions = continuous_actions
 
-        self._state = np.zeros(self.n)
-        self.current_idx = 0
+    def observation_space(self, params: EnvParams):
+        n_obs = 1
         if self.reward_in_obs:
-            self.observation_space = gym.spaces.MultiBinary(2)
-        else:
-            self.observation_space = gym.spaces.MultiBinary(1)
+            n_obs += 1
 
-        if self.continuous_actions:
-            self.action_space = gym.spaces.Box(0, 0, (1,), float)
-        else:
-            self.action_space = gym.spaces.Discrete(1)
+        return spaces.Box(0, 1, (n_obs, ))
 
-    @property
-    def state(self):
-        return self._state
+    def action_space(self, params: EnvParams):
+        return spaces.Discrete(1)
 
-    @state.setter
-    def state(self, state: np.ndarray):
-        self._state = state
+    @partial(jax.jit, static_argnums=(0,))
+    def reset_env(
+            self, key: chex.PRNGKey, params: EnvParams
+    ) -> tuple[chex.Array, SimpleChainState]:
+        state = SimpleChainState(pos_idx=jnp.array(0, dtype=int))
+        return self.get_obs(state), state
 
-    def reset(self, **kwargs):
-        self.state = np.zeros(self.n)
-        self.current_idx = 0
-        self.state[self.current_idx] = 1
-        return self.get_obs(self.state), {}
+    @partial(jax.jit, static_argnums=(0,))
+    def get_reward(self, state: SimpleChainState) -> jnp.ndarray:
+        return (state.pos_idx == self.n).astype(float)
 
-    def get_reward(self, state: np.ndarray = None, prev_state: np.ndarray = None, action: int = None) -> int:
-        if state is None:
-            state = self.state
-        if state[-1] == 1:
-            return 1
-        return 0
-
-    def get_obs(self, state: np.ndarray) -> np.ndarray:
+    @partial(jax.jit, static_argnums=(0,))
+    def get_obs(self, state: SimpleChainState) -> jnp.ndarray:
         if self.reward_in_obs:
-            return np.array([1, self.get_reward(state=state)])
-        return np.array([1])
+            return jnp.array([1, self.get_reward(state)])
+        return jnp.array([1])
 
-    def get_terminal(self) -> bool:
-        return self.state[-1] == 1
+    @partial(jax.jit, static_argnums=(0,))
+    def get_terminal(self, state: SimpleChainState) -> bool:
+        return state.pos_idx == self.n
 
-    def transition(self, state: np.ndarray, action: int) -> np.ndarray:
-        # Just go right
-        idx = state.nonzero()[0].item()
-        state[min(state.shape[0] - 1, idx + 1)] = 1
-        state[idx] = 0
-
-        return state
-
-    def emit_prob(self, state: Any, obs: np.ndarray) -> float:
-        return 1
-
-    def step(self, action: int):
-        self.state = self.transition(self.state.copy(), action)
-        return self.get_obs(self.state), self.get_reward(), self.get_terminal(), False, {}
+    @partial(jax.jit, static_argnums=(0,))
+    def step_env(
+        self,
+        key: chex.PRNGKey,
+        state: SimpleChainState,
+        action: int,
+        params: EnvParams,
+    ) -> tuple[chex.Array, SimpleChainState, jnp.ndarray, jnp.ndarray, dict]:
+        new_state = SimpleChainState(pos_idx=jnp.minimum(state.pos_idx + 1, jnp.array(self.n)))
+        return self.get_obs(new_state), new_state, self.get_reward(new_state), self.get_terminal(new_state), {}
 
 
 class FullyObservableSimpleChain(SimpleChain):
-    def __init__(self, n: int = 10, reward_in_obs: bool = False,
-                 continuous_actions: bool = False):
-        super().__init__(n=n, reward_in_obs=reward_in_obs, continuous_actions=continuous_actions)
-        self.observation_space = gym.spaces.MultiBinary(n)
+    def __init__(self, n: int = 10, reward_in_obs: bool = False):
+        super().__init__(n=n, reward_in_obs=reward_in_obs)
+
+    def observation_space(self, params: EnvParams):
+        n_obs = self.n
+        if self.reward_in_obs:
+            n_obs += 1
+
+        return spaces.Box(0, 1, (n_obs, ))
 
     def get_obs(self, state: np.ndarray) -> np.ndarray:
         return self.state.copy()

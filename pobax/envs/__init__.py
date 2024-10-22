@@ -17,6 +17,7 @@ from pobax.envs.jax.pocman import PerfectMemoryWrapper as PMPerfectMemoryWrapper
 from pobax.envs.jax.rocksample import RockSample
 from pobax.envs.jax.rocksample import PerfectMemoryWrapper as RSPerfectMemoryWrapper
 from pobax.envs.jax.reacher_pomdp import ReacherPOMDP
+from pobax.envs.jax.simple_chain import SimpleChain
 from pobax.envs.jax.tmaze import TMaze
 from pobax.envs.wrappers.gymnax import (
     FlattenObservationWrapper,
@@ -30,7 +31,7 @@ from pobax.envs.wrappers.gymnax import (
     NormalizeVecObservation,
     ActionConcatWrapper
 )
-from pobax.envs.wrappers.pixel import PixelBraxVecEnvWrapper, PixelTMazeVecEnvWrapper
+from pobax.envs.wrappers.pixel import PixelBraxVecEnvWrapper, PixelTMazeVecEnvWrapper, PixelSimpleChainVecEnvWrapper
 
 masked_gymnax_env_map = {
     'Pendulum-F-v0': {'env_str': 'Pendulum-v1', 'mask_dims': [0, 1, 2]},
@@ -215,6 +216,13 @@ def get_pixel_env(env_name: str,
         env = LogWrapper(env, gamma=gamma)
         env = VecEnv(env)
         env = PixelTMazeVecEnvWrapper(env, size=image_size, normalize=normalize_image)
+        return env, env_params
+    elif env_name == 'simple_chain':
+        env = SimpleChain()
+        env_params = env.default_params
+        env = LogWrapper(env, gamma=gamma)
+        env = VecEnv(env)
+        env = PixelSimpleChainVecEnvWrapper(env, size=image_size, normalize=normalize_image)
         return env, env_params
 
     env, env_params = load_brax_env(env_name)

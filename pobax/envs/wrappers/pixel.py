@@ -147,3 +147,30 @@ class PixelTMazeVecEnvWrapper(PixelBraxVecEnvWrapper):
         images = self.get_tmaze_images(states)
         # images = jnp.zeros((4, size, size, 3)) + states.grid_idx[0]
         return images
+
+
+class PixelSimpleChainVecEnvWrapper(PixelBraxVecEnvWrapper):
+    def __init__(self, env: VecEnv,
+                 size: int = 128,
+                 normalize: bool = False):
+        super().__init__(env, size=size, normalize=False)
+
+    def observation_space(self, params):
+        low, high = 0, 1
+        return spaces.Box(
+            low=low,
+            high=high,
+            shape=(self.size, self.size, 2),
+        )
+
+    def reset(
+            self, key: chex.PRNGKey, params: Optional[environment.EnvParams] = None
+    ) -> Tuple[chex.Array, environment.EnvState]:
+        _, env_state = self._env.reset(key, params)
+        image_obs = self.render(env_state)
+        if self.normalize:
+            image_obs /= 255.
+        return image_obs, env_state
+
+    def render(self, states, mode='rgb_array'):
+        return jnp.ones((self.size, self.size, 2))

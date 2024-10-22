@@ -97,13 +97,13 @@ def make_train(args: PPOHyperparams, rand_key: chex.PRNGKey):
     )
 
     @jax.jit
-    def _update_step(rng, transitions, last_obs, last_done, starting_hstate, train_state):
+    def _update_step(rng, transitions, last_obs, last_done, starting_hstate, final_hstate, train_state):
         # here we do everything post collecting
         traj_batch = jax.tree.map(lambda *leaves: jnp.stack(leaves, axis=0), *transitions)
 
         # CALCULATE ADVANTAGE AND TARGETS
         ac_in = (last_obs[np.newaxis, :], last_done[np.newaxis, :])
-        _, _, last_val = network.apply(train_state.params, starting_hstate, ac_in)
+        _, _, last_val = network.apply(train_state.params, final_hstate, ac_in)
         last_val = last_val.squeeze(0)
 
         advantages, targets = calculate_gae(traj_batch, last_val, last_done, gae_lambda, args.gamma)
@@ -165,6 +165,7 @@ def make_train(args: PPOHyperparams, rand_key: chex.PRNGKey):
 
         for i in range(args.num_steps):
             act_rng, step_rng, rng = jax.random.split(rng, 3)
+            # TODO: is last_obs missing a batch dim?
             value, action, log_prob, hstate = agent.act(act_rng, train_state, hstate, last_obs, last_done)
             step_rngs = jax.random.split(step_rng, args.num_envs)
 
@@ -175,9 +176,11 @@ def make_train(args: PPOHyperparams, rand_key: chex.PRNGKey):
             infos.append(info)
             last_obs, last_done = obs, dones
 
+        final_hstate = hstate
+
         # UPDATE FROM MINIBATCH
         update_rng, rng = jax.random.split(rng)
-        train_state, step_loss = _update_step(rng, transitions, last_obs, last_done, init_hstate, train_state)
+        train_state, step_loss = _update_step(rng, transitions, last_obs, last_done, init_hstate, final_hstate, train_state)
 
         if args.debug:
             metric = map_metrics(infos)
