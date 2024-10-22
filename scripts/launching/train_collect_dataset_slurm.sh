@@ -15,7 +15,6 @@ cd ..
 
 # Define the hyperparameters directory
 HYPERPARAMS_DIR="hyperparams"
-ENV_NAME="ant"  # Replace this with the desired environment name
 
 # Initialize an empty list to track job IDs
 job_ids=""
@@ -93,7 +92,7 @@ sbatch --dependency=afterok:${job_ids} <<EOT
 
 # Activate the virtual environment
 source ~/pobax/bin/activate
-
+ENV_NAME="reacher"
 # Define paths for trajectory collection
 RESULTS_DIR="../results"
 MEMORYLESS_PATH="\${RESULTS_DIR}/\${ENV_NAME}_memoryless_ppo/training_results"

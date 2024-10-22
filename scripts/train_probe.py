@@ -64,6 +64,13 @@ def make_train(args: ProbeHyperparams):
         if key.startswith('x_'):
             del experience[key]
 
+    # normalize the target
+    all_targets = experience[args.target_key]
+    target_mean = all_targets.mean(axis=0)
+    target_std = all_targets.std(axis=0) + 1e-8
+    experience[args.target_key] = (experience[args.target_key] - target_mean) / target_std
+    print(f'experience[args.target_key].shape: {experience[args.target_key].shape}')
+
     Experience = namedtuple('Experience', list(experience.keys()))
     experience = Experience(**experience)
 
@@ -118,12 +125,14 @@ def make_train(args: ProbeHyperparams):
 
                 def _loss_fn(params: dict):
                     _, logits = network.apply(params, batch.experience.first.x)
-                    # logits_mask = jnp.concatenate([logits[:, :4], logits[:, 6:]], axis=1)
-                    # target_mask = jnp.concatenate([target[:, :4], target[:, 6:]], axis=1)
-                    # loss = optax.l2_loss(logits_mask, target_mask).sum(axis=-1)
-                    # logits_mask = logits[:, :-2]
-                    # target_mask = target[:, :-2]
-                    loss = optax.l2_loss(logits, target).sum(axis=-1)
+                    mask = jnp.ones_like(logits)
+                    mask = mask.at[:, 0:2].set(0)
+
+                    # Apply the mask by setting indices 4 and 5 to zero in logits and target
+                    masked_logits = logits * mask
+                    masked_target = target * mask
+                    loss = optax.l2_loss(masked_logits, masked_target).sum(axis=-1)
+                    # loss = optax.l2_loss(logits, target).sum(axis=-1)
                     return loss.mean()
 
                 grad_fn = jax.jit(jax.value_and_grad(_loss_fn))

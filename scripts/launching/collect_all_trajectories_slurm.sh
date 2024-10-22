@@ -10,17 +10,17 @@
 # Activate the virtual environment
 source ~/pobax/bin/activate
 cd ..
-
+ENV_NAME="reacher"  # Replace this with the desired environment name
 # Define paths for trajectory collection
 RESULTS_DIR="../results"
-MEMORYLESS_PATH="${RESULTS_DIR}/reacher_memoryless_ppo/training_results"
-MEMORYLESS_LD_PATH="${RESULTS_DIR}/reacher_memoryless_ppo_LD/training_results"
-MEMORYLESS_SKIP_PATH="${RESULTS_DIR}/reacher_memoryless_no_skip_ppo/training_results"
-MEMORYLESS_SKIP_LD_PATH="${RESULTS_DIR}/reacher_memoryless_no_skip_ppo_LD/training_results"
-RNN_PATH="${RESULTS_DIR}/reacher_rnn_ppo/training_results"
-RNN_LD_PATH="${RESULTS_DIR}/reacher_rnn_ppo_LD/training_results"
-RNN_SKIP_PATH="${RESULTS_DIR}/reacher_rnn_skip_ppo/training_results"
-RNN_SKIP_LD_PATH="${RESULTS_DIR}/reacher_rnn_skip_ppo_LD/training_results"
+MEMORYLESS_PATH="${RESULTS_DIR}/${ENV_NAME}_memoryless_ppo/training_results"
+MEMORYLESS_LD_PATH="${RESULTS_DIR}/${ENV_NAME}_memoryless_ppo_LD/training_results"
+MEMORYLESS_SKIP_PATH="${RESULTS_DIR}/${ENV_NAME}_memoryless_no_skip_ppo/training_results"
+MEMORYLESS_SKIP_LD_PATH="${RESULTS_DIR}/${ENV_NAME}_memoryless_no_skip_ppo_LD/training_results"
+RNN_PATH="${RESULTS_DIR}/${ENV_NAME}_rnn_ppo/training_results"
+RNN_LD_PATH="${RESULTS_DIR}/${ENV_NAME}_rnn_ppo_LD/training_results"
+RNN_SKIP_PATH="${RESULTS_DIR}/${ENV_NAME}_rnn_skip_ppo/training_results"
+RNN_SKIP_LD_PATH="${RESULTS_DIR}/${ENV_NAME}_rnn_skip_ppo_LD/training_results"
 
 # Loop over all directories in the results directory
 for results_dir in ${RESULTS_DIR}/*; do

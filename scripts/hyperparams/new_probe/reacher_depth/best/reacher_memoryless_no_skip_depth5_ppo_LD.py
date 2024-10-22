@@ -5,9 +5,9 @@ file = __file__  # Use this in actual script to dynamically get the file name
 exp_name = Path(file).stem
 
 # Define various hyperparameter values
-lrs = [0.00025]  # Learning rates
-lambda0s = [0.75]
-lambda1s = [0.75]
+lrs = [2.5e-3, 2.5e-4, 2.5e-5]  # Learning rates
+lambda0s = [0.1, 0.5, 0.75, 0.95]
+lambda1s = [0.1, 0.5, 0.75, 0.95]
 alphas = [1]
 ld_weights = [0.5]
 vf_coeffs = [0.5]  # Value function coefficients
@@ -18,13 +18,13 @@ hparams = {
     'file_name': f'runs_{exp_name}.txt',
     'entry': 'pobax.algos.ppo',
     'args': [{
-        'env': ['Ant-F-v0'],
+        'env': 'Reacher-misc',
         'memoryless': True,
         'double_critic': True,
-        'approximator': 'rnn',
+        'approximator': 'mlp',
         'skip_connection': False,
         'lr': ' '.join(map(str, lrs)),
-        'depth': 3,
+        'depth': 5,
         'num_stack': 1,
         'num_observation': 1,
         'lambda0': ' '.join(map(str, lambda0s)),
@@ -42,12 +42,11 @@ hparams = {
         'update_epochs': 4,
         'steps_log_freq': 4,
         'update_log_freq': 5,
-        'total_steps': int(1.5e7),
+        'total_steps': int(5e6),
         'seed': 2020,
-        'n_seeds': 20,
+        'n_seeds': 4,
         'platform': 'gpu',
         'debug': False,
-        'save_runner_state': True,
         'study_name': exp_name
     }]
 }

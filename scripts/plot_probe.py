@@ -43,7 +43,7 @@ def plot_epoch_losses(study_path, env_name):
 
     # Save the plot
     parent_dir = Path(ROOT_DIR, 'graphs')
-    plot_path = parent_dir / f'{env_name}_epoch_losses_LD_1e7.png'
+    plot_path = parent_dir / f'{env_name}_epoch_losses_LD_1e7_mask.png'
     plt.savefig(plot_path)
     print(f"Epoch loss plot saved to {plot_path}")
 

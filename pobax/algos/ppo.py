@@ -486,7 +486,6 @@ if __name__ == "__main__":
         "ANNEAL_LR": True,
         "DEBUG": args.debug,
     }
-    print(f'double critic: {config["DOUBLE_CRITIC"]}')
 
     rng = jax.random.PRNGKey(args.seed)
     make_train_rng, rng = jax.random.split(rng)

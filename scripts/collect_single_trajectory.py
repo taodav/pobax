@@ -11,6 +11,7 @@ from tap import Tap
 from flax.training import orbax_utils
 import orbax.checkpoint
 
+from collections import defaultdict
 from gymnax.environments import environment
 from pobax.models.network import ScannedRNN
 from pobax.utils.file_system import load_train_state, make_hash_md5
@@ -21,7 +22,8 @@ class CollectHyperparams(Tap):
     update_idx_to_take: int = None
 
     num_envs: int = 4
-    n_samples: int = int(1e6)
+    n_samples: int = int(1e5)
+    gamma: float = 0.99
 
     seed: int = 2024
     platform: str = 'gpu'
@@ -66,12 +68,41 @@ def ppo_step(runner_state, unused,
     # )
     state = get_state(env_state)
     datum = {
+        'action': action,
+        'done': done,
+        'reward': reward,
         'x': embedding,
         'observation': last_obs,
+        'next_observation': obsv,
     }
     runner_state = (ts, next_env_state, obsv, done,
                     next_hstate, rng)
     return runner_state, datum
+
+def calculate_monte_carlo_return(dataset, gamma=0.99):
+    rewards = dataset['reward']       # Shape: [time_steps]
+    dones = dataset['done']           # Shape: [time_steps]
+    states = dataset['observation']   # Shape: [time_steps, state_dim]
+    time_steps = len(rewards)
+
+    returns = np.zeros_like(rewards)  # Shape: [time_steps]
+    state_returns = defaultdict(list)
+    G = 0
+    for t in reversed(range(time_steps)):
+        G = rewards[t] + gamma * G * (1 - dones[t])
+        returns[t] = G
+        state = states[t]
+        state_hashable = tuple(np.asarray(state).flatten())
+        if state_hashable not in state_returns.keys():
+            state_returns[state_hashable] = [G]
+        else:
+            state_returns[state_hashable].append(G)
+        if dones[t]:
+            G = 0  # Reset G when an episode ends
+    V = {}
+    for state_hashable, returns_list in state_returns.items():
+        V[state_hashable] = np.mean(returns_list)
+    return V
 
 
 def make_collect(args: CollectHyperparams, key: chex.PRNGKey):
@@ -85,6 +116,7 @@ def make_collect(args: CollectHyperparams, key: chex.PRNGKey):
                                                                                      update_idx_to_take=args.update_idx_to_take,
                                                                                      best_over_rng=True)
     args.study_name = network_args['study_name']
+    args.gamma = network_args['gamma']
 
     _env_step = partial(ppo_step, network=network,
                         env=env, env_params=env_params)
@@ -135,6 +167,8 @@ if __name__ == "__main__":
     collect_fn = jax.jit(collect_fn)
 
     dataset = collect_fn(collect_key)
+    V = calculate_monte_carlo_return(dataset, args.gamma)
+    dataset['V'] = V
 
     def path_to_str(d: dict):
         for k, v in d.items():
@@ -150,7 +184,6 @@ if __name__ == "__main__":
         'ckpt': ckpt_info,
     }
     path_to_str(to_save)
-
     save_path = args.collect_path.parent / \
                 f'dataset'
 
