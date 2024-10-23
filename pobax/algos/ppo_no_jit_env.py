@@ -1,4 +1,5 @@
 from functools import partial
+from time import time
 
 import chex
 import jax
@@ -9,8 +10,8 @@ import optax
 from flax.training.train_state import TrainState
 
 from pobax.config import PPOHyperparams
-from pobax.envs import get_env
-from pobax.models import get_gymnax_network_fn, ScannedRNN
+from pobax.envs import get_env, get_pixel_env
+from pobax.models import get_gymnax_network_fn, get_network_fn, ScannedRNN
 from pobax.utils.file_system import get_results_path
 
 from pobax.algos.ppo import PPO, Transition, calculate_gae, filter_period_first_dim, env_step
@@ -20,20 +21,25 @@ def make_update(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
     args.minibatch_size = (
             args.num_envs * args.num_steps // args.num_minibatches
     )
-    env_key, rand_key = jax.random.split(rand_key)
-    env, env_params = get_env(args.env, env_key,
-                              gamma=args.gamma,
-                              action_concat=args.action_concat)
-
-    if hasattr(env, 'gamma'):
-        args.gamma = env.gamma
-
-    assert hasattr(env_params, 'max_steps_in_episode')
 
     double_critic = args.double_critic
     memoryless = args.memoryless
 
-    network_fn, action_size = get_gymnax_network_fn(env, env_params, memoryless=memoryless)
+    # env_key, rand_key = jax.random.split(rand_key)
+    # env, env_params = get_env(args.env, env_key,
+    #                           gamma=args.gamma,
+    #                           action_concat=args.action_concat)
+    #
+    # if hasattr(env, 'gamma'):
+    #     args.gamma = env.gamma
+    #
+    # assert hasattr(env_params, 'max_steps_in_episode')
+    #
+    # network_fn, action_size = get_gymnax_network_fn(env, env_params, memoryless=memoryless)
+
+    env, env_params = get_pixel_env(args.env, gamma=args.gamma)
+
+    network_fn, obs_shape, action_size = get_network_fn(env, memoryless=args.memoryless)
 
     network = network_fn(action_size,
                          double_critic=double_critic,
@@ -173,7 +179,7 @@ def make_update(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
 
         # runner_state = (train_state, env_state, last_obs, last_done, hstate, rng)
 
-        return train_state, metric
+        return train_state, {'info': metric, 'loss': loss_info}
 
         # rng, _rng = jax.random.split(rng)
         # runner_state = (
@@ -292,30 +298,68 @@ if __name__ == "__main__":
 
     runner_state = (train_state, env_state, last_obs, last_done, hstate, rng)
     all_metrics = []
+    t = time()
 
-    for i in range(num_updates):
+    for update_num in range(num_updates):
         # COLLECT TRAJECTORIES
-        initial_hstate = runner_state[-2]
-        runner_state, traj_batch = jax.lax.scan(
-            _env_step, runner_state, jnp.arange(args.num_steps), args.num_steps
-        )
-        (train_state, env_state, last_obs, last_done, hstate, rng) = runner_state
+        # initial_hstate = runner_state[-2]
+        # runner_state, traj_batch = jax.lax.scan(
+        #     _env_step, runner_state, jnp.arange(args.num_steps), args.num_steps
+        # )
+        # (train_state, env_state, last_obs, last_done, hstate, rng) = runner_state
+        #
+        # rng, _rng = jax.random.split(rng)
+        # train_state, metrics = update_jit(_rng, train_state, initial_hstate, hstate, traj_batch, last_obs, last_done)
+        # all_metrics.append(metrics)
+        #
+        # runner_state = (train_state, env_state, last_obs, last_done, hstate, rng)
+        # info = metrics
 
+        transitions = []
+        initial_hstate = hstate
+        for step in range(args.num_steps):
+            rng, _rng = jax.random.split(rng)
+            value, action, log_prob, hstate = agent.act(_rng, train_state, hstate, last_obs, last_done)
+
+            # STEP ENV
+            rng, _rng = jax.random.split(rng)
+            rng_step = jax.random.split(_rng, hstate.shape[0])
+            obsv, env_state, reward, done, info = env.step(rng_step, env_state, action, env_params)
+            transition = Transition(
+                last_done, action, value, reward, log_prob, last_obs, info
+            )
+            transitions.append(transition)
+            last_obs, last_done = obsv, done
+        traj_batch = jax.tree.map(lambda *leaves: jnp.stack(leaves, axis=0), *transitions)
+
+        # Update
         rng, _rng = jax.random.split(rng)
-        train_state, metrics = update_jit(_rng, train_state, initial_hstate, hstate, traj_batch, last_obs, last_done)
+        train_state, update_metrics = update_jit(_rng, train_state, initial_hstate, hstate, traj_batch, last_obs, last_done)
+        metrics = update_metrics['info']
+        total_loss, _ = update_metrics['loss']  # loss infos are all 4x4 b/c we have 4 minibatches and 4 envs
         all_metrics.append(metrics)
 
-        runner_state = (train_state, env_state, last_obs, last_done, hstate, rng)
+        info = traj_batch.info
 
-        info = metrics
-        timesteps = (
-                info["timestep"][info["returned_episode"]] * args.num_envs
-        )
-        avg_return_values = jnp.mean(info["returned_episode_returns"][info["returned_episode"]])
-        if len(timesteps) > 0:
+        if args.debug:
+            metric = metrics['returned_episode_returns'].mean()
+            new_t = time()
+            time_per_step = (new_t - t)
             print(
-                f"timesteps={timesteps[0]} - {timesteps[-1]}, avg episodic return={avg_return_values:.2f}"
+                f"Mean return for step {update_num * args.num_steps * args.num_envs}/{args.total_steps}, "
+                f"avg episodic return={metric:.2f}, "
+                f"total_loss={total_loss.mean():.2f}, "
+                f"Time per update: {time_per_step:.2f}"
             )
+            t = new_t
+        # timesteps = (
+        #         info["timestep"][info["returned_episode"]] * args.num_envs
+        # )
+        # avg_return_values = jnp.mean(info["returned_episode_returns"][info["returned_episode"]])
+        # if len(timesteps) > 0:
+        #     print(
+        #         f"timesteps={timesteps[0]} - {timesteps[-1]}, avg episodic return={avg_return_values:.2f}"
+        #     )
 
     # # our final_eval_metric returns max_num_steps.
     # # we can filter that down by the max episode length amongst the runs.
