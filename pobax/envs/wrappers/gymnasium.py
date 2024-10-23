@@ -1,10 +1,100 @@
-from typing import Any
+from typing import Any, Optional, Tuple, Dict, Union, List
 
-from gymnasium import Wrapper
-from gymnasium.core import WrapperObsType, WrapperActType, SupportsFloat
-
+import chex
+import jax
+import gymnasium as gym
+from gymnasium import Wrapper, core
+from gymnasium.core import WrapperObsType, WrapperActType, SupportsFloat, Env
 from gymnasium.wrappers import PixelObservationWrapper
 
+from gymnax.environments import environment
+from gymnax.environments import spaces
+
+
+class GymnaxToGymWrapper(gym.Env[core.ObsType, core.ActType]):
+    """Wrap Gymnax environment as OOP Gym environment."""
+
+    def __init__(
+            self,
+            env: environment.Environment,
+            params: Optional[environment.EnvParams] = None,
+            seed: Optional[int] = None,
+    ):
+        """Wrap Gymnax environment as OOP Gym environment.
+
+
+        Args:
+            env: Gymnax Environment instance
+            params: If provided, gymnax EnvParams for environment (otherwise uses
+              default)
+            seed: If provided, seed for JAX PRNG (otherwise picks 0)
+        """
+        super().__init__()
+        self._env = env
+        self.env_params = params if params is not None else env.default_params
+        self.metadata.update(
+            {
+                "name": env.name,
+                "render_modes": (
+                    ["human", "rgb_array"] if hasattr(env, "render") else []
+                ),
+            }
+        )
+        self.rng: chex.PRNGKey = jax.random.PRNGKey(0)  # Placeholder
+        self._seed(seed)
+        _, self.env_state = self._env.reset(self.rng, self.env_params)
+
+    @property
+    def action_space(self):
+        """Dynamically adjust action space depending on params."""
+        return spaces.gymnax_space_to_gym_space(self._env.action_space(self.env_params))
+
+    @property
+    def observation_space(self):
+        """Dynamically adjust state space depending on params."""
+        return spaces.gymnax_space_to_gym_space(
+            self._env.observation_space(self.env_params)
+        )
+
+    def _seed(self, seed: Optional[int] = None):
+        """Set RNG seed (or use 0)."""
+        self.rng = jax.random.PRNGKey(seed or 0)
+
+    def step(
+            self, action: core.ActType
+    ) -> Tuple[core.ObsType, float, bool, bool, Dict[Any, Any]]:
+        """Step environment, follow new step API."""
+        self.rng, step_key = jax.random.split(self.rng)
+        o, self.env_state, r, d, info = self._env.step(
+            step_key, self.env_state, action, self.env_params
+        )
+        return o, r, d, d, info
+
+    def reset(
+            self,
+            *,
+            seed: Optional[int] = None,
+            return_info: bool = False,
+            options: Optional[Any] = None,  # dict
+    ) -> Tuple[core.ObsType, Any]:  # dict]:
+        """Reset environment, update parameters and seed if provided."""
+        if seed is not None:
+            self._seed(seed)
+        if options is not None:
+            self.env_params = options.get(
+                "env_params", self.env_params
+            )  # Allow changing environment parameters on reset
+        self.rng, reset_key = jax.random.split(self.rng)
+        o, self.env_state = self._env.reset(reset_key, self.env_params)
+        return o, {}
+
+    def render(
+            self, mode="human"
+    ) -> Optional[Union[core.RenderFrame, List[core.RenderFrame]]]:
+        """use underlying environment rendering if it exists, otherwise return None."""
+        return getattr(self._env, "render", lambda x, y: None)(
+            self.env_state, self.env_params
+        )
 
 class PixelOnlyObservationWrapper(PixelObservationWrapper):
     def __init__(self, *args, **kwargs):

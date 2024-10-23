@@ -10,7 +10,7 @@ import optax
 from flax.training.train_state import TrainState
 
 from pobax.config import PPOHyperparams
-from pobax.envs import get_env, get_pixel_env
+from pobax.envs import get_env, get_gym_env
 from pobax.models import get_gymnax_network_fn, get_network_fn, ScannedRNN
 from pobax.utils.file_system import get_results_path
 
@@ -23,21 +23,8 @@ def make_update(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
     )
 
     double_critic = args.double_critic
-    memoryless = args.memoryless
 
-    # env_key, rand_key = jax.random.split(rand_key)
-    # env, env_params = get_env(args.env, env_key,
-    #                           gamma=args.gamma,
-    #                           action_concat=args.action_concat)
-    #
-    # if hasattr(env, 'gamma'):
-    #     args.gamma = env.gamma
-    #
-    # assert hasattr(env_params, 'max_steps_in_episode')
-    #
-    # network_fn, action_size = get_gymnax_network_fn(env, env_params, memoryless=memoryless)
-
-    env, env_params = get_pixel_env(args.env, gamma=args.gamma)
+    env = get_gym_env(args.env, gamma=args.gamma, seed=args.seed)
 
     network_fn, obs_shape, action_size = get_network_fn(env, memoryless=args.memoryless)
 
@@ -225,7 +212,7 @@ def make_update(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
         #
         # return res
 
-    return _update_step, agent, env, env_params
+    return _update_step, agent, env
 
 
 if __name__ == "__main__":
@@ -246,16 +233,14 @@ if __name__ == "__main__":
 
     rng = jax.random.PRNGKey(args.seed)
     make_train_rng, rng = jax.random.split(rng)
-    update_fn, agent, env, env_params = make_update(args, make_train_rng)
+    update_fn, agent, env = make_update(args, make_train_rng)
     update_jit = jax.jit(update_fn)
-    # TODO: change this to non jit
-    _env_step = jax.jit(partial(env_step, agent=agent, env=env, env_params=env_params))
 
     # INIT NETWORK
     rng, init_rng = jax.random.split(rng)
     init_x = (
         jnp.zeros(
-            (1, args.num_envs, *env.observation_space(env_params).shape)
+            (1, args.num_envs, *env.observation_space.shape)
         ),
         jnp.zeros((1, args.num_envs)),
     )
@@ -288,33 +273,17 @@ if __name__ == "__main__":
     )
 
     # INIT ENV
-    rng, _rng = jax.random.split(rng)
-    reset_rng = jax.random.split(_rng, args.num_envs)
-    obsv, env_state = env.reset(reset_rng, env_params)
-    # init_hstate = ScannedRNN.initialize_carry(args.num_envs, args.hidden_size)
+    obsv, info = env.reset()
+
     hstate = ScannedRNN.initialize_carry(args.num_envs, args.hidden_size)
     last_obs = obsv
     last_done = jnp.zeros(args.num_envs, dtype=bool)
 
-    runner_state = (train_state, env_state, last_obs, last_done, hstate, rng)
     all_metrics = []
     t = time()
 
     for update_num in range(num_updates):
         # COLLECT TRAJECTORIES
-        # initial_hstate = runner_state[-2]
-        # runner_state, traj_batch = jax.lax.scan(
-        #     _env_step, runner_state, jnp.arange(args.num_steps), args.num_steps
-        # )
-        # (train_state, env_state, last_obs, last_done, hstate, rng) = runner_state
-        #
-        # rng, _rng = jax.random.split(rng)
-        # train_state, metrics = update_jit(_rng, train_state, initial_hstate, hstate, traj_batch, last_obs, last_done)
-        # all_metrics.append(metrics)
-        #
-        # runner_state = (train_state, env_state, last_obs, last_done, hstate, rng)
-        # info = metrics
-
         transitions = []
         initial_hstate = hstate
         for step in range(args.num_steps):
@@ -324,7 +293,7 @@ if __name__ == "__main__":
             # STEP ENV
             rng, _rng = jax.random.split(rng)
             rng_step = jax.random.split(_rng, hstate.shape[0])
-            obsv, env_state, reward, done, info = env.step(rng_step, env_state, action, env_params)
+            obsv, reward, done, trunc, info = env.step(action)
             transition = Transition(
                 last_done, action, value, reward, log_prob, last_obs, info
             )

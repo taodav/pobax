@@ -1,7 +1,6 @@
 from functools import partial
 from pathlib import Path
 
-import gymnasium as gym
 import gymnax
 from jax import random
 
@@ -32,6 +31,7 @@ from pobax.envs.wrappers.gymnax import (
     ActionConcatWrapper
 )
 from pobax.envs.wrappers.pixel import PixelBraxVecEnvWrapper, PixelTMazeVecEnvWrapper, PixelSimpleChainVecEnvWrapper
+from pobax.envs.wrappers.gymnasium import GymnaxToGymWrapper
 
 masked_gymnax_env_map = {
     'Pendulum-F-v0': {'env_str': 'Pendulum-v1', 'mask_dims': [0, 1, 2]},
@@ -203,10 +203,11 @@ def get_env(env_name: str,
     return env, env_params
 
 
-def get_pixel_env(env_name: str,
-                  gamma: float = 0.99,
-                  image_size: int = 64,
-                  normalize_image: bool = True):
+def get_gym_env(env_name: str,
+                gamma: float = 0.99,
+                image_size: int = 64,
+                normalize_image: bool = True,
+                seed: int = 2024):
     # For testing purposes
     if env_name == 'tmaze':
         # hallway_length = int(env_name.split('_')[-1])
@@ -216,22 +217,18 @@ def get_pixel_env(env_name: str,
         env = LogWrapper(env, gamma=gamma)
         env = VecEnv(env)
         env = PixelTMazeVecEnvWrapper(env, size=image_size, normalize=normalize_image)
-        return env, env_params
     elif env_name == 'simple_chain':
         env = SimpleChain()
         env_params = env.default_params
         env = LogWrapper(env, gamma=gamma)
         env = VecEnv(env)
         env = PixelSimpleChainVecEnvWrapper(env, size=image_size, normalize=normalize_image)
-        return env, env_params
+    else:
+        env, env_params = load_brax_env(env_name)
+        env = LogWrapper(env, gamma=gamma)
+        env = VecEnv(env)
 
-    env, env_params = load_brax_env(env_name)
-    env = LogWrapper(env, gamma=gamma)
-    env = VecEnv(env)
+        env = PixelBraxVecEnvWrapper(env, size=image_size, normalize=normalize_image)
+    env = GymnaxToGymWrapper(env, env_params, seed=seed)
 
-    env = PixelBraxVecEnvWrapper(env, size=image_size, normalize=normalize_image)
-    return env, env_params
-
-
-
-
+    return env
