@@ -15,7 +15,7 @@ from collections import defaultdict
 from gymnax.environments import environment
 from pobax.models.network import ScannedRNN
 from pobax.utils.file_system import load_train_state, make_hash_md5
-from pobax.envs import get_pixel_env
+from pobax.envs import get_gym_env
 
 class CollectHyperparams(Tap):
     env: str = 'tmaze'
@@ -31,7 +31,7 @@ class CollectHyperparams(Tap):
     study_name: str = 'test'
 
 def ppo_step(runner_state, unused, num_envs,
-                    env, env_params):
+                    env):
     
     def get_state(s):
         if hasattr(s, 'env_state'):
@@ -39,51 +39,58 @@ def ppo_step(runner_state, unused, num_envs,
         else:
             return s
 
-    (env_state, last_obs, last_done, rng) = runner_state
-    rng, _rng = jax.random.split(rng)
-    rng_action = jax.random.split(_rng, num_envs)
-    # SELECT ACTION
-    action_space = env.action_space(env_params)
-    sample = jax.vmap(action_space.sample)
-    action = sample(rng_action)
+    @jax.jit
+    def sample_action(runner_state):
+        (last_obs, last_done, rng) = runner_state
+        rng, _rng = jax.random.split(rng)
+        rng_action = jax.random.split(_rng, num_envs)
+        # SELECT ACTION
+        action_space = env._env.action_space(env.env_params)
+        sample = jax.vmap(action_space.sample)
+        return sample(rng_action), rng
+
+    action, rng = sample_action(runner_state)
 
     # STEP ENV
-    rng, _rng = jax.random.split(rng)
-    rng_step = jax.random.split(_rng, num_envs)
-    obsv, next_env_state, reward, done, info = env.step(rng_step, env_state, action, env_params)
-    frame = env.render(env_state)
+    obsv, reward, done, trunc, info = env.step(action)
+    # frame = env.render(env.env_state)
+
     datum = {
-        'frame': frame,
+        'frame': obsv,
     }
-    runner_state = (next_env_state, obsv, done, rng)
+    runner_state = (obsv, done, rng)
     return runner_state, datum
 
 def make_collect(args: CollectHyperparams, key: chex.PRNGKey):
     steps_to_collect = args.n_samples // args.num_envs
 
-    env, env_params = get_pixel_env(args.env)
+    env = get_gym_env(args.env, seed=args.seed, num_envs=args.num_envs, normalize_image=False)
 
     _env_step = partial(ppo_step, num_envs=args.num_envs,
-                        env=env, env_params=env_params)
+                        env=env)
     _env_step = scan_tqdm(steps_to_collect)(_env_step)
 
     def collect(rng):
         # INIT ENV
         rng, _rng = jax.random.split(rng)
-        reset_rng = jax.random.split(_rng, args.num_envs)
-        obsv, env_state = env.reset(reset_rng, env_params)
+        obsv, info = env.reset()
 
         # init hidden state
-        init_runner_state = (
-            env_state,
+        runner_state = (
             obsv,
             jnp.zeros(args.num_envs, dtype=bool),
             _rng,
         )
 
-        runner_state, dataset = jax.lax.scan(
-            _env_step, init_runner_state, jnp.arange(steps_to_collect), steps_to_collect
-        )
+        # runner_state, dataset = jax.lax.scan(
+        #     _env_step, init_runner_state, jnp.arange(steps_to_collect), steps_to_collect
+        # )
+        dataset = []
+        for i in range(steps_to_collect):
+            runner_state, data = _env_step(runner_state, i)
+            dataset.append(data)
+
+        dataset = jax.tree.map(lambda *leaves: np.stack(leaves), *dataset)
 
         return dataset
 
@@ -136,7 +143,7 @@ def make_video(args: CollectHyperparams, frame_data: dict, max_frames: int = 100
 
             # Extract individual frame
             frame = frames[i, env_idx, :, :, :]  # Shape: (64, 64, 4)
-            frame = frame * 255
+            frame = frame
             # Handle alpha channel: Convert RGBA to BGR by discarding alpha
             if frame.shape[2] == 4:
                 frame = frame[:, :, :3]  # Discard alpha channel
@@ -170,7 +177,7 @@ if __name__ == "__main__":
     make_key, collect_key, key = jax.random.split(key, 3)
 
     collect_fn = make_collect(args, make_key)
-    collect_fn = jax.jit(collect_fn)
+    # collect_fn = jax.jit(collect_fn)
 
     frame = collect_fn(collect_key)
     print(frame['frame'].shape)
