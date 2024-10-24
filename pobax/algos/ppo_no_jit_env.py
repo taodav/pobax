@@ -2,16 +2,17 @@ from functools import partial
 from time import time
 
 import chex
+from flax.training import orbax_utils
+from flax.training.train_state import TrainState
 import jax
 import jax.numpy as jnp
-import flax.linen as nn
 import numpy as np
 import optax
-from flax.training.train_state import TrainState
+import orbax.checkpoint
 
 from pobax.config import PPOHyperparams
-from pobax.envs import get_env, get_gym_env
-from pobax.models import get_gymnax_network_fn, get_network_fn, ScannedRNN
+from pobax.envs import get_gym_env
+from pobax.models import get_network_fn, ScannedRNN
 from pobax.utils.file_system import get_results_path
 
 from pobax.algos.ppo import PPO, Transition, calculate_gae, filter_period_first_dim, env_step
@@ -24,7 +25,7 @@ def make_update(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
 
     double_critic = args.double_critic
 
-    env = get_gym_env(args.env, gamma=args.gamma, seed=args.seed)
+    env = get_gym_env(args.env, gamma=args.gamma, seed=args.seed, num_envs=args.num_envs)
 
     network_fn, obs_shape, action_size = get_network_fn(env, memoryless=args.memoryless)
 
@@ -149,23 +150,6 @@ def make_update(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
         metric = traj_batch.info
         metric = jax.tree.map(steps_filter, metric)
 
-        # rng = update_state[-1]
-        # if args.debug:
-        #
-        #     def callback(info):
-        #         timesteps = (
-        #                 info["timestep"][info["returned_episode"]] * args.num_envs
-        #         )
-        #         avg_return_values = jnp.mean(info["returned_episode_returns"][info["returned_episode"]])
-        #         if len(timesteps) > 0:
-        #             print(
-        #                 f"timesteps={timesteps[0]} - {timesteps[-1]}, avg episodic return={avg_return_values:.2f}"
-        #             )
-        #
-        #     jax.debug.callback(callback, metric)
-
-        # runner_state = (train_state, env_state, last_obs, last_done, hstate, rng)
-
         return train_state, {'info': metric, 'loss': loss_info}
 
         # rng, _rng = jax.random.split(rng)
@@ -213,6 +197,11 @@ def make_update(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
         # return res
 
     return _update_step, agent, env
+
+
+@jax.jit
+def stack_list(lst):
+    return jax.tree.map(lambda *leaves: jnp.stack(leaves, axis=0), *lst)
 
 
 if __name__ == "__main__":
@@ -299,7 +288,8 @@ if __name__ == "__main__":
             )
             transitions.append(transition)
             last_obs, last_done = obsv, done
-        traj_batch = jax.tree.map(lambda *leaves: jnp.stack(leaves, axis=0), *transitions)
+
+        traj_batch = stack_list(transitions)
 
         # Update
         rng, _rng = jax.random.split(rng)
@@ -321,14 +311,9 @@ if __name__ == "__main__":
                 f"Time per update: {time_per_step:.2f}"
             )
             t = new_t
-        # timesteps = (
-        #         info["timestep"][info["returned_episode"]] * args.num_envs
-        # )
-        # avg_return_values = jnp.mean(info["returned_episode_returns"][info["returned_episode"]])
-        # if len(timesteps) > 0:
-        #     print(
-        #         f"timesteps={timesteps[0]} - {timesteps[-1]}, avg episodic return={avg_return_values:.2f}"
-        #     )
+
+    final_train_state = train_state
+    out = {'metrics': stack_list(all_metrics)}
 
     # # our final_eval_metric returns max_num_steps.
     # # we can filter that down by the max episode length amongst the runs.
@@ -341,21 +326,21 @@ if __name__ == "__main__":
     #     return x[..., :largest_episode, :]
     # out['final_eval_metric'] = jax.tree.map(get_first_n_filter, final_eval)
     #
-    # if not args.save_runner_state:
-    #     del out['runner_state']
-    #
-    # results_path = get_results_path(args, return_npy=False)  # returns a results directory
-    #
-    # all_results = {
-    #     'out': out,
-    #     'args': args.as_dict()
-    # }
-    #
-    # # Save all results with Orbax
-    # orbax_checkpointer = orbax.checkpoint.PyTreeCheckpointer()
-    # save_args = orbax_utils.save_args_from_target(all_results)
-    #
-    # print(f"Saving results to {results_path}")
-    # orbax_checkpointer.save(results_path, all_results, save_args=save_args)
-    #
-    # print("Done.")
+    if args.save_runner_state:
+        out['train_state'] = train_state
+
+    results_path = get_results_path(args, return_npy=False)  # returns a results directory
+
+    all_results = {
+        'out': out,
+        'args': args.as_dict()
+    }
+
+    # Save all results with Orbax
+    orbax_checkpointer = orbax.checkpoint.PyTreeCheckpointer()
+    save_args = orbax_utils.save_args_from_target(all_results)
+
+    print(f"Saving results to {results_path}")
+    orbax_checkpointer.save(results_path, all_results, save_args=save_args)
+
+    print("Done.")

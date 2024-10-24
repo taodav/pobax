@@ -207,6 +207,7 @@ def get_gym_env(env_name: str,
                 gamma: float = 0.99,
                 image_size: int = 64,
                 normalize_image: bool = True,
+                num_envs: int = None,
                 seed: int = 2024):
     # For testing purposes
     if env_name == 'tmaze':
@@ -229,6 +230,6 @@ def get_gym_env(env_name: str,
         env = VecEnv(env)
 
         env = PixelBraxVecEnvWrapper(env, size=image_size, normalize=normalize_image)
-    env = GymnaxToGymWrapper(env, env_params, seed=seed)
+    env = GymnaxToGymWrapper(env, env_params, seed=seed, num_envs=num_envs)
 
     return env

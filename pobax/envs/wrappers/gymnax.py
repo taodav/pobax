@@ -182,6 +182,7 @@ class BraxGymnaxWrapper:
         self.max_steps_in_episode = 1000
         env = EpisodeWrapper(env, episode_length=self.max_steps_in_episode, action_repeat=1)
         env = AutoResetWrapper(env)
+        self.name = env_name
         self._env = env
         self.action_size = env.action_size
         self.observation_size = (env.observation_size,)

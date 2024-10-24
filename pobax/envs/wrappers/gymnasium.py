@@ -19,6 +19,7 @@ class GymnaxToGymWrapper(gym.Env[core.ObsType, core.ActType]):
             env: environment.Environment,
             params: Optional[environment.EnvParams] = None,
             seed: Optional[int] = None,
+            num_envs: Optional[int] = None,
     ):
         """Wrap Gymnax environment as OOP Gym environment.
 
@@ -42,7 +43,11 @@ class GymnaxToGymWrapper(gym.Env[core.ObsType, core.ActType]):
         )
         self.rng: chex.PRNGKey = jax.random.PRNGKey(0)  # Placeholder
         self._seed(seed)
-        _, self.env_state = self._env.reset(self.rng, self.env_params)
+        self.num_envs = num_envs
+        rng = self.rng
+        if self.num_envs is not None:
+            rng = jax.random.split(self.rng, self.num_envs)
+        _, self.env_state = self._env.reset(rng, self.env_params)
 
     @property
     def action_space(self):
@@ -65,8 +70,9 @@ class GymnaxToGymWrapper(gym.Env[core.ObsType, core.ActType]):
     ) -> Tuple[core.ObsType, float, bool, bool, Dict[Any, Any]]:
         """Step environment, follow new step API."""
         self.rng, step_key = jax.random.split(self.rng)
+        step_keys = jax.random.split(step_key, self.num_envs)
         o, self.env_state, r, d, info = self._env.step(
-            step_key, self.env_state, action, self.env_params
+            step_keys, self.env_state, action, self.env_params
         )
         return o, r, d, d, info
 
@@ -85,7 +91,8 @@ class GymnaxToGymWrapper(gym.Env[core.ObsType, core.ActType]):
                 "env_params", self.env_params
             )  # Allow changing environment parameters on reset
         self.rng, reset_key = jax.random.split(self.rng)
-        o, self.env_state = self._env.reset(reset_key, self.env_params)
+        reset_keys = jax.random.split(reset_key, self.num_envs)
+        o, self.env_state = self._env.reset(reset_keys, self.env_params)
         return o, {}
 
     def render(

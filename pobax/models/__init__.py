@@ -42,13 +42,13 @@ def get_gymnax_network_fn(env: environment.Environment, env_params: environment.
     return network_fn, action_size
 
 
-def get_network_fn(env: Union[gym.Env, environment.Environment], env_params: environment.EnvParams = None,
+def get_network_fn(env: gym.Env,
                    memoryless: bool = False):
-    obs_space = env.observation_space(env_params)
-    action_space = env.action_space(env_params)
+    obs_space = env.observation_space
+    action_space = env.action_space
 
     obs_shape = obs_space.shape
-    if isinstance(action_space, gymnax.environments.spaces.Discrete):
+    if isinstance(action_space, gym.spaces.Discrete):
         network_fn = ImageDiscreteActorCriticRNN
         if memoryless:
             network_fn = ImageDiscreteActorCritic
