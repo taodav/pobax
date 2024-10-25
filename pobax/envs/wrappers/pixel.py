@@ -4,8 +4,8 @@ from typing import Optional, Tuple, Union
 import chex
 import jax
 import mujoco
+from mujoco import _enums, _structs, _functions
 from brax import base
-from brax.io import image
 from gymnax.environments import spaces, environment
 from jax import numpy as jnp
 
@@ -22,7 +22,8 @@ def unwrap_env_state(s):
 class PixelBraxVecEnvWrapper(GymnaxWrapper):
     def __init__(self, env: VecEnv,
                  size: int = 128,
-                 normalize: bool = False):
+                 normalize: bool = False,
+                 zoom_factor: float = 1.):
         super().__init__(env)
         self._env.reset = jax.jit(self._env.reset)
         self._env.step = jax.jit(self._env.step)
@@ -31,6 +32,7 @@ class PixelBraxVecEnvWrapper(GymnaxWrapper):
 
         self.normalize = normalize
         self.size = size
+        self.zoom_factor = zoom_factor
 
     def observation_space(self, params):
         low, high = 0, 255
@@ -45,8 +47,22 @@ class PixelBraxVecEnvWrapper(GymnaxWrapper):
     def reset(
             self, key: chex.PRNGKey, params: Optional[environment.EnvParams] = None
     ) -> Tuple[chex.Array, environment.EnvState]:
+        def make_camera(camera_id: int):
+            # Render camera.
+            camera = _structs.MjvCamera()
+            camera.fixedcamid = camera_id
+            camera.distance *= self.zoom_factor
+
+            # Defaults to mjCAMERA_FREE, otherwise mjCAMERA_FIXED refers to a
+            # camera explicitly defined in the model.
+            if camera_id == -1:
+                camera.type = _enums.mjtCamera.mjCAMERA_FREE
+                _functions.mjv_defaultFreeCamera(sys.mj_model, camera)
+            return camera
+
         sys = self._unwrapped._env.sys
         self.renderer = [mujoco.Renderer(sys.mj_model, height=self.size, width=self.size) for _ in range(key.shape[0])]
+        self.cameras = [make_camera(-1) for _ in range(key.shape[0])]
 
         _, env_state = self._env.reset(key, params)
         image_obs = self.render(env_state)
@@ -91,7 +107,7 @@ class PixelBraxVecEnvWrapper(GymnaxWrapper):
             d = mujoco.MjData(sys.mj_model)
             d.qpos, d.qvel = state.q[i], state.qd[i]
             mujoco.mj_forward(sys.mj_model, d)
-            self.renderer[i].update_scene(d, camera=-1)
+            self.renderer[i].update_scene(d, camera=self.cameras[i])
             return self.renderer[i].render()
 
         images = jnp.stack([get_image(states.pipeline_state, i) for i in range(n)])

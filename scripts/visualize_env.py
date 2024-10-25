@@ -1,6 +1,4 @@
 from functools import partial
-from pathlib import Path
-from typing import Union, NamedTuple
 
 import chex
 import jax
@@ -8,13 +6,7 @@ import jax.numpy as jnp
 from jax_tqdm import scan_tqdm
 import numpy as np
 from tap import Tap
-from flax.training import orbax_utils
-import orbax.checkpoint
 
-from collections import defaultdict
-from gymnax.environments import environment
-from pobax.models.network import ScannedRNN
-from pobax.utils.file_system import load_train_state, make_hash_md5
 from pobax.envs import get_gym_env
 
 class CollectHyperparams(Tap):
@@ -23,7 +15,7 @@ class CollectHyperparams(Tap):
     update_idx_to_take: int = None
 
     num_envs: int = 4
-    n_samples: int = int(1e4)
+    n_samples: int = int(1e2)
     gamma: float = 0.99
 
     seed: int = 2024
