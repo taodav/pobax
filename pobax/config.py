@@ -55,6 +55,8 @@ class PPOHyperparams(Tap):
     max_grad_norm: float = 0.5
     anneal_lr: bool = True
 
+    image_size: int = 32
+
     num_eval_envs: int = 10
     steps_log_freq: int = 1
     update_log_freq: int = 1

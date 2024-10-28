@@ -25,7 +25,8 @@ def make_update(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
 
     double_critic = args.double_critic
 
-    env = get_gym_env(args.env, gamma=args.gamma, seed=args.seed, num_envs=args.num_envs)
+    env = get_gym_env(args.env, gamma=args.gamma, seed=args.seed, num_envs=args.num_envs,
+                      image_size=args.image_size)
 
     network_fn, obs_shape, action_size = get_network_fn(env, memoryless=args.memoryless)
 

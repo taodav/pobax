@@ -56,7 +56,8 @@ def ppo_step(runner_state, unused, num_envs,
 def make_collect(args: CollectHyperparams, key: chex.PRNGKey):
     steps_to_collect = args.n_samples // args.num_envs
 
-    env = get_gym_env(args.env, seed=args.seed, num_envs=args.num_envs, normalize_image=False)
+    env = get_gym_env(args.env, seed=args.seed, num_envs=args.num_envs, normalize_image=False,
+                      image_size=32)
 
     _env_step = partial(ppo_step, num_envs=args.num_envs,
                         env=env)
