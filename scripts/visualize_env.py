@@ -15,7 +15,7 @@ class CollectHyperparams(Tap):
     update_idx_to_take: int = None
 
     num_envs: int = 4
-    n_samples: int = int(1e2)
+    n_samples: int = int(1e3)
     gamma: float = 0.99
 
     seed: int = 2024
