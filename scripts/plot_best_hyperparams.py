@@ -214,14 +214,25 @@ if __name__ == "__main__":
         # ('PPO + RNN_skip', Path(ROOT_DIR, 'results', f'{env_name}_rnn_skip_ppo'), 'purple'),
         # ('PPO + RNN_skip + LD', Path(ROOT_DIR, 'results', f'{env_name}_rnn_skip_ppo_LD'), 'green'),
 
-        ('PPO + Memoryless', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_no_skip_ppo'), 'yellow'),
-        ('PPO + Memoryless + LD', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_no_skip_ppo_LD'), 'cyan'),
-        ('PPO + RNN + LD', Path(ROOT_DIR, 'results', f'{env_name}_rnn_ppo_LD'), 'blue'),
-        ('PPO + RNN', Path(ROOT_DIR, 'results', f'{env_name}_rnn_ppo'), 'dark gray'),
-        ('PPO + Memoryless + LD + Skip connection', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_ppo_LD'), 'red'),
-        ('PPO + Memoryless + Skip connection', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_ppo'), 'orange'),
-        ('PPO + RNN_skip', Path(ROOT_DIR, 'results', f'{env_name}_rnn_skip_ppo'), 'purple'),
-        ('PPO + RNN_skip + LD', Path(ROOT_DIR, 'results', f'{env_name}_rnn_skip_ppo_LD'), 'green'),
+        # ('PPO + Memoryless', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_no_skip_ppo'), 'yellow'),
+        # ('PPO + Memoryless + LD', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_no_skip_ppo_LD'), 'cyan'),
+        # ('PPO + RNN + LD', Path(ROOT_DIR, 'results', f'{env_name}_rnn_ppo_LD'), 'blue'),
+        # ('PPO + RNN', Path(ROOT_DIR, 'results', f'{env_name}_rnn_ppo'), 'dark gray'),
+        # ('PPO + Memoryless + LD + Skip connection', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_ppo_LD'), 'red'),
+        # ('PPO + Memoryless + Skip connection', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_ppo'), 'orange'),
+        # ('PPO + RNN_skip', Path(ROOT_DIR, 'results', f'{env_name}_rnn_skip_ppo'), 'purple'),
+        # ('PPO + RNN_skip + LD', Path(ROOT_DIR, 'results', f'{env_name}_rnn_skip_ppo_LD'), 'green'),
+
+        # value distance
+        ('PPO + Memoryless + Lambda 0', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_no_skip_lambda0_ppo'), 'yellow'),
+        ('PPO + Memoryless + Lambda 1', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_no_skip_lambda1_ppo'), 'cyan'),
+        ('PPO + RNN + Lambda 0', Path(ROOT_DIR, 'results', f'{env_name}_rnn_lambda0_ppo'), 'blue'),
+        ('PPO + RNN + Lambda 1', Path(ROOT_DIR, 'results', f'{env_name}_rnn_lambda1_ppo'), 'dark gray'),
+        ('PPO + Memoryless + Lambda 0 + Skip connection', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_lambda0_ppo'), 'red'),
+        ('PPO + Memoryless + Lambda 1 + Skip connection', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_lambda1_ppo'), 'orange'),
+        ('PPO + RNN_skip + Lambda 0', Path(ROOT_DIR, 'results', f'{env_name}_rnn_skip_lambda0_ppo'), 'purple'),
+        ('PPO + RNN_skip + Lambda 1', Path(ROOT_DIR, 'results', f'{env_name}_rnn_skip_lambda1_ppo'), 'green'),
+
     ]
 
     # fixedlambda
@@ -272,7 +283,7 @@ if __name__ == "__main__":
 
     fig, axes = plot_reses(all_reses, individual_runs=False, n_rows=2)
 
-    save_plot_to = Path(ROOT_DIR, 'graphs', f'{plot_name}_probe.jpg')
+    save_plot_to = Path(ROOT_DIR, 'graphs', f'{plot_name}_value_distance.jpg')
 
     fig.savefig(save_plot_to, bbox_inches='tight')
     print(f"Saved figure to {save_plot_to}")

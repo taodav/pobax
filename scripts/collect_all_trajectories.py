@@ -47,7 +47,7 @@ class CollectHyperparams(Tap):
         self.add_argument('--behavior_path', type=Path)
 
 
-def ppo_pocman_step(runner_state, unused,
+def ppo_step(runner_state, unused,
                     behavior_network, memoryless_network, memoryless_LD_network, memoryless_skip_network, memoryless_skip_LD_network,
                     rnn_network, rnn_LD_network, rnn_skip_network, rnn_skip_LD_network,
                     env, env_params):
@@ -151,7 +151,7 @@ def make_collect(args: CollectHyperparams, key: chex.PRNGKey):
                                                                                   update_idx_to_take=args.update_idx_to_take,
                                                                                   best_over_rng=True)
 
-    _env_step = partial(ppo_pocman_step, behavior_network=behavior_network,
+    _env_step = partial(ppo_step, behavior_network=behavior_network,
                         memoryless_network=memoryless_network, memoryless_LD_network=memoryless_LD_network,
                         memoryless_skip_network=memoryless_skip_network, memoryless_skip_LD_network=memoryless_skip_LD_network,
                         rnn_network=rnn_network, rnn_LD_network=rnn_LD_network,

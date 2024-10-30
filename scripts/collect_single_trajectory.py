@@ -84,24 +84,41 @@ def calculate_monte_carlo_return(dataset, gamma=0.99):
     dones = dataset['done']           # Shape: [time_steps]
     states = dataset['observation']   # Shape: [time_steps, state_dim]
     time_steps = len(rewards)
+    state_hashable_list = []
 
-    returns = np.zeros_like(rewards)  # Shape: [time_steps]
+    # # print the first episode reward
+    # episode_rewards = []
+    # episode_reward = 0
+    # while dones[episode_reward] == False:
+    #     episode_reward += 1
+    #     episode_rewards.append(rewards[episode_reward])
+    # # calculate mc return for first episode
+    # mc = 0
+    # for i in range(episode_reward-1, -1, -1):
+    #     mc = rewards[i] + gamma * mc * (1 - dones[i])
+    # print(f"First episode MC return: {mc}")
+    # print(f"First episode reward: {sum(episode_rewards)}")
+
+    returns = jnp.zeros_like(rewards)  # Shape: [time_steps]
     state_returns = defaultdict(list)
-    G = 0
-    for t in reversed(range(time_steps)):
+    G = 0.0
+    for t in reversed(range(time_steps)):  
         G = rewards[t] + gamma * G * (1 - dones[t])
-        returns[t] = G
+        returns = returns.at[t].set(G)
         state = states[t]
-        state_hashable = tuple(np.asarray(state).flatten())
-        if state_hashable not in state_returns.keys():
-            state_returns[state_hashable] = [G]
-        else:
-            state_returns[state_hashable].append(G)
+        state_hashable = make_hash_md5(state)
+        state_hashable_list.append(state_hashable)
+        state_returns[state_hashable].append(G)
         if dones[t]:
-            G = 0  # Reset G when an episode ends
-    V = {}
+            G = 0.0  # Reset G when an episode ends
+    V_dict = {}
     for state_hashable, returns_list in state_returns.items():
-        V[state_hashable] = np.mean(returns_list)
+        V_dict[state_hashable] = jnp.mean(jnp.array(returns_list))
+
+    # reverse the state_hashable_list
+    state_hashable_list = state_hashable_list[::-1]
+    V = jnp.array([V_dict[state_hashable] for state_hashable in state_hashable_list])
+    print(f"V shape: {V.shape}")
     return V
 
 

@@ -6,8 +6,8 @@ file = __file__  # Use this in actual script to dynamically get the file name
 exp_name = Path(file).stem
 
 # Define various hyperparameter values
-lrs = [2.5e-3, 2.5e-4, 2.5e-5]  # Learning rates
-lambda0s = np.linspace(0, 0.999, num=16)  # GAE lambda values
+lrs = [0.0025]  # Learning rates
+lambda0s = [1]
 vf_coeffs = [0.5]  # Value function coefficients
 entropy_coeffs = [0.01]  # Entropy coefficients
 
@@ -36,9 +36,10 @@ hparams = {
         'update_log_freq': 5,
         'total_steps': int(5e6),
         'seed': 2020,
-        'n_seeds': 5,
+        'n_seeds': 20,
         'platform': 'gpu',
         'debug': False,
+        'save_runner_state': True,
         'study_name': exp_name
     }]
 }
