@@ -224,14 +224,14 @@ if __name__ == "__main__":
         # ('PPO + RNN_skip + LD', Path(ROOT_DIR, 'results', f'{env_name}_rnn_skip_ppo_LD'), 'green'),
 
         # value distance
-        ('PPO + Memoryless + Lambda 0', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_no_skip_lambda0_ppo'), 'yellow'),
-        ('PPO + Memoryless + Lambda 1', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_no_skip_lambda1_ppo'), 'cyan'),
-        ('PPO + RNN + Lambda 0', Path(ROOT_DIR, 'results', f'{env_name}_rnn_lambda0_ppo'), 'blue'),
-        ('PPO + RNN + Lambda 1', Path(ROOT_DIR, 'results', f'{env_name}_rnn_lambda1_ppo'), 'dark gray'),
-        ('PPO + Memoryless + Lambda 0 + Skip connection', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_lambda0_ppo'), 'red'),
-        ('PPO + Memoryless + Lambda 1 + Skip connection', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_lambda1_ppo'), 'orange'),
-        ('PPO + RNN_skip + Lambda 0', Path(ROOT_DIR, 'results', f'{env_name}_rnn_skip_lambda0_ppo'), 'purple'),
-        ('PPO + RNN_skip + Lambda 1', Path(ROOT_DIR, 'results', f'{env_name}_rnn_skip_lambda1_ppo'), 'green'),
+        ('PPO + Memoryless + Lambda 0', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_no_skip_lambda0_ppo_best'), 'yellow'),
+        ('PPO + Memoryless + Lambda 1', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_no_skip_lambda1_ppo_best'), 'cyan'),
+        ('PPO + RNN + Lambda 0', Path(ROOT_DIR, 'results', f'{env_name}_rnn_lambda0_ppo_best'), 'blue'),
+        ('PPO + RNN + Lambda 1', Path(ROOT_DIR, 'results', f'{env_name}_rnn_lambda1_ppo_best'), 'dark gray'),
+        ('PPO + Memoryless + Lambda 0 + Skip connection', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_lambda0_ppo_best'), 'red'),
+        ('PPO + Memoryless + Lambda 1 + Skip connection', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_lambda1_ppo_best'), 'orange'),
+        ('PPO + RNN_skip + Lambda 0', Path(ROOT_DIR, 'results', f'{env_name}_rnn_skip_lambda0_ppo_best'), 'purple'),
+        ('PPO + RNN_skip + Lambda 1', Path(ROOT_DIR, 'results', f'{env_name}_rnn_skip_lambda1_ppo_best'), 'green'),
 
     ]
 

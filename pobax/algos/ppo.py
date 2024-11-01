@@ -274,6 +274,7 @@ def make_train(config: dict, rand_key: jax.random.PRNGKey):
 
                     def _loss_fn(params, init_hstate, traj_batch, gae, targets):
                         # RERUN NETWORK
+                        print("traj_batch.obs.shape", traj_batch.obs.shape)
                         _, pi, value, _ = network.apply(
                             params, init_hstate[0], (traj_batch.obs, traj_batch.done)
                         )

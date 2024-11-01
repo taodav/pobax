@@ -3,6 +3,7 @@ from pathlib import Path
 import orbax.checkpoint
 from definitions import ROOT_DIR
 from pobax.utils.file_system import load_info
+import jax.numpy as jnp
 
 colors = {
     'pink': '#ff96b6',
@@ -25,25 +26,26 @@ def plot_epoch_losses(study_path, env_name):
 
     for study, path, color in study_path:
         if path.suffix == '.npy':
-            print(f"Loading {path}")
+            # print(f"Loading {path}")
             restored = load_info(path)
         else:
             orbax_checkpointer = orbax.checkpoint.PyTreeCheckpointer()
             restored = orbax_checkpointer.restore(path)
-        epoch_losses = restored['epoch_losses']
+        epoch_losses = restored['value_info']['value']
+        print(f'{study}:', restored['distance'])
 
         # Plot each experiment's epoch losses
-        plt.plot(epoch_losses, label=study, color=colors[color])
+        plt.plot(jnp.log(epoch_losses), label=study, color=colors[color])
 
     plt.xlabel('Epoch')
-    plt.ylabel('Loss')
+    plt.ylabel('Log Loss')
     plt.title(f'Training Loss for {env_name}')
     plt.legend()
     plt.grid(True)
 
     # Save the plot
     parent_dir = Path(ROOT_DIR, 'graphs')
-    plot_path = parent_dir / f'{env_name}_epoch_losses_LD_1e7_mask.png'
+    plot_path = parent_dir / f'{env_name}_value_distance_plot.png'
     plt.savefig(plot_path)
     print(f"Epoch loss plot saved to {plot_path}")
 
@@ -52,7 +54,7 @@ def plot_epoch_losses(study_path, env_name):
 
 if __name__ == "__main__":
     env_name = 'reacher'
-    fname = 'probe.npy'
+    # fname = 'probe.npy'
     study_path =[
         # ('PPO + Memoryless', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_no_skip_ppo', fname), 'yellow'),
         # ('PPO + Memoryless + LD', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_no_skip_ppo_LD', fname), 'cyan'),
@@ -63,14 +65,19 @@ if __name__ == "__main__":
         # ('PPO + RNN Skip', Path(ROOT_DIR, 'results', f'{env_name}_rnn_skip_ppo', fname), 'purple'),
         # ('PPO + RNN Skip + LD', Path(ROOT_DIR, 'results', f'{env_name}_rnn_skip_ppo_LD', fname), 'green'),
 
-        ('PPO + Memoryless', Path(ROOT_DIR, 'results', f'memoryless_embedding', fname), 'yellow'),
-        ('PPO + Memoryless + LD', Path(ROOT_DIR, 'results', f'memoryless_LD_embedding', fname), 'cyan'),
-        ('PPO + Memoryless + Skip connection', Path(ROOT_DIR, 'results', f'memoryless_skip_embedding', fname), 'orange'),
-        ('PPO + Memoryless + Skip connection + LD', Path(ROOT_DIR, 'results', f'memoryless_skip_LD_embedding', fname), 'red'),
-        ('PPO + RNN', Path(ROOT_DIR, 'results', f'rnn_embedding', fname), 'dark gray'),
-        ('PPO + RNN + LD', Path(ROOT_DIR, 'results', f'rnn_LD_embedding', fname), 'blue'),
-        ('PPO + RNN Skip', Path(ROOT_DIR, 'results', f'rnn_skip_embedding', fname), 'purple'),
-        ('PPO + RNN Skip + LD', Path(ROOT_DIR, 'results', f'rnn_skip_LD_embedding', fname), 'green'),
+        # ('PPO + Memoryless', Path(ROOT_DIR, 'results', f'memoryless_embedding', fname), 'yellow'),
+        # ('PPO + Memoryless + LD', Path(ROOT_DIR, 'results', f'memoryless_LD_embedding', fname), 'cyan'),
+        # ('PPO + Memoryless + Skip connection', Path(ROOT_DIR, 'results', f'memoryless_skip_embedding', fname), 'orange'),
+        # ('PPO + Memoryless + Skip connection + LD', Path(ROOT_DIR, 'results', f'memoryless_skip_LD_embedding', fname), 'red'),
+        # ('PPO + RNN', Path(ROOT_DIR, 'results', f'rnn_embedding', fname), 'dark gray'),
+        # ('PPO + RNN + LD', Path(ROOT_DIR, 'results', f'rnn_LD_embedding', fname), 'blue'),
+        # ('PPO + RNN Skip', Path(ROOT_DIR, 'results', f'rnn_skip_embedding', fname), 'purple'),
+        # ('PPO + RNN Skip + LD', Path(ROOT_DIR, 'results', f'rnn_skip_LD_embedding', fname), 'green'),
+
+        ('PPO + Memoryless + TD', Path(ROOT_DIR, 'results', f'distance_mlp_td.npy'), 'yellow'),
+        ('PPO + Memoryless + MC', Path(ROOT_DIR, 'results', f'distance_mlp_mc.npy'), 'cyan'),
+        ('PPO + RNN_skip + TD', Path(ROOT_DIR, 'results', f'distance_rnn_skip_td.npy'), 'orange'),
+        ('PPO + RNN_skip + MC', Path(ROOT_DIR, 'results', f'distance_rnn_skip_mc.npy'), 'red'),
 
         # ('Memoryless PPO + depth 3', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_no_skip_depth3_ppo', fname), 'dark gray'),
         # ('Memoryless PPO + depth 3 + LD', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_no_skip_depth3_ppo_LD', fname), 'blue'),

@@ -32,7 +32,7 @@ class CollectHyperparams(Tap):
     def configure(self) -> None:
         self.add_argument('--collect_path', type=Path)
 
-def ppo_step(runner_state, unused,
+def collect_step(runner_state, unused,
                     network,
                     env, env_params):
     
@@ -63,16 +63,12 @@ def ppo_step(runner_state, unused,
     rng_step = jax.random.split(_rng, next_hstate.shape[0])
     obsv, next_env_state, reward, done, info = env.step(rng_step, env_state, action, env_params)
 
-    # transition = Transition(
-    #     last_done, action, value, reward, log_prob, last_obs, info
-    # )
     state = get_state(env_state)
     datum = {
+        'observation': last_obs,
         'action': action,
         'done': done,
         'reward': reward,
-        'x': embedding,
-        'observation': last_obs,
         'next_observation': obsv,
     }
     runner_state = (ts, next_env_state, obsv, done,
@@ -85,19 +81,6 @@ def calculate_monte_carlo_return(dataset, gamma=0.99):
     states = dataset['observation']   # Shape: [time_steps, state_dim]
     time_steps = len(rewards)
     state_hashable_list = []
-
-    # # print the first episode reward
-    # episode_rewards = []
-    # episode_reward = 0
-    # while dones[episode_reward] == False:
-    #     episode_reward += 1
-    #     episode_rewards.append(rewards[episode_reward])
-    # # calculate mc return for first episode
-    # mc = 0
-    # for i in range(episode_reward-1, -1, -1):
-    #     mc = rewards[i] + gamma * mc * (1 - dones[i])
-    # print(f"First episode MC return: {mc}")
-    # print(f"First episode reward: {sum(episode_rewards)}")
 
     returns = jnp.zeros_like(rewards)  # Shape: [time_steps]
     state_returns = defaultdict(list)
@@ -114,12 +97,10 @@ def calculate_monte_carlo_return(dataset, gamma=0.99):
     V_dict = {}
     for state_hashable, returns_list in state_returns.items():
         V_dict[state_hashable] = jnp.mean(jnp.array(returns_list))
-
     # reverse the state_hashable_list
     state_hashable_list = state_hashable_list[::-1]
     V = jnp.array([V_dict[state_hashable] for state_hashable in state_hashable_list])
-    print(f"V shape: {V.shape}")
-    return V
+    return V, returns
 
 
 def make_collect(args: CollectHyperparams, key: chex.PRNGKey):
@@ -135,7 +116,7 @@ def make_collect(args: CollectHyperparams, key: chex.PRNGKey):
     args.study_name = network_args['study_name']
     args.gamma = network_args['gamma']
 
-    _env_step = partial(ppo_step, network=network,
+    _env_step = partial(collect_step, network=network,
                         env=env, env_params=env_params)
     _env_step = scan_tqdm(steps_to_collect)(_env_step)
 
@@ -184,8 +165,9 @@ if __name__ == "__main__":
     collect_fn = jax.jit(collect_fn)
 
     dataset = collect_fn(collect_key)
-    V = calculate_monte_carlo_return(dataset, args.gamma)
-    dataset['V'] = V
+    V, G = calculate_monte_carlo_return(dataset, args.gamma)
+    dataset['V'] = V # Monte Carlo values
+    dataset['G'] = G # discounted returns
 
     def path_to_str(d: dict):
         for k, v in d.items():
@@ -201,7 +183,7 @@ if __name__ == "__main__":
         'ckpt': ckpt_info,
     }
     path_to_str(to_save)
-    save_path = args.collect_path.parent / \
+    save_path = args.collect_path.parent.parent / \
                 f'dataset'
 
     # Save all results with Orbax
