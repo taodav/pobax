@@ -48,6 +48,7 @@ class GymnaxToGymWrapper(gym.Env[core.ObsType, core.ActType]):
         if self.num_envs is not None:
             rng = jax.random.split(self.rng, self.num_envs)
         _, self.env_state = self._env.reset(rng, self.env_params)
+        self.max_steps_in_episode = self.env_params.max_steps_in_episode
 
     @property
     def action_space(self):

@@ -35,7 +35,6 @@ def make_update(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
                          hidden_size=args.hidden_size)
 
     steps_filter = partial(filter_period_first_dim, n=args.steps_log_freq)
-    update_filter = partial(filter_period_first_dim, n=args.update_log_freq)
 
     # Used for vmapping over our double critic.
     transition_axes_map = Transition(
@@ -153,50 +152,6 @@ def make_update(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
 
         return train_state, {'info': metric, 'loss': loss_info}
 
-        # rng, _rng = jax.random.split(rng)
-        # runner_state = (
-        #     train_state,
-        #     env_state,
-        #     obsv,
-        #     jnp.zeros((args.num_envs), dtype=bool),
-        #     init_hstate,
-        #     _rng,
-        # )
-        #
-        # # returned metric has an extra dimension.
-        # runner_state, metric = jax.lax.scan(
-        #     _update_step, runner_state, jnp.arange(num_updates), num_updates
-        # )
-        #
-        # # save metrics only every update_log_freq
-        # metric = jax.tree.map(update_filter, metric)
-        #
-        # # TODO: offline eval here.
-        # final_train_state = runner_state[0]
-        #
-        # reset_rng = jax.random.split(_rng, args.num_eval_envs)
-        # eval_obsv, eval_env_state = env.reset(reset_rng, env_params)
-        #
-        # eval_init_hstate = ScannedRNN.initialize_carry(args.num_eval_envs, args.hidden_size)
-        #
-        # eval_runner_state = (
-        #     final_train_state,
-        #     eval_env_state,
-        #     eval_obsv,
-        #     jnp.zeros((args.num_eval_envs), dtype=bool),
-        #     eval_init_hstate,
-        #     _rng,
-        # )
-        #
-        # # COLLECT EVAL TRAJECTORIES
-        # eval_runner_state, eval_traj_batch = jax.lax.scan(
-        #     _env_step, eval_runner_state, None, env_params.max_steps_in_episode
-        # )
-        #
-        # res = {"runner_state": runner_state, "metric": metric, 'final_eval_metric': eval_traj_batch.info}
-        #
-        # return res
-
     return _update_step, agent, env
 
 
@@ -225,6 +180,7 @@ if __name__ == "__main__":
     make_train_rng, rng = jax.random.split(rng)
     update_fn, agent, env = make_update(args, make_train_rng)
     update_jit = jax.jit(update_fn)
+
 
     # INIT NETWORK
     rng, init_rng = jax.random.split(rng)
@@ -272,11 +228,13 @@ if __name__ == "__main__":
     all_metrics = []
     t = time()
 
-    for update_num in range(num_updates):
-        # COLLECT TRAJECTORIES
+    def take_steps(rng, env, train_state, hstate, last_obs, last_done,
+                   num_steps: int):
+        """
+        Runs the train_state over env for num_steps
+        """
         transitions = []
-        initial_hstate = hstate
-        for step in range(args.num_steps):
+        for step in range(num_steps):
             rng, _rng = jax.random.split(rng)
             value, action, log_prob, hstate = agent.act(_rng, train_state, hstate, last_obs, last_done)
 
@@ -284,13 +242,25 @@ if __name__ == "__main__":
             rng, _rng = jax.random.split(rng)
             rng_step = jax.random.split(_rng, hstate.shape[0])
             obsv, reward, done, trunc, info = env.step(action)
+
+            # TODO: add logging for non-gymnax envs
             transition = Transition(
                 last_done, action, value, reward, log_prob, last_obs, info
             )
             transitions.append(transition)
             last_obs, last_done = obsv, done
+            # TODO: this assumes auto-reset is in place.
 
         traj_batch = stack_list(transitions)
+        return env, traj_batch, hstate, last_obs, last_done
+
+    for update_num in range(num_updates):
+        # COLLECT TRAJECTORIES
+        initial_hstate = hstate
+
+        rng, _rng = jax.random.split(rng)
+        env, traj_batch, hstate, last_obs, last_done = take_steps(_rng, env, train_state, hstate, last_obs, last_done,
+                                                                  num_steps=args.num_steps)
 
         # Update
         rng, _rng = jax.random.split(rng)
@@ -316,17 +286,29 @@ if __name__ == "__main__":
     final_train_state = train_state
     out = {'metrics': stack_list(all_metrics)}
 
-    # # our final_eval_metric returns max_num_steps.
-    # # we can filter that down by the max episode length amongst the runs.
-    # final_eval = out['final_eval_metric']
-    #
-    # # the +1 at the end is to include the done step
-    # largest_episode = final_eval['returned_episode'].argmax(axis=-2).max() + 1
-    #
-    # def get_first_n_filter(x):
-    #     return x[..., :largest_episode, :]
-    # out['final_eval_metric'] = jax.tree.map(get_first_n_filter, final_eval)
-    #
+    print("Evaluating trained policy")
+    # final evaluation
+    eval_res = []
+    max_steps_in_episode = env.max_steps_in_episode if hasattr(env, 'max_steps_in_episode') else args.default_max_steps_in_episode
+    # For now, we use num_eval_envs as a surrogate for num eval episodes
+    for i in range(args.num_eval_envs):
+        # INIT ENV
+        obsv, info = env.reset()
+
+        hstate = ScannedRNN.initialize_carry(args.num_envs, args.hidden_size)
+        last_obs = obsv
+        last_done = jnp.zeros(args.num_envs, dtype=bool)
+
+        rng, _rng = jax.random.split(rng)
+        _, eval_batch, final_hstate, last_obs, last_done = take_steps(_rng, env, final_train_state, hstate, last_obs, last_done,
+                                                                      num_steps=max_steps_in_episode)
+        eval_res.append({'rewards': eval_batch.reward, 'done': eval_batch.done, 'info': eval_batch.info})
+
+    out['eval'] = stack_list(eval_res)
+    update_filter = partial(filter_period_first_dim, n=args.update_log_freq)
+
+    out = jax.tree.map(update_filter, out)
+
     if args.save_runner_state:
         out['train_state'] = train_state
 
