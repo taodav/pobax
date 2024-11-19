@@ -78,6 +78,8 @@ if __name__ == "__main__":
         ('PPO + Memoryless + MC', Path(ROOT_DIR, 'results', f'distance_mlp_mc.npy'), 'cyan'),
         ('PPO + RNN_skip + TD', Path(ROOT_DIR, 'results', f'distance_rnn_skip_td.npy'), 'orange'),
         ('PPO + RNN_skip + MC', Path(ROOT_DIR, 'results', f'distance_rnn_skip_mc.npy'), 'red'),
+        ('PPO + RNN + TD', Path(ROOT_DIR, 'results', f'distance_rnn_td.npy'), 'dark gray'),
+        ('PPO + RNN + MC', Path(ROOT_DIR, 'results', f'distance_rnn_mc.npy'), 'blue'),
 
         # ('Memoryless PPO + depth 3', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_no_skip_depth3_ppo', fname), 'dark gray'),
         # ('Memoryless PPO + depth 3 + LD', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_no_skip_depth3_ppo_LD', fname), 'blue'),

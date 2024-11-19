@@ -1,6 +1,8 @@
 from functools import partial
 from pathlib import Path
 from typing import Union, NamedTuple
+import matplotlib.pyplot as plt
+from definitions import ROOT_DIR
 
 import chex
 import jax
@@ -10,19 +12,17 @@ import numpy as np
 from tap import Tap
 from flax.training import orbax_utils
 import orbax.checkpoint
-
-from collections import defaultdict
-from gymnax.environments import environment
 from pobax.models.network import ScannedRNN
-from pobax.utils.file_system import load_train_state, make_hash_md5
+from pobax.utils.file_system import load_train_state, make_hash_md5, numpyify_and_save
+# collect a dataset of trajectories based on final train states and plot the variance of discounted returns
 
-class CollectHyperparams(Tap):
+class VarianceHyperparams(Tap):
     collect_path: Union[str, Path]
 
     update_idx_to_take: int = None
 
-    num_envs: int = 4
-    n_samples: int = int(1e5)
+    num_envs: int = 1
+    n_episodes: int = int(1e4)
     gamma: float = 0.99
 
     seed: int = 2024
@@ -50,11 +50,9 @@ def collect_step(runner_state, unused,
     ac_in = (last_obs[np.newaxis, :], last_done[np.newaxis, :])
     next_hstate, pi, value, embedding = network.apply(ts.params, hstate, ac_in)
     action = pi.sample(seed=_rng)
-    log_prob = pi.log_prob(action)
-    value, action, log_prob = (
+    value, action = (
         value.squeeze(0),
         action.squeeze(0),
-        log_prob.squeeze(0),
     )
     embedding = embedding.squeeze(0)
 
@@ -65,48 +63,21 @@ def collect_step(runner_state, unused,
 
     state = get_state(env_state)
     datum = {
-        'observation': last_obs,
-        'action': action,
         'done': done,
         'reward': reward,
-        'hidden_state': hstate,
-        'next_observation': obsv,
     }
     runner_state = (ts, next_env_state, obsv, done,
                     next_hstate, rng)
     return runner_state, datum
 
-def calculate_monte_carlo_return(dataset, gamma=0.99):
-    rewards = dataset['reward']       # Shape: [time_steps]
-    dones = dataset['done']           # Shape: [time_steps]
-    states = dataset['observation']   # Shape: [time_steps, state_dim]
-    time_steps = len(rewards)
-    state_hashable_list = []
+def calculate_discounted_returns(rewards, gamma):
+    # rewards: [steps, num_envs]
+    discounts = gamma ** jnp.arange(rewards.shape[0])
+    discounted_rewards = rewards * discounts  # [steps, num_envs]
+    total_returns = jnp.sum(discounted_rewards, axis=0)  # [num_envs]
+    return total_returns
 
-    returns = jnp.zeros_like(rewards)  # Shape: [time_steps]
-    state_returns = defaultdict(list)
-    G = 0.0
-    for t in reversed(range(time_steps)):  
-        G = rewards[t] + gamma * G * (1 - dones[t])
-        returns = returns.at[t].set(G)
-        state = states[t]
-        state_hashable = make_hash_md5(state)
-        state_hashable_list.append(state_hashable)
-        state_returns[state_hashable].append(G)
-        if dones[t]:
-            G = 0.0  # Reset G when an episode ends
-    V_dict = {}
-    for state_hashable, returns_list in state_returns.items():
-        V_dict[state_hashable] = jnp.mean(jnp.array(returns_list))
-    # reverse the state_hashable_list
-    state_hashable_list = state_hashable_list[::-1]
-    V = jnp.array([V_dict[state_hashable] for state_hashable in state_hashable_list])
-    return V, returns
-
-
-def make_collect(args: CollectHyperparams, key: chex.PRNGKey):
-    steps_to_collect = args.n_samples // args.num_envs
-
+def make_collect_trajectory(args: VarianceHyperparams, key: chex.PRNGKey):
     network_key, key = jax.random.split(key, 2)
 
     args.collect_path = Path(args.collect_path).resolve()
@@ -114,6 +85,8 @@ def make_collect(args: CollectHyperparams, key: chex.PRNGKey):
     env, env_params, network_args, network, ts = load_train_state(network_key, args.collect_path,
                                                                                      update_idx_to_take=args.update_idx_to_take,
                                                                                      best_over_rng=True)
+    steps_to_collect = env_params.max_steps_in_episode
+
     args.study_name = network_args['study_name']
     args.gamma = network_args['gamma']
 
@@ -125,7 +98,7 @@ def make_collect(args: CollectHyperparams, key: chex.PRNGKey):
         'network': {'args': network_args, 'ts': ts, 'path': args.collect_path},
     }
 
-    def collect(rng):
+    def collect_trajectory(rng):
         # INIT ENV
         rng, _rng = jax.random.split(rng)
         reset_rng = jax.random.split(_rng, args.num_envs)
@@ -151,25 +124,32 @@ def make_collect(args: CollectHyperparams, key: chex.PRNGKey):
 
         return flat_dataset
 
-    return collect, ckpts
+    return collect_trajectory, ckpts
 
 
 if __name__ == "__main__":
     # jax.disable_jit(True)
-    args = CollectHyperparams().parse_args()
+    args = VarianceHyperparams().parse_args()
     jax.config.update('jax_platform_name', args.platform)
 
     key = jax.random.PRNGKey(args.seed)
-    make_key, collect_key, key = jax.random.split(key, 3)
+    make_key, key = jax.random.split(key, 2)
 
-    collect_fn, ckpt_info = make_collect(args, make_key)
+    collect_fn, ckpt_info = make_collect_trajectory(args, make_key)
     collect_fn = jax.jit(collect_fn)
 
-    dataset = collect_fn(collect_key)
-    V, G = calculate_monte_carlo_return(dataset, args.gamma)
-    dataset['V'] = V # Monte Carlo values
-    dataset['G'] = G # discounted returns
+    return_list = []
+    for i in range(args.n_episodes):
+        print(f'Collecting episode {i}')
+        collect_key, key = jax.random.split(key)
+        dataset = collect_fn(collect_key)
+        return_list.append(calculate_discounted_returns(dataset['reward'], args.gamma))
 
+    return_list = jnp.array(return_list)
+    std = jnp.std(return_list)
+    max_return = jnp.max(return_list)
+    mean = jnp.mean(return_list)
+    print(f'Mean of discounted returns: {mean}, Std of discounted returns: {std}, Max discounted return: {max_return}')
     def path_to_str(d: dict):
         for k, v in d.items():
             if isinstance(v, Path):
@@ -179,19 +159,23 @@ if __name__ == "__main__":
 
 
     to_save = {
-        'dataset': dataset,
+        'mean': mean,
+        'std': std,
+        'max_return': max_return,
+        'return_list': return_list,
         'args': args.as_dict(),
-        'ckpt': ckpt_info,
+        # 'ckpt': ckpt_info,
     }
     path_to_str(to_save)
     save_path = args.collect_path.parent.parent / \
-                f'dataset'
+                f'{args.study_name}_variance_of_return'
 
     # Save all results with Orbax
-    orbax_checkpointer = orbax.checkpoint.PyTreeCheckpointer()
-    save_args = orbax_utils.save_args_from_target(to_save)
+    # orbax_checkpointer = orbax.checkpoint.PyTreeCheckpointer()
+    # save_args = orbax_utils.save_args_from_target(to_save)
+    # orbax_checkpointer.save(save_path, to_save, save_args=save_args)
 
+    numpyify_and_save(save_path, to_save)
     print(f"Saving results to {save_path}")
-    orbax_checkpointer.save(save_path, to_save, save_args=save_args)
 
     print("Done.")

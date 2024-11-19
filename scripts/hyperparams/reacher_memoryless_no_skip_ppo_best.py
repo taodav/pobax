@@ -1,4 +1,5 @@
 from pathlib import Path
+import numpy as np
 
 # Set up the experiment name based on the script filename
 file = __file__  # Use this in actual script to dynamically get the file name
@@ -6,9 +7,7 @@ exp_name = Path(file).stem
 
 # Define various hyperparameter values
 lrs = [0.0025]  # Learning rates
-lambda0s = [1]
-alphas = [1]
-ld_weights = [0.5]
+lambda0s = [0.5994]  # GAE lambda values
 vf_coeffs = [0.5]  # Value function coefficients
 entropy_coeffs = [0.01]  # Entropy coefficients
 
@@ -17,18 +16,13 @@ hparams = {
     'file_name': f'runs_{exp_name}.txt',
     'entry': 'pobax.algos.ppo',
     'args': [{
-        'env': 'Reacher-misc',
+        'env': ['Reacher-misc'],
         'memoryless': True,
-        'double_critic': False,
         'approximator': 'mlp',
         'skip_connection': False,
-        'lr': ' '.join(map(str, lrs)),
         'depth': 3,
-        'num_stack': 1,
-        'num_observation': 1,
+        'lr': ' '.join(map(str, lrs)),
         'lambda0': ' '.join(map(str, lambda0s)),
-        'alpha': ' '.join(map(str, alphas)),
-        'ld_weight': ' '.join(map(str, ld_weights)),
         'vf_coeff': ' '.join(map(str, vf_coeffs)),
         'entropy_coeff': ' '.join(map(str, entropy_coeffs)),
         'clip_eps': 0.2,
@@ -42,7 +36,7 @@ hparams = {
         'update_log_freq': 5,
         'total_steps': int(5e6),
         'seed': 2020,
-        'n_seeds': 20,
+        'n_seeds': 30,
         'platform': 'gpu',
         'debug': False,
         'save_runner_state': True,

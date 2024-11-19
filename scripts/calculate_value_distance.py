@@ -54,7 +54,7 @@ def collect_step(runner_state, unused,
     last_done = jnp.expand_dims(last_done, axis=0)
     # SELECT ACTION
     ac_in = (last_obs[np.newaxis, :], last_done[np.newaxis, :])
-    value = network.apply(ts.params, hstate, ac_in)
+    _, value = network.apply(ts.params, hstate, ac_in)
     value = value.squeeze(0)
 
     datum = {
