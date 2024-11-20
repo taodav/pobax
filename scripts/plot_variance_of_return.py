@@ -66,8 +66,10 @@ def plot_returns(study_path):
 if __name__ == "__main__":
     env_name = 'reacher'
     study_path = [
-        ('PPO + Memoryless', Path(ROOT_DIR, 'results', 'test_memoryless_variance_of_return.npy')),
-        ('PPO + RNN', Path(ROOT_DIR, 'results', 'test_rnn_variance_of_return.npy')),
+        # ('PPO + RNN_skip', Path(ROOT_DIR, 'results', 'reacher_rnn_skip_ppo_best_variance_of_return.npy')),
+        ('PPO + RNN', Path(ROOT_DIR, 'results', 'reacher_rnn_ppo_best_variance_of_return.npy')),
+        ('PPO + Memoryless', Path(ROOT_DIR, 'results', 'reacher_memoryless_no_skip_ppo_best_variance_of_return.npy')),
+        # ('PPO + Memoryless_skip', Path(ROOT_DIR, 'results', 'reacher_memoryless_ppo_best_variance_of_return.npy')),
     ]
 
     plot_returns(study_path)
