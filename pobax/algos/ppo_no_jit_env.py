@@ -1,3 +1,5 @@
+import os
+os.environ['MUJOCO_GL'] = 'egl'
 from functools import partial
 from time import time
 
