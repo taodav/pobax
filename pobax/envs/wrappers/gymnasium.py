@@ -5,7 +5,7 @@ import jax
 import gymnasium as gym
 from gymnasium import Wrapper, core
 from gymnasium.core import WrapperObsType, WrapperActType, SupportsFloat, Env
-from gymnasium.wrappers import PixelObservationWrapper
+from gymnasium.wrappers import AddRenderObservation
 
 from gymnax.environments import environment
 from gymnax.environments import spaces
@@ -104,7 +104,7 @@ class GymnaxToGymWrapper(gym.Env[core.ObsType, core.ActType]):
             self.env_state, self.env_params
         )
 
-class PixelOnlyObservationWrapper(PixelObservationWrapper):
+class PixelOnlyObservationWrapper(AddRenderObservation):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.observation_space = self.observation_space['pixels']
