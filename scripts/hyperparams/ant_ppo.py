@@ -26,9 +26,10 @@ hparams = {
             'entropy_coeff': 0.01,
             'steps_log_freq': 8,
             'update_log_freq': 10,
-            'total_steps': int(1e7),
-            'seed': 2024,
+            'total_steps': int(1e5),
+            'seed': [2024 + i for i in range(2)],
             'platform': 'cpu',
+            'debug': True,
             'study_name': exp_name
         }
     ]

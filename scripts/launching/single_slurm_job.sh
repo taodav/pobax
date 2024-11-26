@@ -20,8 +20,8 @@ while IFS= read -r command; do
 #!/bin/bash
 #SBATCH --partition=gpus
 #SBATCH --gres=gpu:1
-#SBATCH --time=12:00:00
-#SBATCH --mem=32G
+#SBATCH --time=72:00:00
+#SBATCH --mem=64G
 #SBATCH -J ${job_name}
 #SBATCH -o ${job_name}_%j.out
 #SBATCH -e ${job_name}_%j.err

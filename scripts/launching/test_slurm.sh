@@ -1,14 +1,19 @@
 #!/bin/bash
-#SBATCH --partition=gpus          # Specify the partition to run on
-#SBATCH --gres=gpu:1              # Request 1 GPU resource
-#SBATCH --nodelist=gpu2001
-#SBATCH --time=24:00:00            # Request 1 hour of runtime
-#SBATCH --mem=32G                  # Request 8GB of memory
-#SBATCH -J collect_single_trajectory      # Specify a job name
-#SBATCH -o collect_single_trajectory-%j.out # Specify an output file for stdout
-#SBATCH -e collect_single_trajectory-%j.err # Specify an error file for stderr
+#SBATCH --partition=compute
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=32
+#SBATCH --time=24:00:00
+#SBATCH --mem=64G
+#SBATCH -J ${job_name}
+#SBATCH -o ${job_name}_%j.out
+#SBATCH -e ${job_name}_%j.err
 cd ..
 # Activate the virtual environment
 source ~/pobax/bin/activate
 
-python -m pobax.algos.ppo_no_jit_env --debug --env ant --memoryless
+export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
+export MKL_NUM_THREADS=$SLURM_CPUS_PER_TASK
+export OPENBLAS_NUM_THREADS=$SLURM_CPUS_PER_TASK
+export NUMEXPR_NUM_THREADS=$SLURM_CPUS_PER_TASK
+
+srun python -m pobax.algos.ppo_no_jit_env --env ant --action_concat --lr 0.00025 --lambda0 0.95 --lambda1 0.95 --alpha 1 --ld_weight 0 --hidden_size 128 --entropy_coeff 0.01 --steps_log_freq 8 --update_log_freq 10 --total_steps 5000 --seed 2024 --platform cpu --debug --study_name ant_ppo

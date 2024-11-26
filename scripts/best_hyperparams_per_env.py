@@ -4,45 +4,6 @@ from pathlib import Path
 
 import numpy as np
 
-
-def argmax_firstNaxes(A, N):
-    s = A.shape
-    new_shp = (np.prod(s[:N]),) + s[N:]
-    max_idx = A.reshape(new_shp).argmax(0)
-    return np.unravel_index(max_idx, s[:N])
-
-
-def advanced_indexing(x, indices):
-    """
-    Indexes an n-dimensional array `x` using an (n-1)-dimensional index array `indices`.
-    `x` is an array of shape (d1, d2, ..., dn)
-    `indices` is an index array of shape (d1, d2, ..., dn-1)
-    This function indexes along the last dimension `dn` of `x`.
-    """
-    # Number of dimensions in the input array
-    n = x.ndim
-
-    # Generate a list of arange arrays for each dimension except the last one
-    meshgrids = np.meshgrid(*[np.arange(dim) for dim in x.shape[:-1]], indexing='ij')
-
-    # Convert the list of meshgrids to tuple for indexing
-    # We append `indices` to index along the last dimension
-    full_indices = tuple(meshgrids) + (indices,)
-
-    # Perform the advanced indexing
-    result = x[full_indices]
-
-    return result
-
-def fill_in_first_n_with_zeros(x: np.ndarray, n: int = 10):
-    first_n = x[..., :n, :, :, :]
-    n_zero_mask = first_n == 0
-    mean_first_n = first_n.mean(axis=-1)[..., None]
-    mean_mask = n_zero_mask * mean_first_n
-    x[..., :n, :] += mean_mask
-
-    return x
-
 def argmax_last(array):
     shape = array.shape
     array = array.reshape((-1, shape[-1]))
