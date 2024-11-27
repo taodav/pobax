@@ -1,5 +1,3 @@
-import os
-os.environ['MUJOCO_GL'] = 'egl'
 from functools import partial
 from time import time
 
@@ -47,7 +45,7 @@ def make_update(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
     if double_critic:
         # last_val is index 1 here b/c we squeezed earlier.
         _calculate_gae = jax.vmap(calculate_gae,
-                                  in_axes=[transition_axes_map, 1, None, 0],
+                                  in_axes=[transition_axes_map, 1, None, 0, None],
                                   out_axes=2)
 
     agent = PPO(network, double_critic=double_critic, ld_weight=args.ld_weight, alpha=args.alpha,

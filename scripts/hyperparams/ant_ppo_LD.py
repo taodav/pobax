@@ -23,7 +23,7 @@ hparams = {
         'action_concat': True,
         'lr': lrs,
         'lambda0': lambda0s,
-        'lambda1': ' '.join(map(str, lambda1s)),
+        'lambda1': lambda1s,
         'alpha': ' '.join(map(str, alphas)),
         'ld_weight': ld_weights,
         'hidden_size': 128,
