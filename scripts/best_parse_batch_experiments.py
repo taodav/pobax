@@ -47,7 +47,7 @@ def parse_exp_dir(study_path, study_hparam_path):
         args_tuple = tuple(float(args[train_hparam].item()) for train_hparam in train_sign_hparams)
         # Get online metrics
         online_eval = restored['out']['metrics']
-        online_disc_returns = online_eval['returned_discounted_episode_returns']
+        online_disc_returns = online_eval['returned_episode_returns']
         # online disc returns has shape (num_updates // update_frequency, num_steps // step_frequency, n_envs)
 
         final_eval = restored['out']['eval']['info']
@@ -55,7 +55,7 @@ def parse_exp_dir(study_path, study_hparam_path):
         # we take the mean over axis=-2 here, since this dimension might be different
         # for the final eval.
         final_n_episodes = final_eval['returned_episode'].sum(axis=-2, keepdims=True)
-        final_disc_returns = final_eval['returned_discounted_episode_returns'].sum(axis=-2, keepdims=True)
+        final_disc_returns = final_eval['returned_episode_returns'].sum(axis=-2, keepdims=True)
         final_disc_returns /= (final_n_episodes + (final_n_episodes == 0).astype(float))  # add the 0 mask to prevent division by 0.
         if args_tuple in eval_dict:
             eval_dict[args_tuple].append(online_disc_returns)

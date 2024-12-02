@@ -164,17 +164,17 @@ def parse_exp_dir(study_path, study_hparam_path):
             for i, k in enumerate(swept_order[:-1]):
                 assert k == train_sign_hparams[i]
 
-        config, args = restored['config'], restored['args']
+        args = restored['args']
 
         # Get online metrics
         online_eval = restored['out']['metric']
-        online_disc_returns = online_eval['returned_discounted_episode_returns']
+        online_disc_returns = online_eval['returned_episode_returns']
 
         final_eval = restored['out']['final_eval_metric']
         # we take the mean over axis=-2 here, since this dimension might be different
         # for the final eval.
         final_n_episodes = final_eval['returned_episode'].sum(axis=-2, keepdims=True)
-        final_disc_returns = final_eval['returned_discounted_episode_returns'].sum(axis=-2, keepdims=True)
+        final_disc_returns = final_eval['returned_episode_returns'].sum(axis=-2, keepdims=True)
         final_disc_returns /= (final_n_episodes + (final_n_episodes == 0).astype(float))  # add the 0 mask to prevent division by 0.
 
         # we add a num_updates dimension
@@ -358,8 +358,8 @@ if __name__ == "__main__":
     parser.add_argument('study_path', type=str)
     args = parser.parse_args()
 
-    study_path = Path(args.study_path)
-    hyperparams_dir = Path(ROOT_DIR, 'scripts', 'hyperparams')
+    study_path = Path(args.study_path).resolve()
+    hyperparams_dir = Path(ROOT_DIR, 'scripts', 'hyperparams').resolve()
     study_hparam_filename = study_path.stem + '.py'
     study_hparam_path = find_file_in_dir(study_hparam_filename, hyperparams_dir)
 
