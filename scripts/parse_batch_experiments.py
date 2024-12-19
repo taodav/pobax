@@ -27,30 +27,6 @@ from pobax.utils.file_system import get_fn_from_module, get_inner_fn_arguments
 
 from definitions import ROOT_DIR
 
-
-def get_total_size(obj, seen=None):
-    """Recursively finds size of objects in bytes."""
-    size = sys.getsizeof(obj)
-    if seen is None:
-        seen = set()
-
-    # Add object's id to seen to avoid double counting of objects
-    obj_id = id(obj)
-    if obj_id in seen:
-        return 0
-    seen.add(obj_id)
-
-    if isinstance(obj, dict):
-        size += sum((get_total_size(k, seen) + get_total_size(v, seen)) for k, v in obj.items())
-    elif isinstance(obj, (list, tuple, set, frozenset)):
-        size += sum(get_total_size(item, seen) for item in obj)
-    elif isinstance(obj, np.ndarray):
-        # Numpy array, account for the full memory usage of the array
-        size += obj.nbytes
-
-    return size
-
-
 def combine_seeds_and_envs(x: jnp.ndarray):
     # Here, dim=-1 is the NUM_ENVS parameter. We take the mean over this.
     # dim=-2 is the NUM_STEPS parameter.
@@ -62,29 +38,6 @@ def combine_seeds_and_envs(x: jnp.ndarray):
     # We take the mean over NUM_ENVS dimension.
     mean_over_num_envs = envs_seeds_swapped.mean(axis=-1)
     return mean_over_num_envs
-
-
-def get_first_returns(returned_episode: jnp.ndarray, returns: jnp.ndarray):
-    first_episode_ends = returned_episode.argmax(axis=-2)
-
-    mesh_inputs = [np.arange(dim) for dim in first_episode_ends.shape]
-    grids = np.meshgrid(*mesh_inputs, indexing='ij')
-    grids_before, grids_after = grids[:-1], grids[-1:]
-    return returns[(*grids_before, first_episode_ends, *grids_after)]
-
-
-def get_final_eval(final_eval: dict):
-    # Get final eval metrics
-    disc_returns = final_eval['returned_discounted_episode_returns']
-
-    first_episode_ends = final_eval['returned_episode'].argmax(axis=-2)
-
-    mesh_inputs = [np.arange(dim) for dim in first_episode_ends.shape]
-    grids = np.meshgrid(*mesh_inputs, indexing='ij')
-    grids_before, grids_after = grids[:-1], grids[-1:]
-    final_first_disc_returns = disc_returns[(*grids_before, first_episode_ends, *grids_after)]
-    return final_first_disc_returns
-
 
 def parse_exp_dir(study_path, study_hparam_path):
     # TODO: refactor this to use the entry point and see the arguments to the `train` function.
@@ -357,7 +310,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('study_path', type=str)
     args = parser.parse_args()
-
+    
     study_path = Path(args.study_path).resolve()
     hyperparams_dir = Path(ROOT_DIR, 'scripts', 'hyperparams').resolve()
     study_hparam_filename = study_path.stem + '.py'
