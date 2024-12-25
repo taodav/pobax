@@ -119,9 +119,6 @@ class PixelBraxVecEnvWrapper(GymnaxWrapper):
 
         return images
 
-
-
-
 def get_tmaze_image(state: TMazeState, hallway_length: int, size: int):
     in_start = state.grid_idx == 0
     in_junction = state.grid_idx == (hallway_length + 1)
@@ -135,6 +132,48 @@ def get_tmaze_image(state: TMazeState, hallway_length: int, size: int):
     # return jnp.stack((start_obs, hallway_obs, junction_obs), axis=-1)
     return jnp.stack((start_obs_0, start_obs_1, hallway_obs, junction_obs), axis=-1)
 
+class PixelCraftaxVecEnvWrapper(GymnaxWrapper):
+    def __init__(self, env: VecEnv,
+                 size: int = 128,
+                 normalize: bool = False):
+        super().__init__(env)
+        self._env.reset = jax.jit(self._env.reset)
+        self._env.step = jax.jit(self._env.step)
+
+        self.renderer = None
+
+        self.normalize = normalize
+        self.size = 110
+
+    def reset(
+            self, key: chex.PRNGKey, params: Optional[environment.EnvParams] = None
+    ) -> Tuple[chex.Array, environment.EnvState]:
+        image_obs, env_state = self._env.reset(key, params)
+        # Craftax already returned normalized visual input
+        image_obs = self.get_obs(image_obs, self.normalize)
+        return image_obs, env_state
+    
+    def step(
+            self,
+            key: chex.PRNGKey,
+            state: environment.EnvState,
+            action: Union[int, float],
+            params: Optional[environment.EnvParams] = None,
+    ) -> Tuple[chex.Array, environment.EnvState, float, bool, dict]:
+        image_obs, env_state, reward, done, info = self._env.step(
+            key, state, action, params
+        )
+        image_obs = self.get_obs(image_obs, self.normalize)
+        return image_obs, env_state, reward, done, info
+
+    def get_obs(self, obs, normalize):
+        if not normalize:
+            obs *= 255
+        assert len(obs.shape) == 4
+        assert obs.shape[1] == 130
+        obs = obs[:,:90, :, :]
+        return obs
+    
 
 class PixelTMazeVecEnvWrapper(PixelBraxVecEnvWrapper):
     def __init__(self, env: VecEnv,

@@ -208,7 +208,36 @@ class BraxGymnaxWrapper:
             high=1.0,
             shape=(self._env.action_size,),
         )
+    
+@struct.dataclass
+class CraftEnvParams:
+    max_steps_in_episode: int = 1
+    craft_env_params: environment.EnvParams = None
 
+class CraftaxGymnaxWrapper:
+    def __init__(self, env_name):
+        from craftax.craftax_env import make_craftax_env_from_name
+        env = make_craftax_env_from_name(env_name, auto_reset=True)
+        self.max_steps_in_episode = 100000
+        self.name = env_name
+        self._env = env
+        self.env_params = CraftEnvParams(max_steps_in_episode=self.max_steps_in_episode, craft_env_params=env.default_params)
+
+    def reset(self, key, params=None):
+        obs, state = self._env.reset_env(key, params.craft_env_params)
+        return obs, state
+
+    def step(self, key, state, action, params=None):
+        # Pixel value is already normalized
+        next_obs, next_state, reward, done, info = self._env.step_env(key, state, action, params.craft_env_params)
+        return next_obs, next_state, reward, done, {}
+        
+
+    def observation_space(self, params):
+        return self._env.observation_space(params.craft_env_params)
+
+    def action_space(self, params):
+        return self._env.action_space(params.craft_env_params)
 
 class ClipAction(GymnaxWrapper):
     def __init__(self, env, low=-1.0, high=1.0):
