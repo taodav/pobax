@@ -174,6 +174,16 @@ class PixelCraftaxVecEnvWrapper(GymnaxWrapper):
         obs = obs[:,:90, :, :]
         return obs
     
+    def observation_space(self, params):
+        low, high = 0, 255
+        if self.normalize:
+            high = 1
+        return spaces.Box(
+            low=low,
+            high=high,
+            shape=(110, 90, 3),
+        )
+
 
 class PixelTMazeVecEnvWrapper(PixelBraxVecEnvWrapper):
     def __init__(self, env: VecEnv,

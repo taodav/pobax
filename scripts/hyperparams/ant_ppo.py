@@ -14,7 +14,7 @@ hparams = {
     'entry': '-m pobax.algos.ppo_no_jit_env',
     'args': [
         {
-            'env': 'ant',
+            'env': 'ant_pixels',
             'double_critic': False,
             'action_concat': True,
             'lr': lrs,
@@ -22,7 +22,7 @@ hparams = {
             'lambda1': ' '.join(map(str, lambda1s)),
             'alpha': ' '.join(map(str, alphas)),
             'ld_weight': ' '.join(map(str, ld_weights)),
-            'hidden_size': 128,
+            'hidden_size': 512,
             'entropy_coeff': 0.01,
             'steps_log_freq': 8,
             'update_log_freq': 10,

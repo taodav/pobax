@@ -18,7 +18,7 @@ hparams = {
     'file_name': f'runs_{exp_name}.txt',
     'entry': '-m pobax.algos.ppo_no_jit_env',
     'args': [{
-        'env': 'ant_pixels',
+        'env': 'walker2d_pixels',
         'double_critic': True,
         'action_concat': True,
         'lr': lrs,

@@ -31,7 +31,7 @@ def combine_seeds_and_envs(x: jnp.ndarray):
 
 def parse_exp_dir(study_path, study_hparam_path):
     # TODO: THIS
-    train_sign_hparams = ['vf_coeff', 'lambda0', 'lr']
+    train_sign_hparams = ['vf_coeff', 'lambda0', 'lr', 'lambda1', 'ld_weight']
     study_paths = list(study_path.iterdir())
 
     scores, final_scores, envs, hyperparams, eval_dict, final_eval_dict = {}, {}, [], {}, {}, {}

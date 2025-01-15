@@ -49,19 +49,30 @@ def get_network_fn(env: gym.Env,
 
     obs_shape = obs_space.shape
     if isinstance(action_space, gym.spaces.Discrete):
-        network_fn = ImageDiscreteActorCriticRNN
-        if memoryless:
-            network_fn = ImageDiscreteActorCritic
-        action_size = action_space.n
-
+        if len(obs_shape) > 1:
+            network_fn = ImageDiscreteActorCriticRNN
+            if memoryless:
+                network_fn = ImageDiscreteActorCritic
+            action_size = action_space.n
+        else:
+            network_fn = DiscreteActorCriticRNN
+            if memoryless:
+                network_fn = DiscreteActorCritic
+            action_size = action_space.n
     else:
         action_shape = action_space.shape
         action_size = action_shape[0]
 
         # Check whether we use image observations
-        network_fn = ImageContinuousActorCriticRNN
-        if memoryless:
-            network_fn = ImageContinuousActorCritic
+        if len(obs_shape) > 1:
+            # image observations
+            network_fn = ImageContinuousActorCriticRNN
+            if memoryless:
+                network_fn = ImageContinuousActorCritic
+        else:
+            network_fn = ContinuousActorCriticRNN
+            if memoryless:
+                network_fn = ContinuousActorCritic
 
     return network_fn, obs_shape, action_size
 

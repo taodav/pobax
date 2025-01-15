@@ -11,7 +11,7 @@
 source ~/pobax/bin/activate
 
 # Specify the filename
-input_file="../runs/runs_ant_memoryless_ppo_no_frame.txt"
+input_file="../runs/runs_test_craftax_1M.txt"
 job_name=$(basename "$input_file" .txt) # Extract the base name of the file without extension
 
 # Read commands from the file and submit each as a separate job
@@ -21,7 +21,7 @@ while IFS= read -r command; do
 #SBATCH --partition=gpus
 #SBATCH --gres=gpu:4
 #SBATCH --time=72:00:00
-#SBATCH --mem=64G
+#SBATCH --mem=32G
 #SBATCH -J ${job_name}
 #SBATCH -o ${job_name}_%j.out
 #SBATCH -e ${job_name}_%j.err

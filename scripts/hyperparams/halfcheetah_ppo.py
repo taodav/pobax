@@ -14,9 +14,8 @@ hparams = {
     'entry': '-m pobax.algos.ppo_no_jit_env',
     'args': [
         {
-            'env': 'ant',
+            'env': 'halfcheetah_pixels',
             'double_critic': False,
-            'memoryless': True,
             'action_concat': True,
             'lr': lrs,
             'lambda0': lambda0s,
