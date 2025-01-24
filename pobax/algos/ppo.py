@@ -163,6 +163,7 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
     env_key, rand_key = jax.random.split(rand_key)
     env, env_params = get_env(args.env, env_key,
                                      gamma=args.gamma,
+                                     normalize_image=False,
                                      action_concat=args.action_concat)
 
     if hasattr(env, 'gamma'):

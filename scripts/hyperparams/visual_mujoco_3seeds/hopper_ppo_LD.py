@@ -18,7 +18,7 @@ hparams = {
     'file_name': f'runs_{exp_name}.txt',
     'entry': '-m pobax.algos.ppo_no_jit_env',
     'args': [{
-        'env': 'walker2d_pixels',
+        'env': 'hopper_pixels',
         'double_critic': True,
         'action_concat': True,
         'lr': lrs,
@@ -26,7 +26,7 @@ hparams = {
         'lambda1': lambda1s,
         'alpha': ' '.join(map(str, alphas)),
         'ld_weight': ld_weights,
-        'hidden_size': 1024,
+        'hidden_size': 512,
         'entropy_coeff': 0.01,
         'steps_log_freq': 8,
         'update_log_freq': 10,

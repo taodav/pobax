@@ -118,6 +118,7 @@ def load_craftax_env(env_str: str,
 def get_env(env_name: str,
             rand_key: random.PRNGKey,
             normalize_env: bool = False,
+            normalize_image: bool = True,
             gamma: float = 0.99,
             perfect_memory: bool = False,
             action_concat: bool = False):
@@ -203,7 +204,7 @@ def get_env(env_name: str,
         print(f"Overwriting args gamma {gamma} with env gamma {env.gamma}.")
         gamma = env.gamma
 
-    if action_concat:
+    if action_concat and len(env.observation_space(env_params).shape) == 1:
         env = ActionConcatWrapper(env)
 
     env = LogWrapper(env, gamma=gamma)
@@ -213,6 +214,8 @@ def get_env(env_name: str,
 
     # Vectorize our environment
     env = VecEnv(env)
+    if env_name.endswith('pixels'):
+        env = PixelCraftaxVecEnvWrapper(env, normalize=normalize_image)
     print(f'normalized env: {normalize_env}')
     if normalize_env:
         env = NormalizeVecObservation(env)
@@ -253,7 +256,7 @@ def get_gym_env(env_name: str,
         env, env_params = load_craftax_env(env_name)
         env = LogWrapper(env, gamma=gamma)
         env = VecEnv(env)
-        if env_name.endswith('Pixels-v1'):
-            env = PixelCraftaxVecEnvWrapper(env, size=image_size, normalize=normalize_image)
+        if env_name.endswith('pixels'):
+            env = PixelCraftaxVecEnvWrapper(env, normalize=normalize_image)
     env = GymnaxToGymWrapper(env, env_params, seed=seed, num_envs=num_envs)
     return env

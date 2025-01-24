@@ -11,7 +11,7 @@ ld_weights = [0]
 hparams = {
     'file_name':
         f'runs_{exp_name}.txt',
-    'entry': '-m pobax.algos.ppo_no_jit_env',
+    'entry': '-m pobax.algos.ppo',
     'args': [
         {
             'env': 'craftax_pixels',

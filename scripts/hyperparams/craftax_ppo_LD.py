@@ -16,7 +16,7 @@ entropy_coeffs = [0.01]  # Entropy coefficients
 # Prepare the hyperparameters dictionary
 hparams = {
     'file_name': f'runs_{exp_name}.txt',
-    'entry': '-m pobax.algos.ppo_no_jit_env',
+    'entry': '-m pobax.algos.ppo',
     'args': [{
         'env': 'craftax_pixels',
         'double_critic': True,
