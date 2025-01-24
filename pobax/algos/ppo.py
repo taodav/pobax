@@ -420,8 +420,11 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
         )
 
         # COLLECT EVAL TRAJECTORIES
+        # eval_runner_state, eval_traj_batch = jax.lax.scan(
+        #     _env_step, eval_runner_state, None, env_params.max_steps_in_episode
+        # )
         eval_runner_state, eval_traj_batch = jax.lax.scan(
-            _env_step, eval_runner_state, None, env_params.max_steps_in_episode
+            _env_step, eval_runner_state, None, 50
         )
 
         res = {"runner_state": runner_state, "metric": metric, 'final_eval_metric': eval_traj_batch.info}

@@ -14,7 +14,7 @@ hparams = {
     'entry': '-m pobax.algos.ppo_no_jit_env',
     'args': [
         {
-            'env': 'Craftax-Symbolic-v1',
+            'env': 'craftax',
             'double_critic': False,
             'memoryless': True,
             'action_concat': True,

@@ -34,7 +34,8 @@ hparams = {
         'num_envs': 64,
         'entropy_coeff': 0.01,
         'total_steps': int(1e9),
-        'seed': [2024 + i for i in range(3)],
+        'seed': 2024,
+        'n_seeds': 3,
         'platform': 'gpu',
         'debug': True,
         'study_name': exp_name
