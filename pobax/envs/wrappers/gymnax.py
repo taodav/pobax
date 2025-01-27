@@ -53,7 +53,7 @@ class MaskObservationWrapper(GymnaxWrapper):
             dtype=self._env.observation_space(params).dtype,
         )
 
-    @partial(jax.jit, static_argnums=(0,))
+    @partial(jax.jit, static_argnums=(0,-1))
     def reset(
             self, key: chex.PRNGKey, params: Optional[environment.EnvParams] = None
     ) -> Tuple[chex.Array, environment.EnvState]:
@@ -61,7 +61,7 @@ class MaskObservationWrapper(GymnaxWrapper):
         obs = obs[self.mask_dims]
         return obs, state
 
-    @partial(jax.jit, static_argnums=(0,))
+    @partial(jax.jit, static_argnums=(0,-1))
     def step(
             self,
             key: chex.PRNGKey,
