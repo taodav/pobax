@@ -216,7 +216,7 @@ def get_env(env_name: str,
     env = VecEnv(env)
     if env_name.endswith('pixels'):
         env = PixelCraftaxVecEnvWrapper(env, normalize=normalize_image)
-    print(f'normalized env: {normalize_env}')
+
     if normalize_env:
         env = NormalizeVecObservation(env)
         env = NormalizeVecReward(env, gamma)
