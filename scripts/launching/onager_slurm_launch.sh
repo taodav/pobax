@@ -1,6 +1,6 @@
 cd ../../
 
-PRELAUNCH_NAMES='rocksample_11_11_perfect_mem_ppo rocksample_15_15_perfect_mem_ppo battleship_10_perfect_mem_ppo'
+PRELAUNCH_NAMES='masked_mujoco_ppo masked_mujoco_ppo_LD masked_mujoco_ppo_memoryless masked_mujoco_ppo_observable'
 
 for item in $PRELAUNCH_NAMES;
 do
