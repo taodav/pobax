@@ -12,6 +12,6 @@ do
       --duration 2-00:00:00 \
       --venv venv \
       --gpus 1 \
-      --partition gpus \
+      --partition 3090-gcondo \
       # --tasks-per-node 5
 done
