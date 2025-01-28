@@ -26,7 +26,7 @@ hparams = {
         'hidden_size': 256,
         'steps_log_freq': 16,
         'update_log_freq': 20,
-        'total_steps': int(1e8),
+        'total_steps': int(5e7),
         'seed': 2024,
         'n_seeds': 5,
         'platform': 'gpu',
