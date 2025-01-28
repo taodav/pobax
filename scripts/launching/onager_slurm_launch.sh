@@ -1,6 +1,6 @@
 cd ../../
 
-PRELAUNCH_NAMES='masked_mujoco_ppo masked_mujoco_ppo_LD masked_mujoco_ppo_memoryless masked_mujoco_ppo_observable'
+PRELAUNCH_NAMES='masked_mujoco_ppo masked_mujoco_ppo_memoryless masked_mujoco_ppo_observable'
 
 for item in $PRELAUNCH_NAMES;
 do
