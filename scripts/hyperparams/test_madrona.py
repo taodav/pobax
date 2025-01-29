@@ -3,7 +3,7 @@ from pathlib import Path
 exp_name = Path(__file__).stem
 
 lrs = [0.00025]
-lambda0s = [0.9]
+lambda0s = [0.7]
 lambda1s = [0.95]
 alphas = [1]
 ld_weights = [0]
@@ -11,10 +11,10 @@ ld_weights = [0]
 hparams = {
     'file_name':
         f'runs_{exp_name}.txt',
-    'entry': '-m pobax.algos.ppo_no_jit_env',
+    'entry': '-m pobax.algos.ppo',
     'args': [
         {
-            'env': 'ant',
+            'env': 'halfcheetah_pixels',
             'double_critic': False,
             'memoryless': True,
             'action_concat': True,
@@ -27,8 +27,8 @@ hparams = {
             'entropy_coeff': 0.01,
             'steps_log_freq': 8,
             'update_log_freq': 10,
-            'total_steps': int(1e7),
-            'seed': [2024 + i for i in range(30)],
+            'total_steps': int(5e6),
+            'seed': 2024,
             'platform': 'gpu',
             'debug': True,
             'study_name': exp_name

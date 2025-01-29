@@ -29,9 +29,10 @@ from pobax.envs.wrappers.gymnax import (
     NormalizeVecReward,
     NormalizeVecObservation,
     ActionConcatWrapper,
-    AutoResetEnvWrapper
+    AutoResetEnvWrapper,
+    MadronaWrapper
 )
-from pobax.envs.wrappers.pixel import PixelBraxVecEnvWrapper, PixelTMazeVecEnvWrapper, PixelSimpleChainVecEnvWrapper, PixelCraftaxVecEnvWrapper
+from pobax.envs.wrappers.pixel import PixelBraxVecEnvWrapper, PixelTMazeVecEnvWrapper, PixelSimpleChainVecEnvWrapper, PixelCraftaxVecEnvWrapper, PixelMadronaVecEnvWrapper
 from pobax.envs.wrappers.gymnasium import GymnaxToGymWrapper
 
 masked_gymnax_env_map = {
@@ -90,7 +91,7 @@ def is_jax_env(env_name: str):
     return any(all_bools)
 
 
-def load_brax_env(env_str: str,
+def load_brax_env(env_str: str, num_envs: int = 4,
                   gamma: float = 0.99):
     from gymnax import EnvParams
     from pobax.envs.wrappers.gymnax import BraxGymnaxWrapper, LogWrapper, ClipAction, VecEnv
@@ -117,6 +118,8 @@ def load_craftax_env(env_str: str,
 
 def get_env(env_name: str,
             rand_key: random.PRNGKey,
+            num_envs: int = 4,
+            image_size: int = 64,
             normalize_env: bool = False,
             normalize_image: bool = True,
             gamma: float = 0.99,
@@ -180,7 +183,7 @@ def get_env(env_name: str,
         env_params = env.default_params
 
     elif env_name in brax_envs:
-        env, env_params = load_brax_env(env_name, gamma=gamma)
+        env, env_params = load_brax_env(env_name, num_envs, gamma=gamma)
     
     elif env_name in craftax_envs:
         env, env_params = load_craftax_env(env_name, gamma=gamma)
@@ -213,10 +216,14 @@ def get_env(env_name: str,
         env = MaskObservationWrapper(env, mask_dims=mask_dims)
 
     # Vectorize our environment
-    env = VecEnv(env)
-    if env_name.endswith('pixels'):
+    if env_name in brax_envs and env_name.endswith('pixels'):
+        env = MadronaWrapper(env, num_worlds=num_envs)
+    else:
+        env = VecEnv(env)
+    if env_name.endswith('pixels') and env_name in craftax_envs.keys():
         env = PixelCraftaxVecEnvWrapper(env, normalize=normalize_image)
-    print(f'normalized env: {normalize_env}')
+    if env_name in brax_envs and env_name.endswith('pixels'):
+        env = PixelMadronaVecEnvWrapper(env, num_worlds=num_envs, normalize=normalize_image, size=image_size)
     if normalize_env:
         env = NormalizeVecObservation(env)
         env = NormalizeVecReward(env, gamma)

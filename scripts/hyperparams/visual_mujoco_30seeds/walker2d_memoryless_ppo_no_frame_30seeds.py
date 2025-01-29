@@ -3,7 +3,7 @@ from pathlib import Path
 exp_name = Path(__file__).stem
 
 lrs = [0.00025]
-lambda0s = [0.1]
+lambda0s = [0.9]
 lambda1s = [0.95]
 alphas = [1]
 ld_weights = [0]
@@ -14,7 +14,7 @@ hparams = {
     'entry': '-m pobax.algos.ppo_no_jit_env',
     'args': [
         {
-            'env': 'ant_pixels',
+            'env': 'walker2d',
             'double_critic': False,
             'memoryless': True,
             'action_concat': True,

@@ -4,6 +4,10 @@ from collections import deque
 from dataclasses import replace
 from functools import partial
 import inspect
+import os
+
+# Set the MUJOCO_GL environment variable to use EGL
+# os.environ['MUJOCO_GL'] = 'egl'
 
 import chex
 import flax.training.train_state
@@ -162,8 +166,10 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
     )
     env_key, rand_key = jax.random.split(rand_key)
     env, env_params = get_env(args.env, env_key,
+                                     num_envs=args.num_envs,
                                      gamma=args.gamma,
                                      normalize_image=False,
+                                     image_size=args.image_size,
                                      action_concat=args.action_concat)
 
     if hasattr(env, 'gamma'):
@@ -192,7 +198,7 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
     if double_critic:
         # last_val is index 1 here b/c we squeezed earlier.
         _calculate_gae = jax.vmap(calculate_gae,
-                                 in_axes=[transition_axes_map, 1, None, 0],
+                                 in_axes=[transition_axes_map, 1, None, 0, None],
                                  out_axes=2)
 
     def train(vf_coeff, ld_weight, alpha, lambda1, lambda0, lr, rng):
