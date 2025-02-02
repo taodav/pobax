@@ -3,6 +3,7 @@ from pathlib import Path
 
 import gymnax
 from jax import random
+import navix as nx
 
 from definitions import ROOT_DIR
 
@@ -18,6 +19,7 @@ from pobax.envs.jax.rocksample import PerfectMemoryWrapper as RSPerfectMemoryWra
 from pobax.envs.jax.reacher_pomdp import ReacherPOMDP
 from pobax.envs.jax.simple_chain import SimpleChain
 from pobax.envs.jax.tmaze import TMaze
+import pobax.envs.jax.navix_mazes
 from pobax.envs.wrappers.gymnax import (
     FlattenObservationWrapper,
     LogWrapper,
@@ -33,6 +35,7 @@ from pobax.envs.wrappers.gymnax import (
 )
 from pobax.envs.wrappers.pixel import PixelBraxVecEnvWrapper, PixelTMazeVecEnvWrapper, PixelSimpleChainVecEnvWrapper, PixelCraftaxVecEnvWrapper
 from pobax.envs.wrappers.gymnasium import GymnaxToGymWrapper
+from pobax.envs.wrappers.nx import NavixGymnaxWrapper
 
 masked_gymnax_env_map = {
     'Pendulum-F-v0': {'env_str': 'Pendulum-v1', 'mask_dims': [0, 1, 2]},
@@ -195,6 +198,11 @@ def get_env(env_name: str,
         env_params = env.default_params
         if perfect_memory:
             env = RSPerfectMemoryWrapper(env)
+
+    elif env_name.startswith('Navix-DMLab-Maze'):
+        nx_env = nx.make(env_name)
+        env = NavixGymnaxWrapper(nx_env)
+        env_params = env.default_params
 
     else:
         env, env_params = gymnax.make(env_name)

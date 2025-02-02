@@ -208,11 +208,13 @@ class BraxGymnaxWrapper:
             high=1.0,
             shape=(self._env.action_size,),
         )
-    
+
+
 @struct.dataclass
 class CraftEnvParams:
     max_steps_in_episode: int = 1
     craft_env_params: environment.EnvParams = None
+
 
 class CraftaxGymnaxWrapper:
     def __init__(self, env_name):

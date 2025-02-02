@@ -3,6 +3,7 @@ from typing import Union
 import gymnasium as gym
 import gymnax.environments.spaces
 from gymnax.environments import environment, spaces
+import navix as nx
 
 from pobax.envs.jax.battleship import Battleship
 
@@ -17,7 +18,8 @@ def get_gymnax_network_fn(env: environment.Environment, env_params: environment.
         if memoryless:
             network_fn = BattleShipActorCritic
         action_size = env.action_space(env_params).n
-    elif isinstance(env.action_space(env_params), spaces.Discrete):
+    elif isinstance(env.action_space(env_params), spaces.Discrete) or \
+            isinstance(env.action_space(env_params), nx.spaces.Discrete):
         action_size = env.action_space(env_params).n
 
         # Check whether we use image observations
