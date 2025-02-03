@@ -2,6 +2,7 @@ from functools import partial
 from typing import Tuple, Optional, Union
 
 import jax
+import jax.numpy as jnp
 import chex
 from flax import struct
 from gymnax.environments import environment, spaces
@@ -22,10 +23,13 @@ class NavixGymnaxWrapper:
         return environment.EnvParams(max_steps_in_episode=self._env.max_steps)
 
     def observation_space(self, params) -> spaces.Box:
+        # return spaces.Box(0, 8, (4, 7, 1))
         return self._env.observation_space
 
     def action_space(self, params) -> spaces.Discrete:
-        return self._env.action_space
+        # Action space here is 3, b/c rest of actions are unused.
+        return spaces.Discrete(3)
+        # return self._env.action_space
 
     @partial(jax.jit, static_argnums=(0, -1))
     def reset(
@@ -44,8 +48,8 @@ class NavixGymnaxWrapper:
             action: int,
             params: Optional[environment.EnvParams] = None,
     ) -> Tuple[chex.Array, NavixState, float, bool, dict]:
-        timestep = self._env.step(state, action)
+        timestep = self._env.step(state.timestep, action)
         state = NavixState(timestep=timestep)
 
-        done = (timestep.step_type == 1) or (timestep.step_type == 2)
+        done = jnp.logical_or((timestep.step_type == 1), (timestep.step_type == 2))
         return timestep.observation, state, timestep.reward, done, timestep.info

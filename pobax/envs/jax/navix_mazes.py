@@ -1,16 +1,21 @@
 from functools import partial
-from typing import Union, Callable
+from typing import Union, Callable, Dict, Any, Tuple
 
 import chex
+from flax import struct
 import jax
 import jax.numpy as jnp
+from jax import Array
 import navix as nx
+from navix import rewards, terminations, observations, transitions
+from navix.actions import DEFAULT_ACTION_SET
 from navix.entities import Wall, Player, Goal
 from navix.environments import Timestep
 from navix.environments import Environment as NavixEnvironment
 from navix.grid import random_positions, random_directions
 from navix.rendering.cache import RenderingCache
 from navix.states import State
+from navix.spaces import Space, Discrete
 
 import numpy as np
 
@@ -80,25 +85,64 @@ nav_maze_random_goal_03 = """
 #########################################
 """
 
+class ASCIIMaze(NavixEnvironment):
+    grid: jnp.ndarray = struct.field(pytree_node=False, default=None)
+    wall_pos: jnp.ndarray = struct.field(pytree_node=False, default=None)
 
-class Maze(NavixEnvironment):
-    spec: str = "nav_maze_random_goal_01"
+    @classmethod
+    def create(
+            cls,
+            height: int,
+            width: int,
+            max_steps: int | None = None,
+            observation_fn: Callable[[State], Array] = observations.symbolic,
+            reward_fn: Callable[[State, Array, State], Array] = rewards.DEFAULT_TASK,
+            termination_fn: Callable[
+                [State, Array, State], Array
+            ] = terminations.DEFAULT_TERMINATION,
+            transitions_fn: Callable[
+                [State, Array, Tuple[Callable[[State], State], ...]], State
+            ] = transitions.DEFAULT_TRANSITION,
+            action_set: Tuple[Callable[[State], State], ...] = DEFAULT_ACTION_SET,
+            observation_space: Space | None = None,
+            action_space: Space | None = None,
+            reward_space: Space | None = None,
+            spec: str = 'nav_maze_random_goal_01',
+            **kwargs,
+    ) -> NavixEnvironment:
 
-    def _reset(self, key: chex.PRNGKey, cache: Union[RenderingCache, None] = None) -> Timestep:
-        player_pos_key, player_dir_key, goal_key = jax.random.split(key, 3)
+        ascii_str = globals()[spec]
 
-        ascii_str = globals()[self.spec]
         grid = nx.grid.from_ascii_map(ascii_str)
 
         # Get our wall positions
         wall_pos = jnp.stack(jnp.nonzero(grid == -1), axis=1)
-        walls = Wall.create(position=wall_pos)
+        return cls(
+            height=height,
+            width=width,
+            max_steps=max_steps,
+            observation_fn=observation_fn,
+            reward_fn=reward_fn,
+            termination_fn=termination_fn,
+            transitions_fn=transitions_fn,
+            action_set=action_set,
+            observation_space=observation_space,
+            action_space=action_space,
+            reward_space=reward_space,
+            grid=grid,
+            wall_pos=wall_pos,
+            **kwargs,
+        )
+
+    def _reset(self, key: chex.PRNGKey, cache: Union[RenderingCache, None] = None) -> Timestep:
+        walls = Wall.create(position=self.wall_pos)
+        player_pos_key, player_dir_key, goal_key = jax.random.split(key, 3)
 
         # player position
-        player_pos = random_positions(player_pos_key, grid)
+        player_pos = random_positions(player_pos_key, self.grid)
         player_dir = random_directions(player_dir_key)
 
-        avail_goal_grid = grid.at[player_pos].set(-1)
+        avail_goal_grid = self.grid.at[player_pos].set(-1)
         goal_pos = random_positions(goal_key, avail_goal_grid)
 
         # spawn goal and player
@@ -114,8 +158,8 @@ class Maze(NavixEnvironment):
 
         state = State(
             key=key,
-            grid=grid,
-            cache=cache or RenderingCache.init(grid),
+            grid=self.grid,
+            cache=cache or RenderingCache.init(self.grid),
             entities=entities,
         )
         return Timestep(
@@ -141,7 +185,7 @@ categorical_obs_space = nx.spaces.Discrete.create(n_elements=9, shape=(radius + 
 
 nx.register_env(
     "Navix-DMLab-Maze-01-v0",
-    lambda *args, **kwargs: Maze.create(
+    lambda *args, **kwargs: ASCIIMaze.create(
         # observation_fn=kwargs.pop("observation_fn", nx.observations.categorical_first_person),
         observation_fn=kwargs.pop("observation_fn", categorical_obs_fn),
         observation_space=categorical_obs_space,
@@ -157,7 +201,7 @@ nx.register_env(
 
 nx.register_env(
     "Navix-DMLab-Maze-RGB-01-v0",
-    lambda *args, **kwargs: Maze.create(
+    lambda *args, **kwargs: ASCIIMaze.create(
         observation_fn=kwargs.pop("observation_fn", nx.observations.rgb_first_person),
         reward_fn=kwargs.pop("reward_fn", nx.rewards.on_goal_reached),
         termination_fn=kwargs.pop("termination_fn", nx.terminations.on_goal_reached),
@@ -171,7 +215,7 @@ nx.register_env(
 
 nx.register_env(
     "Navix-DMLab-Maze-02-v0",
-    lambda *args, **kwargs: Maze.create(
+    lambda *args, **kwargs: ASCIIMaze.create(
         # observation_fn=kwargs.pop("observation_fn", nx.observations.categorical_first_person),
         observation_fn=kwargs.pop("observation_fn", categorical_obs_fn),
         observation_space=categorical_obs_space,
@@ -187,7 +231,7 @@ nx.register_env(
 
 nx.register_env(
     "Navix-DMLab-Maze-RGB-02-v0",
-    lambda *args, **kwargs: Maze.create(
+    lambda *args, **kwargs: ASCIIMaze.create(
         observation_fn=kwargs.pop("observation_fn", nx.observations.rgb_first_person),
         reward_fn=kwargs.pop("reward_fn", nx.rewards.on_goal_reached),
         termination_fn=kwargs.pop("termination_fn", nx.terminations.on_goal_reached),
@@ -201,7 +245,7 @@ nx.register_env(
 
 nx.register_env(
     "Navix-DMLab-Maze-03-v0",
-    lambda *args, **kwargs: Maze.create(
+    lambda *args, **kwargs: ASCIIMaze.create(
         # observation_fn=kwargs.pop("observation_fn", nx.observations.categorical_first_person),
         observation_fn=kwargs.pop("observation_fn", categorical_obs_fn),
         observation_space=categorical_obs_space,
@@ -217,7 +261,7 @@ nx.register_env(
 
 nx.register_env(
     "Navix-DMLab-Maze-RGB-03-v0",
-    lambda *args, **kwargs: Maze.create(
+    lambda *args, **kwargs: ASCIIMaze.create(
         observation_fn=kwargs.pop("observation_fn", nx.observations.rgb_first_person),
         reward_fn=kwargs.pop("reward_fn", nx.rewards.on_goal_reached),
         termination_fn=kwargs.pop("termination_fn", nx.terminations.on_goal_reached),
