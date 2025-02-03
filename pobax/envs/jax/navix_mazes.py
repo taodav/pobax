@@ -273,14 +273,3 @@ nx.register_env(
     ),
 )
 
-if __name__ == "__main__":
-    import matplotlib.pyplot as plt
-    key = jax.random.PRNGKey(2024)
-    env = nx.make("Navix-DMLab-Maze-RGB-03-v0")
-    tstep = env.reset(key)
-
-    plt.imshow(tstep.observation)
-    plt.show()
-
-
-    print()
