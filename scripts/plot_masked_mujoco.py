@@ -161,6 +161,7 @@ if __name__ == "__main__":
         ('PPO + MEMORYLESS', Path(ROOT_DIR, 'results', f'masked_mujoco_ppo_memoryless'), 'dark gray'),
         ('PPO + STATE', Path(ROOT_DIR, 'results', f'masked_mujoco_ppo_observable'), 'green'),
     ]
+    plot_name = study_paths[0][1].stem
 
     all_reses = []
     all_F_reses = []
@@ -182,3 +183,8 @@ if __name__ == "__main__":
 
     means_and_confidences = calc_means_and_confidences(all_reses, all_F_reses)
     fig, axes = plot_res(means_and_confidences, n_rows=2)
+
+    save_plot_to = Path(ROOT_DIR, 'results', f'{plot_name}.pdf')
+
+    fig.savefig(save_plot_to, bbox_inches='tight')
+    print(f"Saved figure to {save_plot_to}")
