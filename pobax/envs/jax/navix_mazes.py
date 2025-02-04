@@ -19,6 +19,17 @@ from navix.spaces import Space, Discrete
 
 import numpy as np
 
+nav_maze_random_goal_00 = """
+##########
+#...#....#
+#...#....#
+#...####.#
+###......#
+#.####...#
+#........#
+##########
+"""
+
 nav_maze_random_goal_01 = """
 #####################
 #...#...#...........#
@@ -185,6 +196,35 @@ def categorical_one_hot(state: State):
 radius = nx.observations.RADIUS
 categorical_obs_space = nx.spaces.Discrete.create(n_elements=9, shape=(radius + 1, radius * 2 + 1, 2))
 
+nx.register_env(
+    "Navix-DMLab-Maze-00-v0",
+    lambda *args, **kwargs: ASCIIMaze.create(
+        # observation_fn=kwargs.pop("observation_fn", nx.observations.categorical_first_person),
+        observation_fn=kwargs.pop("observation_fn", categorical_one_hot),
+        observation_space=categorical_obs_space,
+        reward_fn=kwargs.pop("reward_fn", nx.rewards.on_goal_reached),
+        termination_fn=kwargs.pop("termination_fn", nx.terminations.on_goal_reached),
+        height=8,
+        width=10,
+        max_steps=500,
+        spec="nav_maze_random_goal_00",
+        *args,
+    ),
+)
+
+nx.register_env(
+    "Navix-DMLab-Maze-RGB-00-v0",
+    lambda *args, **kwargs: ASCIIMaze.create(
+        observation_fn=kwargs.pop("observation_fn", nx.observations.rgb_first_person),
+        reward_fn=kwargs.pop("reward_fn", nx.rewards.on_goal_reached),
+        termination_fn=kwargs.pop("termination_fn", nx.terminations.on_goal_reached),
+        height=8,
+        width=10,
+        max_steps=500,
+        spec="nav_maze_random_goal_00",
+        *args,
+    ),
+)
 
 nx.register_env(
     "Navix-DMLab-Maze-01-v0",
