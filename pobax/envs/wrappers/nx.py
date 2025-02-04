@@ -57,6 +57,7 @@ class NavixGymnaxWrapper:
         done = jnp.logical_or((timestep.step_type == 1), (timestep.step_type == 2))
         return timestep.observation, state, timestep.reward, done, timestep.info
 
+# class
 
 class MazeFoVWrapper(GymnaxWrapper):
     def __init__(self, env: NavixEnvironment):

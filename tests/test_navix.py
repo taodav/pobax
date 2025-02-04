@@ -33,7 +33,7 @@ if __name__ == "__main__":
         obs, env_state, reward, done, info = env.step(rng_step, env_state, action, env_params)
 
         new_runner_state = env_state, obs, done, rng
-        return new_runner_state, (obs, done)
+        return new_runner_state, (obs, done, env_state)
 
     runner_state = env_state, obs, jnp.zeros(2).astype(bool), key
     final_runner_state, (obs, dones) = jax.lax.scan(env_step, runner_state, jnp.arange(steps), steps)
