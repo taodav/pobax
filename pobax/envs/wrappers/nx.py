@@ -60,20 +60,24 @@ class NavixGymnaxWrapper:
 # class
 
 class MazeFoVWrapper(GymnaxWrapper):
-    def __init__(self, env: NavixEnvironment):
+    def __init__(self, env: NavixGymnaxWrapper,
+                 mask_value: int = -1):
         super().__init__(env)
+        radius = nx.observations.RADIUS
+
+        self.grid_rows, self.grid_cols, _ = env.observation_space(env.default_params).shape
+        self.agent_r, self.agent_c = radius, radius
 
         # Precompute these constants
-        self.rays, self.ray_lengths = precompute_rays()
-
-# RAYS, RAY_LENGTHS = precompute_rays()
-
+        # Agent position is always (radius, radius)
+        self.rays, self.ray_lengths = precompute_rays(self.grid_rows, self.grid_cols, self.agent_r, self.agent_c)
+        self.mask_value = mask_value
 
     # -------------------------------
     # Field-of-view (FOV) computation
     # -------------------------------
 
-    def is_visible(self, idx, obs_with_goal):
+    def is_visible(self, idx, obs):
         """
         Given a target cell index (as a 2-element array [r, c]) and the current observation,
         return True if that cell is visible to the agent.
@@ -84,7 +88,6 @@ class MazeFoVWrapper(GymnaxWrapper):
             If any intermediate cell (i.e. before the target) is a wall, then the view is blocked.
         """
         r, c = idx[0], idx[1]
-        obs = obs_with_goal[..., 0]
         WALL = 1
 
         # For the agent’s own cell, always return True.
@@ -104,41 +107,60 @@ class MazeFoVWrapper(GymnaxWrapper):
 
             return jax.lax.fori_loop(0, length - 1, body, True)
 
-        return jax.lax.cond((r == AGENT_R) & (c == AGENT_C),
+        return jax.lax.cond((r == self.agent_r) & (c == self.agent_c),
                             lambda _: True,
                             check_ray,
                             operand=None)
 
 
-    def compute_visibility(obs):
+    def compute_visibility(self, obs):
         """
         Compute a boolean (GRID_ROWS x GRID_COLS) visibility mask given the observation.
         """
         # Create an array of all grid cell indices.
-        indices = jnp.array([[r, c] for r in range(GRID_ROWS) for c in range(GRID_COLS)], dtype=jnp.int32)
-        vis_flat = jax.vmap(lambda idx: is_visible(idx, obs))(indices)
-        return vis_flat.reshape((GRID_ROWS, GRID_COLS))
-
+        indices = jnp.array([[r, c] for r in range(self.grid_rows) for c in range(self.grid_cols)], dtype=jnp.int32)
+        vis_flat = jax.vmap(lambda idx: self.is_visible(idx, obs))(indices)
+        return vis_flat.reshape((self.grid_rows, self.grid_cols))
 
     # -------------------------------
     # The jitted masking function
     # -------------------------------
 
-    @jax.jit
-    def mask_observation(obs, mask_value=-1):
+    @partial(jax.jit, static_argnums=0)
+    def mask_observation(self, obs):
         """
-        Given an observation (a 4×7 array) returns a new array where cells that are
+        Given an observation (a 4×7x2 array) returns a new array where cells that are
         not in the agent's field-of-view are replaced by mask_value.
 
         Parameters:
-          obs: jnp.ndarray of shape (4,7)
+          obs: jnp.ndarray of shape (4,7,2), where obs[..., 0] is the walls map.
           mask_value: the value to fill in for unseen cells (default: -1)
 
         Returns:
-          A 4×7 jnp.ndarray where unseen cells are masked out.
+          A 4×7x2 jnp.ndarray where unseen cells are masked out for both channels.
         """
-        vis = compute_visibility(obs)
-        return jnp.where(vis, obs, mask_value)
+        grid_obs = obs[..., 0]
+        vis = self.compute_visibility(grid_obs)
+        vmapped_where = jax.vmap(jnp.where, in_axes=[None, -1, None], out_axes=-1)
+        return vmapped_where(vis, obs, self.mask_value)
+
+    @partial(jax.jit, static_argnums=(0,-1))
+    def reset(
+            self, key: chex.PRNGKey, params: Optional[environment.EnvParams] = None
+    ) -> Tuple[chex.Array, environment.EnvState]:
+        obs, state = self._env.reset(key, params)
+        return self.mask_observation(obs), state
+
+    @partial(jax.jit, static_argnums=(0, -1))
+    def step(
+            self,
+            key: chex.PRNGKey,
+            state: environment.EnvState,
+            action: Union[int, float],
+            params: Optional[environment.EnvParams] = None,
+    ) -> Tuple[chex.Array, environment.EnvState, float, bool, dict]:
+        obs, state, reward, done, info = self._env.step(key, state, action, params)
+        return self.mask_observation(obs), state, reward, done, info
 
 
 # -------------------------------
