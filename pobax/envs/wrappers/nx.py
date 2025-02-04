@@ -63,80 +63,82 @@ class MazeFoVWrapper(GymnaxWrapper):
     def __init__(self, env: NavixEnvironment):
         super().__init__(env)
 
+        # Precompute these constants
         self.rays, self.ray_lengths = precompute_rays()
 
-# Precompute these constants (they will be embedded into the jitted code)
 # RAYS, RAY_LENGTHS = precompute_rays()
 
 
-# -------------------------------
-# Field-of-view (FOV) computation
-# -------------------------------
+    # -------------------------------
+    # Field-of-view (FOV) computation
+    # -------------------------------
 
-def is_visible(idx, obs):
-    """
-    Given a target cell index (as a 2-element array [r, c]) and the current observation,
-    return True if that cell is visible to the agent.
+    def is_visible(self, idx, obs_with_goal):
+        """
+        Given a target cell index (as a 2-element array [r, c]) and the current observation,
+        return True if that cell is visible to the agent.
 
-    The logic is:
-      - If the cell is the agent’s own cell, it is visible.
-      - Otherwise, we “walk” the ray from the agent to the cell.
-        If any intermediate cell (i.e. before the target) is a wall, then the view is blocked.
-    """
-    r, c = idx[0], idx[1]
+        The logic is:
+          - If the cell is the agent’s own cell, it is visible.
+          - Otherwise, we “walk” the ray from the agent to the cell.
+            If any intermediate cell (i.e. before the target) is a wall, then the view is blocked.
+        """
+        r, c = idx[0], idx[1]
+        obs = obs_with_goal[..., 0]
+        WALL = 1
 
-    # For the agent’s own cell, always return True.
-    def check_ray(_):
-        length = RAY_LENGTHS[r, c]
+        # For the agent’s own cell, always return True.
+        def check_ray(_):
+            length = self.ray_lengths[r, c]
 
-        # Loop over the cells along the ray (except the final one)
-        def body(i, vis):
-            cell = RAYS[r, c, i]  # cell is a 2-element vector [row, col]
-            # If this intermediate cell is a wall, then block the view.
-            return jax.lax.cond(
-                (i < length - 1) & (obs[cell[0], cell[1]] == WALL),
-                lambda _: False,
-                lambda _: vis,
-                operand=None,
-            )
+            # Loop over the cells along the ray (except the final one)
+            def body(i, vis):
+                cell = self.rays[r, c, i]  # cell is a 2-element vector [row, col]
+                # If this intermediate cell is a wall, then block the view.
+                return jax.lax.cond(
+                    (i < length - 1) & (obs[cell[0], cell[1]] == WALL),
+                    lambda _: False,
+                    lambda _: vis,
+                    operand=None,
+                )
 
-        return jax.lax.fori_loop(0, length - 1, body, True)
+            return jax.lax.fori_loop(0, length - 1, body, True)
 
-    return jax.lax.cond((r == AGENT_R) & (c == AGENT_C),
-                        lambda _: True,
-                        check_ray,
-                        operand=None)
-
-
-def compute_visibility(obs):
-    """
-    Compute a boolean (GRID_ROWS x GRID_COLS) visibility mask given the observation.
-    """
-    # Create an array of all grid cell indices.
-    indices = jnp.array([[r, c] for r in range(GRID_ROWS) for c in range(GRID_COLS)], dtype=jnp.int32)
-    vis_flat = jax.vmap(lambda idx: is_visible(idx, obs))(indices)
-    return vis_flat.reshape((GRID_ROWS, GRID_COLS))
+        return jax.lax.cond((r == AGENT_R) & (c == AGENT_C),
+                            lambda _: True,
+                            check_ray,
+                            operand=None)
 
 
-# -------------------------------
-# The jitted masking function
-# -------------------------------
+    def compute_visibility(obs):
+        """
+        Compute a boolean (GRID_ROWS x GRID_COLS) visibility mask given the observation.
+        """
+        # Create an array of all grid cell indices.
+        indices = jnp.array([[r, c] for r in range(GRID_ROWS) for c in range(GRID_COLS)], dtype=jnp.int32)
+        vis_flat = jax.vmap(lambda idx: is_visible(idx, obs))(indices)
+        return vis_flat.reshape((GRID_ROWS, GRID_COLS))
 
-@jax.jit
-def mask_observation(obs, mask_value=-1):
-    """
-    Given an observation (a 4×7 array) returns a new array where cells that are
-    not in the agent's field-of-view are replaced by mask_value.
 
-    Parameters:
-      obs: jnp.ndarray of shape (4,7)
-      mask_value: the value to fill in for unseen cells (default: -1)
+    # -------------------------------
+    # The jitted masking function
+    # -------------------------------
 
-    Returns:
-      A 4×7 jnp.ndarray where unseen cells are masked out.
-    """
-    vis = compute_visibility(obs)
-    return jnp.where(vis, obs, mask_value)
+    @jax.jit
+    def mask_observation(obs, mask_value=-1):
+        """
+        Given an observation (a 4×7 array) returns a new array where cells that are
+        not in the agent's field-of-view are replaced by mask_value.
+
+        Parameters:
+          obs: jnp.ndarray of shape (4,7)
+          mask_value: the value to fill in for unseen cells (default: -1)
+
+        Returns:
+          A 4×7 jnp.ndarray where unseen cells are masked out.
+        """
+        vis = compute_visibility(obs)
+        return jnp.where(vis, obs, mask_value)
 
 
 # -------------------------------
