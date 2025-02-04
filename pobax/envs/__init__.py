@@ -35,7 +35,7 @@ from pobax.envs.wrappers.gymnax import (
 )
 from pobax.envs.wrappers.pixel import PixelBraxVecEnvWrapper, PixelTMazeVecEnvWrapper, PixelSimpleChainVecEnvWrapper, PixelCraftaxVecEnvWrapper
 from pobax.envs.wrappers.gymnasium import GymnaxToGymWrapper
-from pobax.envs.wrappers.nx import NavixGymnaxWrapper
+from pobax.envs.wrappers.nx import NavixGymnaxWrapper, MazeFoVWrapper
 
 masked_gymnax_env_map = {
     'Pendulum-F-v0': {'env_str': 'Pendulum-v1', 'mask_dims': [0, 1, 2]},
@@ -203,6 +203,12 @@ def get_env(env_name: str,
         nx_env = nx.make(env_name)
         env = NavixGymnaxWrapper(nx_env)
         env_params = env.default_params
+        if 'RGB' in env_name:
+            print("FoV masking is not implemented yet for RGB features.")
+        else:
+            env = MazeFoVWrapper(env)
+
+
 
     else:
         env, env_params = gymnax.make(env_name)

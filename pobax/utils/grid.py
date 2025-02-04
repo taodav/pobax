@@ -1,6 +1,7 @@
 # Helpers for agent-centric gridworld mapping
 from jax import lax
 import jax.numpy as jnp
+import numpy as np
 
 
 def convert_to_agent_centric_map(grid: jnp.ndarray, pos: jnp.ndarray):
@@ -97,7 +98,6 @@ def precompute_rays(GRID_ROWS: int, GRID_COLS: int, AGENT_R: int, AGENT_C: int):
 
 
 if __name__ == "__main__":
-    import numpy as np
     grid = jnp.array([
         [0, 1, 1, 0],
         [0, 1, 1, 0],
