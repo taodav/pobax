@@ -10,7 +10,7 @@ from tap import Tap
 from pobax.envs import get_gym_env
 
 class CollectHyperparams(Tap):
-    env: str = 'tmaze'
+    env: str = 'Craftax-Pixels-v1'
 
     update_idx_to_take: int = None
 

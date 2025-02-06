@@ -62,6 +62,11 @@ def plot_reses(all_reses: list[tuple], n_rows: int = 2,
     plt.rcParams.update({'font.size': 32})
 
     # check to see that all our envs are the same across all reses.
+    for _, x, _ in all_reses:
+        for i in range(len(x['envs'])):
+            if x['envs'][i].endswith('pixels'):
+                x['envs'][i] = x['envs'][i][:-7]
+                print(x['envs'][i])
     all_envs = [set(x['envs']) for _, x, _ in all_reses]
     for envs in all_envs:
         assert envs == all_envs[0]
@@ -168,16 +173,20 @@ def find_file_in_dir(file_name: str, base_dir: Path) -> Path:
             return path
 
 if __name__ == "__main__":
-    env_name = 'rocksample_11_11'
+    env_name = 'craftax'
 
     # normal
     study_paths = [
         # ('$\lambda$-discrepancy + Quantile PPO', Path(ROOT_DIR, 'results', f'{env_name}_quantile_LD_ppo'), 'green'),
         # ('$\lambda$-discrepancy + PPO', Path(ROOT_DIR, 'results', f'{env_name}_LD_ppo'), 'dark gray'),
-        ('Perfect Memory PPO (RNN)', Path(ROOT_DIR, 'results', f'{env_name}_perfect_mem_rnn_ppo'), 'purple'),
-        ('Perfect Memory PPO (NN)', Path(ROOT_DIR, 'results', f'{env_name}_perfect_mem_ppo'), 'pink'),
-        ('PPO (RNN)', Path(ROOT_DIR, 'results', f'{env_name}_ppo'), 'blue'),
-        ('PPO (NN)', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_ppo'), 'dark gray'),
+        ('PPO + RNN', Path(ROOT_DIR, 'results', f'{env_name}_ppo'), 'purple'),
+        ('PPO + RNN + LD', Path(ROOT_DIR, 'results', f'{env_name}_ppo_LD'), 'blue'),
+        ('PPO + MEMORYLESS', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_ppo'), 'dark gray'),
+        ('PPO + MEMORYLESS + No frame', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_ppo_no_frame'), 'green'),
+        # ('PPO', Path(ROOT_DIR, 'results', f'test_craftax_1M'), 'blue'),
+        # ('Perfect Memory PPO (NN)', Path(ROOT_DIR, 'results', f'{env_name}_perfect_mem_ppo'), 'pink'),
+        # ('PPO (RNN)', Path(ROOT_DIR, 'results', f'{env_name}_ppo'), 'blue'),
+        # ('PPO (NN)', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_ppo'), 'dark gray'),
     ]
 
     # best

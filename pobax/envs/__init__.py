@@ -28,9 +28,10 @@ from pobax.envs.wrappers.gymnax import (
     VecEnv,
     NormalizeVecReward,
     NormalizeVecObservation,
-    ActionConcatWrapper
+    ActionConcatWrapper,
+    AutoResetEnvWrapper
 )
-from pobax.envs.wrappers.pixel import PixelBraxVecEnvWrapper, PixelTMazeVecEnvWrapper, PixelSimpleChainVecEnvWrapper
+from pobax.envs.wrappers.pixel import PixelBraxVecEnvWrapper, PixelTMazeVecEnvWrapper, PixelSimpleChainVecEnvWrapper, PixelCraftaxVecEnvWrapper
 from pobax.envs.wrappers.gymnasium import GymnaxToGymWrapper
 
 masked_gymnax_env_map = {
@@ -60,8 +61,10 @@ masked_gymnax_env_map = {
 }
 
 
-brax_envs = ['ant', 'walker2d', 'halfcheetah', 'hopper']
+brax_envs = ['ant', 'walker2d', 'halfcheetah', 'hopper', 'ant_pixels', 'walker2d_pixels', 'halfcheetah_pixels', 'hopper_pixels']
 
+# craftax_envs = ['Craftax-Symbolic-v1', 'Craftax-Pixels-v1', 'Craftax-Classic-Symbolic-v1', 'Craftax-Classic-Pixels-v1']
+craftax_envs = {'craftax': 'Craftax-Symbolic-v1', 'craftax_pixels': 'Craftax-Pixels-v1', 'craftax_classic': 'Craftax-Classic-Symbolic-v1', 'craftax_classic_pixels': 'Craftax-Classic-Pixels-v1'}
 
 def is_jax_env(env_name: str):
     from brax.envs import _envs as brax_envs
@@ -92,6 +95,8 @@ def load_brax_env(env_str: str,
     from gymnax import EnvParams
     from pobax.envs.wrappers.gymnax import BraxGymnaxWrapper, LogWrapper, ClipAction, VecEnv
     from pobax.envs.wrappers.gymnax import NormalizeVecReward, NormalizeVecObservation
+    if env_str.endswith('pixels'):
+        env_str = env_str.split('_')[0]
     env = BraxGymnaxWrapper(env_str)
     env_params = EnvParams(max_steps_in_episode=env.max_steps_in_episode)
 
@@ -99,10 +104,21 @@ def load_brax_env(env_str: str,
 
     return env, env_params
 
+def load_craftax_env(env_str: str,
+                        gamma: float = 0.99):
+    from gymnax import EnvParams
+    from pobax.envs.wrappers.gymnax import CraftaxGymnaxWrapper
+    env_str = craftax_envs[env_str]
+    env = CraftaxGymnaxWrapper(env_str)
+    env = AutoResetEnvWrapper(env)
+    env_params = env.env_params
+    return env, env_params
+
 
 def get_env(env_name: str,
             rand_key: random.PRNGKey,
             normalize_env: bool = False,
+            normalize_image: bool = True,
             gamma: float = 0.99,
             perfect_memory: bool = False,
             action_concat: bool = False):
@@ -165,6 +181,9 @@ def get_env(env_name: str,
 
     elif env_name in brax_envs:
         env, env_params = load_brax_env(env_name, gamma=gamma)
+    
+    elif env_name in craftax_envs:
+        env, env_params = load_craftax_env(env_name, gamma=gamma)
 
     elif 'rocksample' in env_name:  # [rocksample, rocksample_15_15]
 
@@ -185,7 +204,7 @@ def get_env(env_name: str,
         print(f"Overwriting args gamma {gamma} with env gamma {env.gamma}.")
         gamma = env.gamma
 
-    if action_concat:
+    if action_concat and len(env.observation_space(env_params).shape) == 1:
         env = ActionConcatWrapper(env)
 
     env = LogWrapper(env, gamma=gamma)
@@ -195,6 +214,9 @@ def get_env(env_name: str,
 
     # Vectorize our environment
     env = VecEnv(env)
+    if env_name.endswith('pixels'):
+        env = PixelCraftaxVecEnvWrapper(env, normalize=normalize_image)
+
     if normalize_env:
         env = NormalizeVecObservation(env)
         env = NormalizeVecReward(env, gamma)
@@ -224,12 +246,17 @@ def get_gym_env(env_name: str,
         env = LogWrapper(env, gamma=gamma)
         env = VecEnv(env)
         env = PixelSimpleChainVecEnvWrapper(env, size=image_size, normalize=normalize_image)
-    else:
+    elif env_name in brax_envs:
         env, env_params = load_brax_env(env_name)
         env = LogWrapper(env, gamma=gamma)
         env = VecEnv(env)
-
-        env = PixelBraxVecEnvWrapper(env, size=image_size, normalize=normalize_image)
+        if env_name.endswith('pixels'):
+            env = PixelBraxVecEnvWrapper(env, size=image_size, normalize=normalize_image)
+    else:
+        env, env_params = load_craftax_env(env_name)
+        env = LogWrapper(env, gamma=gamma)
+        env = VecEnv(env)
+        if env_name.endswith('pixels'):
+            env = PixelCraftaxVecEnvWrapper(env, normalize=normalize_image)
     env = GymnaxToGymWrapper(env, env_params, seed=seed, num_envs=num_envs)
-
     return env

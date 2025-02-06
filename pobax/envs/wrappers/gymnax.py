@@ -53,7 +53,7 @@ class MaskObservationWrapper(GymnaxWrapper):
             dtype=self._env.observation_space(params).dtype,
         )
 
-    @partial(jax.jit, static_argnums=(0,))
+    @partial(jax.jit, static_argnums=(0,-1))
     def reset(
             self, key: chex.PRNGKey, params: Optional[environment.EnvParams] = None
     ) -> Tuple[chex.Array, environment.EnvState]:
@@ -61,7 +61,7 @@ class MaskObservationWrapper(GymnaxWrapper):
         obs = obs[self.mask_dims]
         return obs, state
 
-    @partial(jax.jit, static_argnums=(0,))
+    @partial(jax.jit, static_argnums=(0,-1))
     def step(
             self,
             key: chex.PRNGKey,
@@ -208,7 +208,36 @@ class BraxGymnaxWrapper:
             high=1.0,
             shape=(self._env.action_size,),
         )
+    
+@struct.dataclass
+class CraftEnvParams:
+    max_steps_in_episode: int = 1
+    craft_env_params: environment.EnvParams = None
 
+class CraftaxGymnaxWrapper:
+    def __init__(self, env_name):
+        from craftax.craftax_env import make_craftax_env_from_name
+        env = make_craftax_env_from_name(env_name, auto_reset=True)
+        self.max_steps_in_episode = 100000
+        self.name = env_name
+        self._env = env
+        self.env_params = CraftEnvParams(max_steps_in_episode=self.max_steps_in_episode, craft_env_params=env.default_params)
+
+    def reset(self, key, params=None):
+        obs, state = self._env.reset_env(key, params.craft_env_params)
+        return obs, state
+
+    def step(self, key, state, action, params=None):
+        # Pixel value is already normalized
+        next_obs, next_state, reward, done, info = self._env.step_env(key, state, action, params.craft_env_params)
+        return next_obs, next_state, reward, done, {}
+        
+
+    def observation_space(self, params):
+        return self._env.observation_space(params.craft_env_params)
+
+    def action_space(self, params):
+        return self._env.action_space(params.craft_env_params)
 
 class ClipAction(GymnaxWrapper):
     def __init__(self, env, low=-1.0, high=1.0):
@@ -222,6 +251,39 @@ class ClipAction(GymnaxWrapper):
         action = jnp.clip(action, self.low, self.high)
         return self._env.step(key, state, action, params)
 
+class AutoResetEnvWrapper(GymnaxWrapper):
+    """Provides standard auto-reset functionality, providing the same behaviour as Gymnax-default."""
+
+    def __init__(self, env):
+        super().__init__(env)
+
+    @partial(jax.jit, static_argnums=(0, 2))
+    def reset(self, key, params=None):
+        return self._env.reset(key, params)
+
+    @partial(jax.jit, static_argnums=(0, 4))
+    def step(self, rng, state, action, params=None):
+
+        rng, _rng = jax.random.split(rng)
+        obs_st, state_st, reward, done, info = self._env.step(
+            _rng, state, action, params
+        )
+
+        rng, _rng = jax.random.split(rng)
+        obs_re, state_re = self._env.reset(_rng, params)
+
+        # Auto-reset environment based on termination
+        def auto_reset(done, state_re, state_st, obs_re, obs_st):
+            state = jax.tree_map(
+                lambda x, y: jax.lax.select(done, x, y), state_re, state_st
+            )
+            obs = jax.lax.select(done, obs_re, obs_st)
+
+            return obs, state
+
+        obs, state = auto_reset(done, state_re, state_st, obs_re, obs_st)
+
+        return obs, state, reward, done, info
 
 class TransformObservation(GymnaxWrapper):
     def __init__(self, env, transform_obs):

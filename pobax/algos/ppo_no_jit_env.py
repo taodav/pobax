@@ -1,6 +1,9 @@
 from functools import partial
 from time import time
+import os
 
+# Set the MUJOCO_GL environment variable to use EGL
+# os.environ['MUJOCO_GL'] = 'egl'
 import chex
 from flax.training import orbax_utils
 from flax.training.train_state import TrainState
@@ -45,7 +48,7 @@ def make_update(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
     if double_critic:
         # last_val is index 1 here b/c we squeezed earlier.
         _calculate_gae = jax.vmap(calculate_gae,
-                                  in_axes=[transition_axes_map, 1, None, 0],
+                                  in_axes=[transition_axes_map, 1, None, 0, None],
                                   out_axes=2)
 
     agent = PPO(network, double_critic=double_critic, ld_weight=args.ld_weight, alpha=args.alpha,
@@ -289,7 +292,8 @@ if __name__ == "__main__":
     print("Evaluating trained policy")
     # final evaluation
     eval_res = []
-    max_steps_in_episode = env.max_steps_in_episode if hasattr(env, 'max_steps_in_episode') else args.default_max_steps_in_episode
+    # max_steps_in_episode = env.max_steps_in_episode if hasattr(env, 'max_steps_in_episode') else args.default_max_steps_in_episode
+    max_steps_in_episode = 50
     # For now, we use num_eval_envs as a surrogate for num eval episodes
     for i in range(args.num_eval_envs):
         # INIT ENV

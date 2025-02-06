@@ -72,7 +72,7 @@ class ImageContinuousActorCritic(nn.Module):
     def __call__(self, _, x):
         obs, dones = x
 
-        embedding = SmallImageCNN(hidden_size=self.hidden_size)(obs)
+        embedding = FullImageCNN(hidden_size=self.hidden_size)(obs)
         embedding = nn.relu(embedding)
 
         actor = ContinuousActor(self.action_dim, hidden_size=self.hidden_size,
