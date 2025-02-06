@@ -468,6 +468,7 @@ if __name__ == "__main__":
     # our final_eval_metric returns max_num_steps.
     # we can filter that down by the max episode length amongst the runs.
     final_eval = out['final_eval_metric']
+    final_train_state = out['runner_state'][0]
 
     # the +1 at the end is to include the done step
     largest_episode = final_eval['returned_episode'].argmax(axis=-2).max() + 1
@@ -484,7 +485,8 @@ if __name__ == "__main__":
     all_results = {
         'argument_order': train_args,
         'out': out,
-        'args': args.as_dict()
+        'args': args.as_dict(),
+        'final_train_state': final_train_state
     }
 
     # Save all results with Orbax
