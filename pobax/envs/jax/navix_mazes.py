@@ -19,15 +19,26 @@ from navix.spaces import Space, Discrete
 
 import numpy as np
 
+# nav_maze_random_goal_00 = """
+# ##########
+# #...#....#
+# #...#....#
+# #...####.#
+# ###......#
+# #.####...#
+# #........#
+# ##########
+# """
 nav_maze_random_goal_00 = """
-##########
-#...#....#
-#...#....#
-#...####.#
-###......#
-#.####...#
-#........#
-##########
+##############
+#...#...#....#
+#.#.#.#####.##
+#.#.#....#...#
+#.#.#.#..#...#
+#.#...#..#.#.#
+#.#####..#.#.#
+#.....#....#.#
+##############
 """
 
 nav_maze_random_goal_01 = """
@@ -204,9 +215,9 @@ nx.register_env(
         observation_space=categorical_obs_space,
         reward_fn=kwargs.pop("reward_fn", nx.rewards.on_goal_reached),
         termination_fn=kwargs.pop("termination_fn", nx.terminations.on_goal_reached),
-        height=8,
-        width=10,
-        max_steps=500,
+        height=9,
+        width=14,
+        max_steps=800,
         spec="nav_maze_random_goal_00",
         *args,
     ),
@@ -218,9 +229,9 @@ nx.register_env(
         observation_fn=kwargs.pop("observation_fn", nx.observations.rgb_first_person),
         reward_fn=kwargs.pop("reward_fn", nx.rewards.on_goal_reached),
         termination_fn=kwargs.pop("termination_fn", nx.terminations.on_goal_reached),
-        height=8,
-        width=10,
-        max_steps=500,
+        height=9,
+        width=14,
+        max_steps=800,
         spec="nav_maze_random_goal_00",
         *args,
     ),

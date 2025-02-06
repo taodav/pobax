@@ -378,7 +378,7 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
                     timesteps = (
                             info["timestep"][info["returned_episode"]] * args.num_envs
                     )
-                    avg_return_values = jnp.mean(info["returned_episode_returns"][info["returned_episode"]])
+                    avg_return_values = jnp.mean(info["returned_discounted_episode_returns"][info["returned_episode"]])
                     if len(timesteps) > 0:
                         print(
                             f"timesteps={timesteps[0]} - {timesteps[-1]}, avg episodic return={avg_return_values:.2f}"
@@ -444,7 +444,7 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
 
 
 if __name__ == "__main__":
-    jax.disable_jit(True)
+    # jax.disable_jit(True)
     # okay some weirdness here. NUM_ENVS needs to match with NUM_MINIBATCHES
     args = PPOHyperparams().parse_args()
     jax.config.update('jax_platform_name', args.platform)
