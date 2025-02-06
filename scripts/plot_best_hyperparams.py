@@ -173,21 +173,25 @@ def find_file_in_dir(file_name: str, base_dir: Path) -> Path:
             return path
 
 if __name__ == "__main__":
-    env_name = 'craftax'
+    env_name = 'navix_dmlab_01'
+    study_paths = [
+        ('PPO + RNN', Path(ROOT_DIR, 'results', env_name), 'purple'),
+    ]
+
 
     # normal
-    study_paths = [
-        # ('$\lambda$-discrepancy + Quantile PPO', Path(ROOT_DIR, 'results', f'{env_name}_quantile_LD_ppo'), 'green'),
-        # ('$\lambda$-discrepancy + PPO', Path(ROOT_DIR, 'results', f'{env_name}_LD_ppo'), 'dark gray'),
-        ('PPO + RNN', Path(ROOT_DIR, 'results', f'{env_name}_ppo'), 'purple'),
-        ('PPO + RNN + LD', Path(ROOT_DIR, 'results', f'{env_name}_ppo_LD'), 'blue'),
-        ('PPO + MEMORYLESS', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_ppo'), 'dark gray'),
-        ('PPO + MEMORYLESS + No frame', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_ppo_no_frame'), 'green'),
-        # ('PPO', Path(ROOT_DIR, 'results', f'test_craftax_1M'), 'blue'),
-        # ('Perfect Memory PPO (NN)', Path(ROOT_DIR, 'results', f'{env_name}_perfect_mem_ppo'), 'pink'),
-        # ('PPO (RNN)', Path(ROOT_DIR, 'results', f'{env_name}_ppo'), 'blue'),
-        # ('PPO (NN)', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_ppo'), 'dark gray'),
-    ]
+    # study_paths = [
+    #     # ('$\lambda$-discrepancy + Quantile PPO', Path(ROOT_DIR, 'results', f'{env_name}_quantile_LD_ppo'), 'green'),
+    #     # ('$\lambda$-discrepancy + PPO', Path(ROOT_DIR, 'results', f'{env_name}_LD_ppo'), 'dark gray'),
+    #     ('PPO + RNN', Path(ROOT_DIR, 'results', f'{env_name}_ppo'), 'purple'),
+    #     # ('PPO + RNN + LD', Path(ROOT_DIR, 'results', f'{env_name}_ppo_LD'), 'blue'),
+    #     # ('PPO + MEMORYLESS', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_ppo'), 'dark gray'),
+    #     # ('PPO + MEMORYLESS + No frame', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_ppo_no_frame'), 'green'),
+    #     # ('PPO', Path(ROOT_DIR, 'results', f'test_craftax_1M'), 'blue'),
+    #     # ('Perfect Memory PPO (NN)', Path(ROOT_DIR, 'results', f'{env_name}_perfect_mem_ppo'), 'pink'),
+    #     # ('PPO (RNN)', Path(ROOT_DIR, 'results', f'{env_name}_ppo'), 'blue'),
+    #     # ('PPO (NN)', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_ppo'), 'dark gray'),
+    # ]
 
     # best
     # study_paths = [
