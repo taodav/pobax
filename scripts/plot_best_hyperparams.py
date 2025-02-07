@@ -173,9 +173,10 @@ def find_file_in_dir(file_name: str, base_dir: Path) -> Path:
             return path
 
 if __name__ == "__main__":
-    env_name = 'navix_dmlab_01'
+    env_name = 'test_navix_02'
     study_paths = [
         ('PPO + RNN', Path(ROOT_DIR, 'results', env_name), 'purple'),
+        ('PPO + MEMORYLESS', Path(ROOT_DIR, 'results', f'{env_name}_memoryless'), 'dark gray'),
     ]
 
 
