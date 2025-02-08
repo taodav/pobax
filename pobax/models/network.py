@@ -119,6 +119,11 @@ class SmallImageCNN(nn.Module):
             # out2 = nn.relu(out2)
             # conv_out = nn.Conv(features=self.hidden_size, kernel_size=(2, 2), strides=1, padding=0)(out2)
 
+        elif x.shape[-2] == 3 and x.shape[-3] == 2:
+            out1 = nn.Conv(features=64, kernel_size=(1, 1), strides=1, padding=0)(x)
+            out1 = nn.relu(out1)
+            conv_out = nn.Conv(features=128, kernel_size=(2, 2), strides=1, padding=0)(out1)
+
         elif x.shape[-2] == 31 and x.shape[-3] == 19:
             out1 = nn.Conv(features=64, kernel_size=(4, 6), strides=2, padding=0)(x)
             out1 = nn.relu(out1)
