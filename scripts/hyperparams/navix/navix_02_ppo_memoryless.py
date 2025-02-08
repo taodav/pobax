@@ -18,7 +18,7 @@ hparams = {
             'double_critic': False,
             'memoryless': True,
             'action_concat': True,
-            'lr': ' '.join(map(str, lrs)),
+            'lr': lrs,
             'anneal_lr': True,
             'hidden_size': 512,
             'lambda0': ' '.join(map(str, lambda0s)),
