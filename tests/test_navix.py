@@ -13,7 +13,7 @@ from definitions import ROOT_DIR
 
 
 def random_policy_gif():
-    steps = 5000
+    steps = 2000
     key = jax.random.PRNGKey(2024)
 
     env_key, key = jax.random.split(key)
@@ -45,11 +45,11 @@ def random_policy_gif():
     # plt.show()
     np_images = navix_overlay_obs_on_rgb(np.array(obs[:, 0]), jax.tree.map(lambda x: np.array(x[:, 0]), env_state))
 
-    print(f"Collected {steps} samples. Turning into MP4 now.")
+    print(f"Collected {steps} samples. Turning into gif now.")
     # concat_obs = jnp.concatenate((obs[:, 0], obs[:, 1]), axis=1)
     #
     imgs = [Image.fromarray(img) for img in np_images]
-    vod_path = Path(ROOT_DIR, 'results', "navix_maze.mp4")
+    vod_path = Path(ROOT_DIR, 'results', "navix_maze.gif")
     imgs[0].save(vod_path, save_all=True, append_images=imgs[1:], duration=100, loop=0)
 
     print(f"saved to {vod_path}")

@@ -32,9 +32,9 @@ def navix_overlay_obs_on_rgb(obs, states, overlay_alpha: float = 30):
         if direction == 2 or direction == 3:
             start_r, start_c = position[0] - radius, position[1] - radius
         elif direction == 1:
-            start_r, start_c = position[0], position[1] - 3
+            start_r, start_c = position[0], position[1] - radius
         elif direction == 0:
-            start_r, start_c = position[0] - 3, position[1]
+            start_r, start_c = position[0] - radius, position[1]
         else:
             raise NotImplementedError("what")
 
