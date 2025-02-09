@@ -206,11 +206,12 @@ def categorical_one_hot_first_person(state: State):
 def categorical_one_hot(state: State):
     # Add a channel in the last dimension
     categorical_obs = nx.observations.categorical(state)
-    wall_tag, goal_tag = state.entities['wall'].tag[0], state.entities['goal'].tag[0]
-    one_hot_wall = (categorical_obs == wall_tag).astype(int)
+    player_tag, goal_tag = state.entities['player'].tag[0], state.entities['goal'].tag[0]
+    one_hot_player = (categorical_obs == player_tag).astype(int)
+    # one_hot_wall = (categorical_obs == wall_tag).astype(int)
     one_hot_goal = (categorical_obs == goal_tag).astype(int)
 
-    return jnp.stack((one_hot_wall, one_hot_goal), axis=-1)
+    return jnp.stack((one_hot_player, one_hot_goal), axis=-1)
 
 
 radius = nx.observations.RADIUS
