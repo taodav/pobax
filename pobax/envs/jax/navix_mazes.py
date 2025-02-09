@@ -206,17 +206,23 @@ def categorical_one_hot_first_person(state: State):
 def categorical_one_hot(state: State):
     # Add a channel in the last dimension
     categorical_obs = nx.observations.categorical(state)
-    player_tag, goal_tag = state.entities['player'].tag[0], state.entities['goal'].tag[0]
+    player = state.entities['player']
+    player_tag, goal_tag = player.tag[0], state.entities['goal'].tag[0]
+    direction_vec = jnp.eye(4)[player.direction][None, ...]
     one_hot_player = (categorical_obs == player_tag).astype(int)
+    # TODO: encode direction
     # one_hot_wall = (categorical_obs == wall_tag).astype(int)
     one_hot_goal = (categorical_obs == goal_tag).astype(int)
 
-    return jnp.stack((one_hot_player, one_hot_goal), axis=-1)
+    h, w = categorical_obs.shape
+    one_hot_direction = direction_vec.repeat(h, axis=0).repeat(w, axis=1)
+
+    return jnp.concatenate((one_hot_player[..., None], one_hot_goal[..., None], one_hot_direction), axis=-1)
 
 
 radius = nx.observations.RADIUS
 categorical_first_person_obs_space = nx.spaces.Discrete.create(n_elements=9, shape=(radius + 1, radius * 2 + 1, 2))
-categorical_obs_space_fn = lambda h, w : nx.spaces.Discrete.create(n_elements=9, shape=(h, w, 2))
+categorical_obs_space_fn = lambda h, w : nx.spaces.Discrete.create(n_elements=9, shape=(h, w, 2 + 4))
 
 nx.register_env(
     "Navix-DMLab-Maze-00-v0",
