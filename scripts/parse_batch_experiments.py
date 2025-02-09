@@ -17,6 +17,7 @@ from pathlib import Path
 import pickle
 import sys
 
+import jax
 import jax.numpy as jnp
 import orbax.checkpoint
 import numpy as np
@@ -118,6 +119,11 @@ def parse_exp_dir(study_path, study_hparam_path, discounted: bool = False):
                 assert k == train_sign_hparams[i]
 
         args = restored['args']
+        def jnp_to_np(x):
+            if isinstance(x, jnp.ndarray):
+                return np.array(x)
+            return x
+        args = jax.tree.map(jnp_to_np, args)
 
         # Get online metrics
         online_eval = restored['out']['metric']
