@@ -129,9 +129,13 @@ class SmallImageCNN(nn.Module):
             out1 = nn.relu(out1)
             out2 = nn.Conv(features=64, kernel_size=(3, 5), strides=1, padding=0)(out1)
             out2 = nn.relu(out2)
-            # out3 = nn.Conv(features=64, kernel_size=(3, 5), strides=1, padding=0)(out1)
-            # out3 = nn.relu(out1)
-            conv_out = nn.Conv(features=64, kernel_size=(3, 3), strides=1, padding=0)(out2)
+
+            final_out = out2
+            if x.shape[-2] >= 20:
+                out3 = nn.Conv(features=64, kernel_size=(2, 3), strides=1, padding=0)(out2)
+                out3 = nn.relu(out3)
+                final_out = out3
+            conv_out = nn.Conv(features=64, kernel_size=(2, 2), strides=1, padding=0)(final_out)
 
         else:
             raise NotImplementedError

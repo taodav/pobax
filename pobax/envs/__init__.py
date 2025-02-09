@@ -205,10 +205,8 @@ def get_env(env_name: str,
         env_params = env.default_params
         if 'RGB' in env_name:
             print("FoV masking is not implemented yet for RGB features.")
-        else:
+        elif '-F-' not in env_name:
             env = MazeFoVWrapper(env)
-
-
 
     else:
         env, env_params = gymnax.make(env_name)
