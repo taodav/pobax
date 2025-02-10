@@ -163,6 +163,10 @@ class SimpleNN(nn.Module):
         out = nn.Dense(
             self.hidden_size, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
         )(out)
+        out = nn.relu(out)
+        out = nn.Dense(
+            self.hidden_size, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
+        )(out)
         return out
 
 

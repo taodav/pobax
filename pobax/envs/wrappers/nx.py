@@ -25,7 +25,7 @@ class NavixGymnaxWrapper:
         return spaces.Box(
             low=self._env.observation_space.minimum,
             high=self._env.observation_space.maximum,
-            shape=(np.prod(self._env.observation_space.shape),),
+            shape=self._env.observation_space.shape,
             dtype=self._env.observation_space.dtype,
         )
 
