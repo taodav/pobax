@@ -202,7 +202,7 @@ def get_env(env_name: str,
         if perfect_memory:
             env = RSPerfectMemoryWrapper(env)
 
-    elif env_name.startswith('Navix-DMLab-Maze'):
+    elif env_name.startswith('Navix-DMLab'):
         nx_env = nx.make(env_name)
         env = NavixGymnaxWrapper(nx_env)
         env_params = env.default_params

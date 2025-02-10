@@ -55,6 +55,20 @@ nav_maze_random_goal_01 = """
 #####################
 """
 
+nav_random_goal_01 = """
+#####################
+#...................#
+#.........#.........#
+#.........#.........#
+#.........#....#....#
+#.........#....#....#
+#.........#....#....#
+#.........#....#....#
+#.........#....#....#
+#...................#
+#####################
+"""
+
 nav_maze_random_goal_02 = """
 ###############################
 #.#...............#.......#...#
@@ -314,14 +328,30 @@ nx.register_env(
     "Navix-DMLab-Maze-F-01-v0",
     lambda *args, **kwargs: ASCIIMaze.create(
         # observation_fn=kwargs.pop("observation_fn", nx.observations.categorical_first_person),
-        observation_fn=kwargs.pop("observation_fn", observations.symbolic),
-        # observation_space=categorical_obs_space_fn(11, 21),
+        observation_fn=kwargs.pop("observation_fn", categorical_many_hot),
+        observation_space=categorical_many_hot_obs_space_fn(11, 21),
         reward_fn=kwargs.pop("reward_fn", nx.rewards.on_goal_reached),
         termination_fn=kwargs.pop("termination_fn", nx.terminations.on_goal_reached),
         height=11,
         width=21,
         max_steps=2000,
         spec="nav_maze_random_goal_01",
+        *args,
+    ),
+)
+
+nx.register_env(
+    "Navix-DMLab-TestMaze-F-01-v0",
+    lambda *args, **kwargs: ASCIIMaze.create(
+        # observation_fn=kwargs.pop("observation_fn", nx.observations.categorical_first_person),
+        observation_fn=kwargs.pop("observation_fn", categorical_many_hot),
+        observation_space=categorical_many_hot_obs_space_fn(11, 21),
+        reward_fn=kwargs.pop("reward_fn", nx.rewards.on_goal_reached),
+        termination_fn=kwargs.pop("termination_fn", nx.terminations.on_goal_reached),
+        height=11,
+        width=21,
+        max_steps=2000,
+        spec="nav_random_goal_01",
         *args,
     ),
 )
@@ -360,8 +390,8 @@ nx.register_env(
     "Navix-DMLab-Maze-F-02-v0",
     lambda *args, **kwargs: ASCIIMaze.create(
         # observation_fn=kwargs.pop("observation_fn", nx.observations.categorical_first_person),
-        observation_fn=kwargs.pop("observation_fn", observations.symbolic),
-        # observation_space=categorical_obs_space_fn(19, 31),
+        observation_fn=kwargs.pop("observation_fn", categorical_many_hot),
+        observation_space=categorical_many_hot_obs_space_fn(19, 31),
         reward_fn=kwargs.pop("reward_fn", nx.rewards.on_goal_reached),
         termination_fn=kwargs.pop("termination_fn", nx.terminations.on_goal_reached),
         height=19,
@@ -406,8 +436,8 @@ nx.register_env(
     "Navix-DMLab-Maze-F-03-v0",
     lambda *args, **kwargs: ASCIIMaze.create(
         # observation_fn=kwargs.pop("observation_fn", nx.observations.categorical_first_person),
-        observation_fn=kwargs.pop("observation_fn", observations.symbolic),
-        # observation_space=categorical_obs_space_fn(27, 41),
+        observation_fn=kwargs.pop("observation_fn", categorical_many_hot),
+        observation_space=categorical_many_hot_obs_space_fn(27, 41),
         reward_fn=kwargs.pop("reward_fn", nx.rewards.on_goal_reached),
         termination_fn=kwargs.pop("termination_fn", nx.terminations.on_goal_reached),
         height=27,
