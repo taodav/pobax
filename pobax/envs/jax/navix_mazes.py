@@ -224,10 +224,26 @@ def categorical_one_hot(state: State):
     return jnp.concatenate((one_hot_player[..., None], one_hot_goal[..., None], one_hot_wall[..., None],
                             one_hot_direction), axis=-1)
 
+def categorical_many_hot(state: State):
+    grid = state.grid
+    h, w = grid.shape
+    player = state.entities['player']
+    goal = state.entities['goal']
+    agent_r, agent_c = jnp.squeeze(player.position)
+    goal_r, goal_c = jnp.squeeze(goal.position)
+    player_r_one_hot = jnp.zeros(h).at[agent_r].set(1)
+    player_c_one_hot = jnp.zeros(w).at[agent_c].set(1)
+    goal_r_one_hot = jnp.zeros(h).at[goal_r].set(1)
+    goal_c_one_hot = jnp.zeros(w).at[goal_c].set(1)
+    dir_one_hot = jnp.zeros(4).at[jnp.squeeze(player.direction)].set(1)
+    return jnp.concatenate([player_r_one_hot, player_c_one_hot,
+                            goal_r_one_hot, goal_c_one_hot,
+                            dir_one_hot])
 
 radius = nx.observations.RADIUS
 categorical_first_person_obs_space = nx.spaces.Discrete.create(n_elements=9, shape=(radius + 1, radius * 2 + 1, 2))
 # categorical_obs_space_fn = lambda h, w : nx.spaces.Discrete.create(n_elements=9, shape=(h, w, 3 + 4))
+categorical_many_hot_obs_space_fn = lambda h, w : nx.spaces.Discrete.create(n_elements=9, shape=(2 * (h + w) + 4))
 
 nx.register_env(
     "Navix-DMLab-Maze-00-v0",
@@ -249,8 +265,11 @@ nx.register_env(
     "Navix-DMLab-Maze-F-00-v0",
     lambda *args, **kwargs: ASCIIMaze.create(
         # observation_fn=kwargs.pop("observation_fn", nx.observations.categorical_first_person),
-        observation_fn=kwargs.pop("observation_fn", observations.symbolic),
+        # observation_fn=kwargs.pop("observation_fn", observations.symbolic),
         # observation_space=categorical_obs_space_fn(9, 14),
+
+        observation_fn=kwargs.pop("observation_fn", categorical_many_hot),
+        observation_space=categorical_many_hot_obs_space_fn(9, 14),
         reward_fn=kwargs.pop("reward_fn", nx.rewards.on_goal_reached),
         termination_fn=kwargs.pop("termination_fn", nx.terminations.on_goal_reached),
         height=9,
