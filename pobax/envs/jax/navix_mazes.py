@@ -133,6 +133,10 @@ class ASCIIMaze(NavixEnvironment):
             **kwargs,
     ) -> NavixEnvironment:
 
+        if observation_space is None:
+            observation_space = cls._get_obs_space_from_fn(
+                width, height, observation_fn
+            )
         ascii_str = globals()[spec]
 
         grid = nx.grid.from_ascii_map(ascii_str)
