@@ -8,6 +8,7 @@ from flax import struct
 from gymnax.environments import environment, spaces
 import navix as nx
 from navix.environments import Environment as NavixEnvironment
+import numpy as np
 
 from pobax.envs.wrappers.gymnax import GymnaxWrapper
 from pobax.utils.grid import precompute_rays
@@ -25,14 +26,19 @@ class NavixGymnaxWrapper:
     def default_params(self):
         return environment.EnvParams(max_steps_in_episode=self._env.max_steps)
 
-    def observation_space(self, params) -> spaces.Box:
-        # return spaces.Box(0, 8, (4, 7, 1))
-        return self._env.observation_space
+    def observation_space(self, params):
+        return spaces.Box(
+            low=self._env.observation_space.minimum,
+            high=self._env.observation_space.maximum,
+            shape=(np.prod(self._env.observation_space.shape),),
+            dtype=self._env.observation_space.dtype,
+        )
 
-    def action_space(self, params) -> spaces.Discrete:
-        # Action space here is 3, b/c rest of actions are unused.
+    def action_space(self, params):
+        # return spaces.Discrete(
+        #     num_categories=self._env.action_space.maximum.item() + 1,
+        # )
         return spaces.Discrete(3)
-        # return self._env.action_space
 
     @partial(jax.jit, static_argnums=(0, -1))
     def reset(
