@@ -2,8 +2,8 @@ from pathlib import Path
 
 exp_name = Path(__file__).stem
 
-lrs = [0.00025]
-lambda0s = [0.1]
+lrs = [2.5e-3, 2.5e-4, 2.5e-5, 2.5e-6]
+lambda0s = [0.1, 0.5, 0.7, 0.9, 0.95]
 lambda1s = [0.95]
 alphas = [1]
 ld_weights = [0]
@@ -27,8 +27,8 @@ hparams = {
             'entropy_coeff': 0.01,
             'steps_log_freq': 8,
             'update_log_freq': 10,
-            'total_steps': int(1e7),
-            'seed': [2024 + i for i in range(30)],
+            'total_steps': int(5e6),
+            'seed': [2024 + i for i in range(10)],
             'platform': 'gpu',
             'debug': True,
             'study_name': exp_name

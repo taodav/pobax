@@ -4,6 +4,9 @@ from collections import deque
 from dataclasses import replace
 from functools import partial
 import inspect
+from time import time
+# import os
+# os.environ["CRAFTAX_RELOAD_TEXTURES"] = "True"
 
 import chex
 import flax.training.train_state
@@ -161,7 +164,7 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
             args.num_envs * args.num_steps // args.num_minibatches
     )
     env_key, rand_key = jax.random.split(rand_key)
-    env, env_params = get_env(args.env, env_key,
+    env, env_params = get_env(args.env, env_key, args.num_envs,
                                      gamma=args.gamma,
                                      normalize_image=False,
                                      action_concat=args.action_concat)
@@ -192,7 +195,7 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
     if double_critic:
         # last_val is index 1 here b/c we squeezed earlier.
         _calculate_gae = jax.vmap(calculate_gae,
-                                 in_axes=[transition_axes_map, 1, None, 0],
+                                 in_axes=[transition_axes_map, 1, None, 0, None],
                                  out_axes=2)
 
     def train(vf_coeff, ld_weight, alpha, lambda1, lambda0, lr, rng):
@@ -247,33 +250,36 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
         obsv, env_state = env.reset(reset_rng, env_params)
         init_hstate = ScannedRNN.initialize_carry(args.num_envs, args.hidden_size)
 
-        # We first need to populate our LogEnvState stats.
-        rng, _rng = jax.random.split(rng)
-        init_rng = jax.random.split(_rng, args.num_envs)
-        init_obsv, init_env_state = env.reset(init_rng, env_params)
-        init_init_hstate = ScannedRNN.initialize_carry(args.num_envs, args.hidden_size)
+        if not args.env.startswith("craftax"):
+            print(args.env)
+            # We first need to populate our LogEnvState stats.
+            rng, _rng = jax.random.split(rng)
+            init_rng = jax.random.split(_rng, args.num_envs)
+            init_obsv, init_env_state = env.reset(init_rng, env_params)
+            init_init_hstate = ScannedRNN.initialize_carry(args.num_envs, args.hidden_size)
 
-        init_runner_state = (
-            train_state,
-            env_state,
-            init_obsv,
-            jnp.zeros(args.num_envs, dtype=bool),
-            init_init_hstate,
-            _rng,
-        )
+            init_runner_state = (
+                train_state,
+                env_state,
+                init_obsv,
+                jnp.zeros(args.num_envs, dtype=bool),
+                init_init_hstate,
+                _rng,
+            )
 
-        starting_runner_state, _ = jax.lax.scan(
-            _env_step, init_runner_state, None, env_params.max_steps_in_episode
-        )
+            starting_runner_state, _ = jax.lax.scan(
+                _env_step, init_runner_state, None, env_params.max_steps_in_episode
+            )
 
-        def recursive_replace(env_state, new_env_state, names):
-            if not isinstance(env_state, LogEnvState):
-                return replace(env_state, env_state=recursive_replace(env_state.env_state, new_env_state.env_state, names))
-            new_log_vals = {name: getattr(new_env_state, name) for name in names}
-            return replace(env_state, **new_log_vals)
+            def recursive_replace(env_state, new_env_state, names):
+                if not isinstance(env_state, LogEnvState):
+                    return replace(env_state, env_state=recursive_replace(env_state.env_state, new_env_state.env_state, names))
+                new_log_vals = {name: getattr(new_env_state, name) for name in names}
+                return replace(env_state, **new_log_vals)
 
-        replace_field_names = ['returned_episode_returns', 'returned_discounted_episode_returns', 'returned_episode_lengths']
-        env_state = recursive_replace(env_state, starting_runner_state[1], replace_field_names)
+            replace_field_names = ['returned_episode_returns', 'returned_discounted_episode_returns', 'returned_episode_lengths']
+            env_state = recursive_replace(env_state, starting_runner_state[1], replace_field_names)
+            # jax.debug.print("Training starting: {}", time())
 
         # TRAIN LOOP
         def _update_step(runner_state, i):
@@ -403,31 +409,34 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
         metric = jax.tree.map(update_filter, metric)
 
         # TODO: offline eval here.
-        final_train_state = runner_state[0]
+        # final_train_state = runner_state[0]
 
-        reset_rng = jax.random.split(_rng, args.num_eval_envs)
-        eval_obsv, eval_env_state = env.reset(reset_rng, env_params)
+        # if not args.env.startswith("craftax"):
+        #     reset_rng = jax.random.split(_rng, args.num_envs)
+        # else:
+        #     reset_rng, _rng = jax.random.split(_rng)
+        # eval_obsv, eval_env_state = env.reset(reset_rng, env_params)
 
-        eval_init_hstate = ScannedRNN.initialize_carry(args.num_eval_envs, args.hidden_size)
+        # eval_init_hstate = ScannedRNN.initialize_carry(args.num_envs, args.hidden_size)
 
-        eval_runner_state = (
-            final_train_state,
-            eval_env_state,
-            eval_obsv,
-            jnp.zeros((args.num_eval_envs), dtype=bool),
-            eval_init_hstate,
-            _rng,
-        )
+        # eval_runner_state = (
+        #     final_train_state,
+        #     eval_env_state,
+        #     eval_obsv,
+        #     jnp.zeros((args.num_envs), dtype=bool),
+        #     eval_init_hstate,
+        #     _rng,
+        # )
 
         # COLLECT EVAL TRAJECTORIES
         # eval_runner_state, eval_traj_batch = jax.lax.scan(
         #     _env_step, eval_runner_state, None, env_params.max_steps_in_episode
         # )
-        eval_runner_state, eval_traj_batch = jax.lax.scan(
-            _env_step, eval_runner_state, None, 50
-        )
-
-        res = {"runner_state": runner_state, "metric": metric, 'final_eval_metric': eval_traj_batch.info}
+        # eval_runner_state, eval_traj_batch = jax.lax.scan(
+        #     _env_step, eval_runner_state, None, 5
+        # )
+        res = {"runner_state": runner_state, "metric": metric}
+        # res = {"runner_state": runner_state, "metric": metric, 'final_eval_metric': eval_traj_batch.info}
 
         return res
 
@@ -444,7 +453,7 @@ if __name__ == "__main__":
     make_train_rng, rng = jax.random.split(rng)
     rngs = jax.random.split(rng, args.n_seeds)
     train_fn = make_train(args, make_train_rng)
-
+    print(rngs.shape)
     train_args = list(inspect.signature(train_fn).parameters.keys())
 
     vmaps_train = train_fn
@@ -463,19 +472,24 @@ if __name__ == "__main__":
             swept_args.appendleft(getattr(args, arg))
 
     train_jit = jax.jit(vmaps_train)
+    t = time()
     out = train_jit(*swept_args)
+    new_t = time()
+    total_runtime = new_t - t
+    print('Total runtime:', total_runtime)
 
     # our final_eval_metric returns max_num_steps.
     # we can filter that down by the max episode length amongst the runs.
-    final_eval = out['final_eval_metric']
+    # final_eval = out['final_eval_metric']
 
-    # the +1 at the end is to include the done step
-    largest_episode = final_eval['returned_episode'].argmax(axis=-2).max() + 1
+    # # the +1 at the end is to include the done step
+    # largest_episode = final_eval['returned_episode'].argmax(axis=-2).max() + 1
 
-    def get_first_n_filter(x):
-        return x[..., :largest_episode, :]
-    out['final_eval_metric'] = jax.tree.map(get_first_n_filter, final_eval)
+    # def get_first_n_filter(x):
+    #     return x[..., :largest_episode, :]
+    # out['final_eval_metric'] = jax.tree.map(get_first_n_filter, final_eval)
 
+    final_train_state = out['runner_state'][0]
     if not args.save_runner_state:
         del out['runner_state']
 
@@ -484,7 +498,9 @@ if __name__ == "__main__":
     all_results = {
         'argument_order': train_args,
         'out': out,
-        'args': args.as_dict()
+        'args': args.as_dict(),
+        'total_runtime': total_runtime, 
+        'final_train_state': final_train_state
     }
 
     # Save all results with Orbax
@@ -493,5 +509,4 @@ if __name__ == "__main__":
 
     print(f"Saving results to {results_path}")
     orbax_checkpointer.save(results_path, all_results, save_args=save_args)
-
     print("Done.")

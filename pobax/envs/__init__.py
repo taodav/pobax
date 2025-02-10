@@ -29,7 +29,8 @@ from pobax.envs.wrappers.gymnax import (
     NormalizeVecReward,
     NormalizeVecObservation,
     ActionConcatWrapper,
-    AutoResetEnvWrapper
+    AutoResetEnvWrapper,
+    OptimisticResetVecEnvWrapper
 )
 from pobax.envs.wrappers.pixel import PixelBraxVecEnvWrapper, PixelTMazeVecEnvWrapper, PixelSimpleChainVecEnvWrapper, PixelCraftaxVecEnvWrapper
 from pobax.envs.wrappers.gymnasium import GymnaxToGymWrapper
@@ -64,6 +65,7 @@ masked_gymnax_env_map = {
 brax_envs = ['ant', 'walker2d', 'halfcheetah', 'hopper', 'ant_pixels', 'walker2d_pixels', 'halfcheetah_pixels', 'hopper_pixels']
 
 # craftax_envs = ['Craftax-Symbolic-v1', 'Craftax-Pixels-v1', 'Craftax-Classic-Symbolic-v1', 'Craftax-Classic-Pixels-v1']
+# craftax_envs = ['craftax', 'craftax_pixels']
 craftax_envs = {'craftax': 'Craftax-Symbolic-v1', 'craftax_pixels': 'Craftax-Pixels-v1', 'craftax_classic': 'Craftax-Classic-Symbolic-v1', 'craftax_classic_pixels': 'Craftax-Classic-Pixels-v1'}
 
 def is_jax_env(env_name: str):
@@ -117,6 +119,7 @@ def load_craftax_env(env_str: str,
 
 def get_env(env_name: str,
             rand_key: random.PRNGKey,
+            num_envs: int,
             normalize_env: bool = False,
             normalize_image: bool = True,
             gamma: float = 0.99,
@@ -214,7 +217,7 @@ def get_env(env_name: str,
 
     # Vectorize our environment
     env = VecEnv(env)
-    if env_name.endswith('pixels'):
+    if env_name.endswith('pixels') and env_name in craftax_envs.keys():
         env = PixelCraftaxVecEnvWrapper(env, normalize=normalize_image)
     print(f'normalized env: {normalize_env}')
     if normalize_env:

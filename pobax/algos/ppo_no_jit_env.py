@@ -3,7 +3,7 @@ from time import time
 import os
 
 # Set the MUJOCO_GL environment variable to use EGL
-# os.environ['MUJOCO_GL'] = 'egl'
+os.environ['MUJOCO_GL'] = 'egl'
 import chex
 from flax.training import orbax_utils
 from flax.training.train_state import TrainState
@@ -293,7 +293,7 @@ if __name__ == "__main__":
     # final evaluation
     eval_res = []
     # max_steps_in_episode = env.max_steps_in_episode if hasattr(env, 'max_steps_in_episode') else args.default_max_steps_in_episode
-    max_steps_in_episode = 50
+    max_steps_in_episode = 5
     # For now, we use num_eval_envs as a surrogate for num eval episodes
     for i in range(args.num_eval_envs):
         # INIT ENV

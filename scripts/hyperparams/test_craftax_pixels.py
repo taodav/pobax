@@ -31,9 +31,9 @@ hparams = {
             'num_minibatches': 4,
             'num_steps': 16,
             'num_envs': 256,
-            'total_steps': int(1e9),
-            'seed': [2020 + i for i in range(3)],
-            'n_seeds': 1,
+            'total_steps': int(1e6),
+            'seed': 2020,
+            'n_seeds': 3,
             'platform': 'gpu',
             'debug': True,
             'study_name': exp_name

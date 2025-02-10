@@ -11,7 +11,7 @@ ld_weights = [0]
 hparams = {
     'file_name':
         f'runs_{exp_name}.txt',
-    'entry': '-m pobax.algos.ppo_no_jit_env',
+    'entry': '-m pobax.algos.ppo',
     'args': [
         {
             'env': 'craftax',
@@ -33,7 +33,7 @@ hparams = {
             'num_envs': 256,
             'total_steps': int(1e6),
             'seed': 2020,
-            'n_seeds': 1,
+            'n_seeds': 30,
             'platform': 'gpu',
             'debug': True,
             'study_name': exp_name
