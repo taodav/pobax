@@ -13,11 +13,6 @@ import numpy as np
 from pobax.envs.wrappers.gymnax import GymnaxWrapper
 from pobax.utils.grid import precompute_rays
 
-@struct.dataclass
-class NavixState:
-    timestep: nx.environments.Timestep
-
-
 class NavixGymnaxWrapper:
     def __init__(self, env: NavixEnvironment):
         self._env = env
@@ -43,25 +38,21 @@ class NavixGymnaxWrapper:
     @partial(jax.jit, static_argnums=(0, -1))
     def reset(
             self, key: chex.PRNGKey, params: Optional[environment.EnvParams] = None
-    ) -> Tuple[chex.Array, NavixState]:
+    ) -> Tuple[chex.Array, nx.environments.Timestep]:
         timestep = self._env.reset(key)
-        state = NavixState(timestep=timestep)
 
-        return timestep.observation, state
+        return timestep.observation, timestep
 
     @partial(jax.jit, static_argnums=(0, -1))
     def step(
             self,
             key: chex.PRNGKey,
-            state: NavixState,
+            state: nx.environments.Timestep,
             action: int,
             params: Optional[environment.EnvParams] = None,
-    ) -> Tuple[chex.Array, NavixState, float, bool, dict]:
-        timestep = self._env.step(state.timestep, action)
-        state = NavixState(timestep=timestep)
-
-        done = jnp.logical_or((timestep.step_type == 1), (timestep.step_type == 2))
-        return timestep.observation, state, timestep.reward, done, timestep.info
+    ) -> Tuple[chex.Array, nx.environments.Timestep, float, bool, dict]:
+        timestep = self._env.step(state, action)
+        return timestep.observation, timestep, timestep.reward, timestep.is_done(), {}
 
 # class
 
