@@ -218,7 +218,7 @@ def get_env(env_name: str,
         print(f"Overwriting args gamma {gamma} with env gamma {env.gamma}.")
         gamma = env.gamma
 
-    if action_concat and len(env.observation_space(env_params).shape) == 1:
+    if action_concat:
         env = ActionConcatWrapper(env)
 
     env = LogWrapper(env, gamma=gamma)

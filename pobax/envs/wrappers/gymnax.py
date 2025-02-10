@@ -10,6 +10,7 @@ from gymnax.environments import environment, spaces
 import jax
 import jax.numpy as jnp
 import numpy as np
+from sympy.physics.units import action
 
 
 class GymnaxWrapper(object):
@@ -466,25 +467,42 @@ class ActionConcatWrapper(GymnaxWrapper):
     def observation_space(self, params) -> spaces.Box:
         og_obs_space_shape = self._env.observation_space(params).shape
 
-        if len(og_obs_space_shape) > 1:
+        if len(og_obs_space_shape) == 1:
+            shape = (og_obs_space_shape[0] + self.action_size(params),)
+        elif len(og_obs_space_shape) == 3:
+            # images
+            shape = (og_obs_space_shape[0], og_obs_space_shape[1], og_obs_space_shape[2] + self.action_size(params))
+        else:
             raise NotImplementedError
 
         return spaces.Box(
             low=self._env.observation_space(params).low,
             high=self._env.observation_space(params).high,
-            shape=(og_obs_space_shape[0] + self.action_size(params),),
+            shape=shape,
             dtype=self._env.observation_space(params).dtype,
         )
 
-    @partial(jax.jit, static_argnums=(0,))
+    @partial(jax.jit, static_argnums=(0,-1))
     def reset(
             self, key: chex.PRNGKey, params: Optional[environment.EnvParams] = None
     ) -> Tuple[chex.Array, environment.EnvState]:
         action_vec = jnp.zeros(self.action_size(params))
         obs, state = self._env.reset(key, params)
-        return jnp.concatenate([obs, action_vec]), state
+        obs_shape = self.observation_space(params).shape
+        if len(obs_shape) == 1:
+            obs = jnp.concatenate([obs, action_vec])
 
-    @partial(jax.jit, static_argnums=(0,))
+        elif len(obs_shape) == 3:
+            action_vec = action_vec[None, None, ...]
+            h, w, c = obs_shape
+            action_img = action_vec.repeat(h, axis=0).repeat(w, axis=1)
+            obs = jnp.concatenate([obs, action_img], axis=-1)
+        else:
+            raise NotImplementedError
+
+        return obs, state
+
+    @partial(jax.jit, static_argnums=(0,-1))
     def step(
             self,
             key: chex.PRNGKey,
@@ -500,10 +518,18 @@ class ActionConcatWrapper(GymnaxWrapper):
         if isinstance(action_space, spaces.Discrete):
             action_vec = jnp.eye(action_space.n)[action]
 
-        obs = jnp.concatenate([obs, action_vec])
+        obs_shape = self.observation_space(params).shape
+        if len(obs_shape) == 1:
+            obs = jnp.concatenate([obs, action_vec])
+
+        elif len(obs_shape) == 3:
+            action_vec = action_vec[None, None, ...]
+            h, w, c = obs_shape
+            action_img = action_vec.repeat(h, axis=0).repeat(w, axis=1)
+            obs = jnp.concatenate([obs, action_img], axis=-1)
+        else:
+            raise NotImplementedError
         return obs, state, reward, done, info
-
-
 
 
 
