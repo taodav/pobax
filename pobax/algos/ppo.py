@@ -22,7 +22,7 @@ from pobax.config import PPOHyperparams
 from pobax.envs import get_env
 from pobax.envs.wrappers.gymnax import LogEnvState
 from pobax.models import get_gymnax_network_fn, ScannedRNN
-from pobax.utils.file_system import get_results_path
+from pobax.utils.file_system import get_results_path, numpyify
 
 
 class Transition(NamedTuple):
@@ -503,6 +503,8 @@ if __name__ == "__main__":
         'total_runtime': total_runtime,
         'final_train_state': final_train_state
     }
+
+    all_results = jax.tree.map(numpyify, all_results)
 
     # Save all results with Orbax
     orbax_checkpointer = orbax.checkpoint.PyTreeCheckpointer()

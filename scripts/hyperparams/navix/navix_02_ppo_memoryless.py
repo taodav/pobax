@@ -17,7 +17,7 @@ hparams = {
             'env': 'Navix-DMLab-Maze-02-v0',
             'double_critic': False,
             'memoryless': True,
-            'action_concat': True,
+            'action_concat': False,
             'lr': lrs,
             'anneal_lr': True,
             'hidden_size': 512,
