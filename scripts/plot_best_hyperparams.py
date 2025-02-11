@@ -177,7 +177,7 @@ def find_file_in_dir(file_name: str, base_dir: Path) -> Path:
             return path
 
 if __name__ == "__main__":
-    env_name = 'navix_01_ppo'
+    env_name = 'navix_02_ppo'
 
 
     # normal
@@ -187,7 +187,7 @@ if __name__ == "__main__":
         ('PPO + RNN', Path(ROOT_DIR, 'results', f'{env_name}'), 'purple'),
         # ('PPO + RNN + LD', Path(ROOT_DIR, 'results', f'{env_name}_ppo_LD'), 'blue'),
         ('Memoryless PPO', Path(ROOT_DIR, 'results', f'{env_name}_memoryless'), 'dark gray'),
-        # ('PPO + STATE', Path(ROOT_DIR, 'results', f'{env_name}_observable'), 'green'),
+        ('PPO + STATE', Path(ROOT_DIR, 'results', f'{env_name}_observable'), 'green'),
         # ('PPO', Path(ROOT_DIR, 'results', f'test_craftax_1M'), 'blue'),
         # ('Perfect Memory PPO (NN)', Path(ROOT_DIR, 'results', f'{env_name}_perfect_mem_ppo'), 'pink'),
         # ('PPO (RNN)', Path(ROOT_DIR, 'results', f'{env_name}_ppo'), 'blue'),
