@@ -6,7 +6,7 @@ from navix.rendering.cache import TILE_SIZE
 
 
 def navix_overlay_obs_on_rgb(obs, states, overlay_alpha: float = 30):
-    s = states.env_state.timestep.state
+    s = states.env_state.state
     players = s.entities['player']
     directions, positions = players.direction[:, 0], players.position[:, 0]
 

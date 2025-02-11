@@ -6,6 +6,7 @@ from flax.training.train_state import TrainState
 import jax
 import jax.numpy as jnp
 import numpy as np
+from navix import observations
 import optax
 import orbax.checkpoint
 from PIL import Image
@@ -76,10 +77,10 @@ def env_step(runner_state, unused, agent: PPO, env, env_params):
 if __name__ == "__main__":
     key = jax.random.key(2024)
     n_envs = 2
-    n_steps = 800
+    n_steps = 1000
     key, load_key = jax.random.split(key)
 
-    ckpt_path = Path('/home/taodav/Documents/pobax/results/batch_ppo_test/Navix-DMLab-Maze-00-v0_seed(2020)_time(20250206-144901)_954a54bd39887b7b976219864133b30a')
+    ckpt_path = Path('/Users/ruoyutao/Documents/pobax/results/batch_ppo_test/Navix-DMLab-Maze-F-00-v0_seed(2020)_time(20250210-111846)_27f63b8491a147d8d0fbbcab75f125de')
 
     env, env_params, args, agent, ts = load_train_state(ckpt_path, load_key)
 
@@ -111,7 +112,6 @@ if __name__ == "__main__":
         _env_step, runner_state, jnp.arange(n_steps), n_steps
     )
 
-    obs = np.array(traj_batch.obs[:, 0])
     def numpify_state(leaf):
         if isinstance(leaf, jax._src.prng.PRNGKeyArray):
             leaf = jax.random.key_data(leaf)
@@ -120,7 +120,12 @@ if __name__ == "__main__":
 
     print(f"Collected {n_steps} samples. Turning into MP4 now.")
 
-    np_images = navix_overlay_obs_on_rgb(obs, states)
+    if '-F-' not in args.env:
+        obs = np.array(traj_batch.obs[:, 0])
+        np_images = navix_overlay_obs_on_rgb(obs, states)
+    else:
+        states = [jax.tree.map(lambda x: jnp.array(x[i]), states.env_state.state) for i in states.env_state.t]
+        np_images = [np.array(observations.rgb(s)) for s in states]
 
     # concat_obs = jnp.concatenate((obs[:, 0], obs[:, 1]), axis=1)
     #
