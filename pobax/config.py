@@ -67,6 +67,7 @@ class PPOHyperparams(Tap):
     n_seeds: int = 5
     platform: Literal['cpu', 'gpu'] = 'cpu'
     debug: bool = False
+    show_discounted: bool = False  # For debug plotting, do we show undisc returns or disc returns?
 
     study_name: str = 'batch_ppo_test'
 
