@@ -3,7 +3,7 @@ from pathlib import Path
 exp_name = Path(__file__).stem
 
 lrs = [2.5e-3, 2.5e-4, 2.5e-5, 2.5e-6]
-lambda0s = [0.1, 0.5, 0.7, 0.9, 0.95]
+lambda0s = [0.95]
 
 hparams = {
     'file_name':
@@ -17,8 +17,9 @@ hparams = {
             'memoryless': False,
             'lr': ' '.join(map(str, lrs)),
             'lambda0': lambda0s,
-            'hidden_size': 1024,
-            'entropy_coeff': 0.35,
+            'hidden_size': 512,
+            'entropy_coeff': 0.2,
+            'num_envs': 32,
             'steps_log_freq': 8,
             'update_log_freq': 10,
             'total_steps': int(1e7),
