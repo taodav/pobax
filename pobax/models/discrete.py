@@ -99,7 +99,7 @@ class ImageDiscreteActorCritic(nn.Module):
     def __call__(self, _, x):
         obs, dones = x
 
-        if obs.shape[-2] >= 64:
+        if obs.shape[-2] >= 20:
             embedding = FullImageCNN(hidden_size=self.hidden_size)(obs)
         else:
             embedding = SmallImageCNN(hidden_size=self.hidden_size)(obs)
