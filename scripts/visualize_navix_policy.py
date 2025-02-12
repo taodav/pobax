@@ -80,7 +80,8 @@ if __name__ == "__main__":
     n_steps = 1000
     key, load_key = jax.random.split(key)
 
-    ckpt_path = Path('/Users/ruoyutao/Documents/pobax/results/batch_ppo_test/Navix-DMLab-Maze-F-00-v0_seed(2020)_time(20250210-111846)_27f63b8491a147d8d0fbbcab75f125de')
+    # ckpt_path = Path('/Users/ruoyutao/Documents/pobax/results/navix_01_ppo_memoryless/Navix-DMLab-Maze-01-v0_seed(2024)_time(20250211-104715)_072c9acb4cb4a5a026ed32984afa19ad')
+    ckpt_path = Path('/Users/ruoyutao/Documents/pobax/results/navix_02_ppo/Navix-DMLab-Maze-02-v0_seed(2024)_time(20250210-182201)_ce243ea47b8d2945f871e39d17c230a3')
 
     env, env_params, args, agent, ts = load_train_state(ckpt_path, load_key)
 

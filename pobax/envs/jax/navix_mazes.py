@@ -17,6 +17,7 @@ from navix.rendering.cache import RenderingCache
 from navix.states import State
 from navix.spaces import Space, Discrete
 
+from pobax.utils.grid import agent_centric_map
 import numpy as np
 
 # nav_maze_random_goal_00 = """
@@ -221,43 +222,55 @@ def categorical_one_hot_first_person(state: State):
 
     return jnp.stack((one_hot_wall, one_hot_goal), axis=-1)
 
-def categorical_one_hot(state: State):
-    # Add a channel in the last dimension
-    categorical_obs = nx.observations.categorical(state)
-    player = state.entities['player']
-    player_tag, goal_tag, wall_tag = player.tag[0], state.entities['goal'].tag[0], state.entities['wall'].tag[0]
-    direction_vec = jnp.eye(4)[player.direction][None, ...]
-    one_hot_player = (categorical_obs == player_tag).astype(int)
-    # TODO: encode direction
-    one_hot_wall = (categorical_obs == wall_tag).astype(int)
-    one_hot_goal = (categorical_obs == goal_tag).astype(int)
+def categorical_full_first_person(state: State):
+    wall_map = state.grid
+    goal_map = jnp.zeros_like(wall_map).at[state.entities['goal'].position].set(1)
+    wall_and_goal = jnp.stack((wall_map, goal_map), axis=-1)
 
-    h, w = categorical_obs.shape
-    one_hot_direction = direction_vec.repeat(h, axis=0).repeat(w, axis=1)
+    player = state.get_player()
+    ac_wall_and_goal = agent_centric_map(wall_and_goal, player.position, player.direction)
+    return ac_wall_and_goal
 
-    return jnp.concatenate((one_hot_player[..., None], one_hot_goal[..., None], one_hot_wall[..., None],
-                            one_hot_direction), axis=-1)
-
-def categorical_many_hot(state: State):
-    grid = state.grid
-    h, w = grid.shape
-    player = state.entities['player']
-    goal = state.entities['goal']
-    agent_r, agent_c = jnp.squeeze(player.position)
-    goal_r, goal_c = jnp.squeeze(goal.position)
-    player_r_one_hot = jnp.zeros(h).at[agent_r].set(1)
-    player_c_one_hot = jnp.zeros(w).at[agent_c].set(1)
-    goal_r_one_hot = jnp.zeros(h).at[goal_r].set(1)
-    goal_c_one_hot = jnp.zeros(w).at[goal_c].set(1)
-    dir_one_hot = jnp.zeros(4).at[jnp.squeeze(player.direction)].set(1)
-    return jnp.concatenate([player_r_one_hot, player_c_one_hot,
-                            goal_r_one_hot, goal_c_one_hot,
-                            dir_one_hot])
+# def categorical_one_hot(state: State):
+#     # Add a channel in the last dimension
+#     categorical_obs = nx.observations.categorical(state)
+#     player = state.entities['player']
+#     player_tag, goal_tag, wall_tag = player.tag[0], state.entities['goal'].tag[0], state.entities['wall'].tag[0]
+#     direction_vec = jnp.eye(4)[player.direction][None, ...]
+#     one_hot_player = (categorical_obs == player_tag).astype(int)
+#     # TODO: encode direction
+#     one_hot_wall = (categorical_obs == wall_tag).astype(int)
+#     one_hot_goal = (categorical_obs == goal_tag).astype(int)
+#
+#     h, w = categorical_obs.shape
+#     one_hot_direction = direction_vec.repeat(h, axis=0).repeat(w, axis=1)
+#
+#     return jnp.concatenate((one_hot_player[..., None], one_hot_goal[..., None], one_hot_wall[..., None],
+#                             one_hot_direction), axis=-1)
+#
+# def categorical_many_hot(state: State):
+#     grid = state.grid
+#     h, w = grid.shape
+#     player = state.entities['player']
+#     goal = state.entities['goal']
+#     agent_r, agent_c = jnp.squeeze(player.position)
+#     goal_r, goal_c = jnp.squeeze(goal.position)
+#     player_r_one_hot = jnp.zeros(h).at[agent_r].set(1)
+#     player_c_one_hot = jnp.zeros(w).at[agent_c].set(1)
+#     goal_r_one_hot = jnp.zeros(h).at[goal_r].set(1)
+#     goal_c_one_hot = jnp.zeros(w).at[goal_c].set(1)
+#     dir_one_hot = jnp.zeros(4).at[jnp.squeeze(player.direction)].set(1)
+#     return jnp.concatenate([player_r_one_hot, player_c_one_hot,
+#                             goal_r_one_hot, goal_c_one_hot,
+#                             dir_one_hot])
 
 radius = nx.observations.RADIUS
 categorical_first_person_obs_space = nx.spaces.Discrete.create(n_elements=9, shape=(radius + 1, radius * 2 + 1, 2))
 # categorical_obs_space_fn = lambda h, w : nx.spaces.Discrete.create(n_elements=9, shape=(h, w, 3 + 4))
-categorical_many_hot_obs_space_fn = lambda h, w : nx.spaces.Discrete.create(n_elements=9, shape=(2 * (h + w) + 4))
+
+def categorical_full_obs_space_fn(h, w):
+    one_side = 2 * max(h, w) - 1
+    return nx.spaces.Discrete.create(n_elements=9, shape=(one_side, one_side, 2))
 
 nx.register_env(
     "Navix-DMLab-Maze-00-v0",
@@ -282,8 +295,8 @@ nx.register_env(
         # observation_fn=kwargs.pop("observation_fn", observations.symbolic),
         # observation_space=categorical_obs_space_fn(9, 14),
 
-        observation_fn=kwargs.pop("observation_fn", categorical_many_hot),
-        observation_space=categorical_many_hot_obs_space_fn(9, 14),
+        observation_fn=kwargs.pop("observation_fn", categorical_full_first_person),
+        observation_space=categorical_full_obs_space_fn(9, 14),
         reward_fn=kwargs.pop("reward_fn", nx.rewards.on_goal_reached),
         termination_fn=kwargs.pop("termination_fn", nx.terminations.on_goal_reached),
         height=9,
@@ -328,8 +341,8 @@ nx.register_env(
     "Navix-DMLab-Maze-F-01-v0",
     lambda *args, **kwargs: ASCIIMaze.create(
         # observation_fn=kwargs.pop("observation_fn", nx.observations.categorical_first_person),
-        observation_fn=kwargs.pop("observation_fn", categorical_many_hot),
-        observation_space=categorical_many_hot_obs_space_fn(11, 21),
+        observation_fn=kwargs.pop("observation_fn", categorical_full_first_person),
+        observation_space=categorical_full_obs_space_fn(11, 21),
         reward_fn=kwargs.pop("reward_fn", nx.rewards.on_goal_reached),
         termination_fn=kwargs.pop("termination_fn", nx.terminations.on_goal_reached),
         height=11,
@@ -344,8 +357,8 @@ nx.register_env(
     "Navix-DMLab-TestMaze-F-01-v0",
     lambda *args, **kwargs: ASCIIMaze.create(
         # observation_fn=kwargs.pop("observation_fn", nx.observations.categorical_first_person),
-        observation_fn=kwargs.pop("observation_fn", categorical_many_hot),
-        observation_space=categorical_many_hot_obs_space_fn(11, 21),
+        observation_fn=kwargs.pop("observation_fn", categorical_full_first_person),
+        observation_space=categorical_full_obs_space_fn(11, 21),
         reward_fn=kwargs.pop("reward_fn", nx.rewards.on_goal_reached),
         termination_fn=kwargs.pop("termination_fn", nx.terminations.on_goal_reached),
         height=11,
@@ -390,8 +403,8 @@ nx.register_env(
     "Navix-DMLab-Maze-F-02-v0",
     lambda *args, **kwargs: ASCIIMaze.create(
         # observation_fn=kwargs.pop("observation_fn", nx.observations.categorical_first_person),
-        observation_fn=kwargs.pop("observation_fn", categorical_many_hot),
-        observation_space=categorical_many_hot_obs_space_fn(19, 31),
+        observation_fn=kwargs.pop("observation_fn", categorical_full_first_person),
+        observation_space=categorical_full_obs_space_fn(19, 31),
         reward_fn=kwargs.pop("reward_fn", nx.rewards.on_goal_reached),
         termination_fn=kwargs.pop("termination_fn", nx.terminations.on_goal_reached),
         height=19,
@@ -436,8 +449,8 @@ nx.register_env(
     "Navix-DMLab-Maze-F-03-v0",
     lambda *args, **kwargs: ASCIIMaze.create(
         # observation_fn=kwargs.pop("observation_fn", nx.observations.categorical_first_person),
-        observation_fn=kwargs.pop("observation_fn", categorical_many_hot),
-        observation_space=categorical_many_hot_obs_space_fn(27, 41),
+        observation_fn=kwargs.pop("observation_fn", categorical_full_first_person),
+        observation_space=categorical_full_obs_space_fn(27, 41),
         reward_fn=kwargs.pop("reward_fn", nx.rewards.on_goal_reached),
         termination_fn=kwargs.pop("termination_fn", nx.terminations.on_goal_reached),
         height=27,
