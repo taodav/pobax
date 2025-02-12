@@ -189,6 +189,9 @@ class FullImageCNN(nn.Module):
         flat_out = out4.reshape((*out4.shape[:-num_dims], -1))  # Flatten
         flat_out = nn.relu(flat_out)
 
-        final_out = nn.Dense(features=self.hidden_size)(flat_out)
+        dense_out = nn.Dense(features=self.hidden_size)(flat_out)
+        dense_out = nn.relu(dense_out)
+
+        final_out = nn.Dense(features=self.hidden_size)(dense_out)
         return final_out
 
