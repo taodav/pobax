@@ -123,7 +123,7 @@ class PerfectMemoryWrapper(GymnaxWrapper):
 
         # Ghosts
         x, y = jnp.ogrid[:prev_ghost_map.shape[0], :prev_ghost_map.shape[1]]
-        distance = np.abs(x - pos_row) + np.abs(y - pos_col)
+        distance = jnp.abs(x - pos_row) + jnp.abs(y - pos_col)
         ghost_map = prev_ghost_map.at[distance <= 2].set(obs[5])
         ghost_map = ghost_map.at[pos_row, :pos_col].set(obs[6])
         ghost_map = ghost_map.at[:pos_row, pos_col].set(obs[7])
@@ -202,10 +202,36 @@ class PerfectMemoryWrapper(GymnaxWrapper):
         return obs, next_state, reward, done, info
 
 
-class StateWrapper(GymnaxWrapper):
+class PocManStateWrapper(GymnaxWrapper):
 
     def observation_space(self, params: EnvParams):
-        return gymnax.environments.spaces.Box(0, 1, (11,))
+        return gymnax.environments.spaces.Box(0, 1, (self._env.x_size, self._env.y_size, 4))
+
+    def get_obs(self, state: State) -> jnp.ndarray:
+        pass
+
+    @partial(jax.jit, static_argnums=(0,-1))
+    def reset(
+            self, key: chex.PRNGKey, params: Optional[environment.EnvParams] = None
+    ) -> Tuple[chex.Array, environment.EnvState]:
+        _, state = self._env.reset(key, params)
+        obs = self.get_obs(state)
+        return obs, state
+
+    @partial(jax.jit, static_argnums=(0, -1))
+    def step(
+            self,
+            key: chex.PRNGKey,
+            state: environment.EnvState,
+            action: Union[int, float, jnp.ndarray],
+            params: Optional[environment.EnvParams] = None,
+    ) -> Tuple[chex.Array, environment.EnvState, float, bool, dict]:
+        _, state, reward, done, info = self._env.step(
+            key, state, action, params
+        )
+        obs = self.get_obs(state)
+
+        return obs, state, reward, done, info
 
 
 class PocMan(PacMan, Environment):

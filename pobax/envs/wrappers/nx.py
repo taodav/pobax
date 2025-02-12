@@ -16,6 +16,7 @@ from pobax.utils.grid import precompute_rays
 class NavixGymnaxWrapper:
     def __init__(self, env: NavixEnvironment):
         self._env = env
+        self.gamma = 0.99
 
     @property
     def default_params(self):
