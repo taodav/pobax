@@ -38,6 +38,7 @@ class PPOHyperparams(Tap):
     num_minibatches: int = 4
 
     memoryless: bool = False
+    perfect_memory: bool = False
     double_critic: bool = False
     action_concat: bool = False
 
