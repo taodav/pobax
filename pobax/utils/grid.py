@@ -1,5 +1,5 @@
 # Helpers for agent-centric gridworld mapping
-from jax import lax
+from jax import lax, Array
 import jax.numpy as jnp
 import numpy as np
 
@@ -97,14 +97,72 @@ def precompute_rays(GRID_ROWS: int, GRID_COLS: int, AGENT_R: int, AGENT_C: int):
     return jnp.array(RAYS), jnp.array(ray_lengths)
 
 
+def agent_centric_map(
+        grid: Array, origin: Array, direction: Array, padding_value: int = 0
+) -> Array:
+    """Puts a grid around a given origin, facing a given direction, with a given radius.
+
+    Args:
+        grid (Array): A 2D grid of shape `(height, width)`.
+        origin (Array): The origin of the crop.
+        direction (Array): The direction the crop is facing.
+        padding_value (int, optional): The padding value. Defaults to 0.
+
+    Returns:
+        Array: A cropped grid."""
+    input_shape = grid.shape
+    largest_dim = max(input_shape[0], input_shape[1])
+    radius = largest_dim - 1
+
+    add_padding_axis_0 = largest_dim - input_shape[0]
+
+    add_padding_axis_1 = largest_dim - input_shape[1]
+
+    # pad with radius
+    padding = [(radius, 0), (radius, 0)]
+    for _ in range(len(input_shape) - 2):
+        padding.append((0, 0))
+
+    padded = jnp.pad(grid, padding, constant_values=padding_value)
+
+    # translate the grid such that the agent is `radius` away from the top and left edges
+    translated = jnp.roll(padded, -jnp.asarray(origin), axis=(0, 1))
+
+    # now we need to make it square
+    add_padding = [(0, add_padding_axis_0), (0, add_padding_axis_1)]
+    for _ in range(len(input_shape) - 2):
+        add_padding.append((0, 0))
+    translated_square = jnp.pad(translated, add_padding, constant_values=padding_value)
+
+    # crop such that the agent is in the centre of the grid
+    # cropped = translated[: 2 * radius + 1, : 2 * radius + 1]
+
+    # rotate such that the agent is facing north
+    rotated = lax.switch(
+        direction,
+        (
+            lambda x: jnp.rot90(x, 1),  # 0 = transpose, 1 = flip
+            lambda x: jnp.rot90(x, 2),  # 0 = flip, 1 = flip
+            lambda x: jnp.rot90(x, 3),  # 0 = flip, 1 = transpose
+            lambda x: x,
+        ),
+        translated_square,
+    )
+
+    # cropped = rotated.at[: radius + 1].get(fill_value=padding_value)
+    return jnp.asarray(rotated, dtype=grid.dtype)
+
+
 if __name__ == "__main__":
     grid = jnp.array([
-        [0, 1, 1, 0],
-        [0, 1, 1, 0],
-        [0, 1, 1, 0],
-        [0, 1, 1, 0],
+        [1, 1, 1, 0, 0, 0],
+        [0, 0, 1, 0, 0, 0],
+        [0, 1, 0, 1, 1, 1],
+        [0, 0, 1, 0, 0, 1],
     ], dtype=float)
-    pos = jnp.array([3, 3])
-    ac_map = convert_to_agent_centric_map(grid, pos)
+    # pos = jnp.array([2, 2])
+    pos = jnp.array([2, 2])
+    direction = jnp.array(2)
+    ac_map = agent_centric_map(grid, pos, direction)
     ac_map_np = np.array(ac_map)
     print()
