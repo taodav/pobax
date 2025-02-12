@@ -13,7 +13,7 @@ from pobax.envs.classic import load_pomdp, load_pomdp
 from pobax.envs.jax.compass_world import CompassWorld
 from pobax.envs.jax.fishing import Fishing
 from pobax.envs.jax.pocman import PocMan
-from pobax.envs.jax.pocman import PerfectMemoryWrapper as PMPerfectMemoryWrapper
+from pobax.envs.jax.pocman import PocManStateWrapper as PMPerfectMemoryWrapper
 from pobax.envs.jax.rocksample import RockSample
 from pobax.envs.jax.rocksample import PerfectMemoryWrapper as RSPerfectMemoryWrapper
 from pobax.envs.jax.reacher_pomdp import ReacherPOMDP
