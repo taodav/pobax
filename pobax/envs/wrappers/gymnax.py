@@ -226,10 +226,12 @@ class CraftaxGymnaxWrapper:
         self._env = env
         self.env_params = CraftEnvParams(max_steps_in_episode=self.max_steps_in_episode, craft_env_params=env.default_params)
 
+    @partial(jax.jit, static_argnums=(0,-1))
     def reset(self, key, params=None):
         obs, state = self._env.reset_env(key, params.craft_env_params)
         return obs, state
 
+    @partial(jax.jit, static_argnums=(0,-1))
     def step(self, key, state, action, params=None):
         # Pixel value is already normalized
         next_obs, next_state, reward, done, info = self._env.step_env(key, state, action, params.craft_env_params)

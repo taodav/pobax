@@ -153,6 +153,38 @@ def agent_centric_map(
     return jnp.asarray(rotated, dtype=grid.dtype)
 
 
+def agent_position_map(
+        grid: Array, origin: Array, padding_value: int = 0
+) -> Array:
+    """Puts a grid around a given origin, with a given radius.
+
+    Args:
+        grid (Array): A 2D grid of shape `(height, width)`.
+        origin (Array): The origin of the crop.
+        direction (Array): The direction the crop is facing.
+        padding_value (int, optional): The padding value. Defaults to 0.
+
+    Returns:
+        Array: A cropped grid."""
+    input_shape = grid.shape
+    radius_r, radius_c = input_shape[0] - 1, input_shape[1] - 1
+
+    # pad with radius
+    padding = [(radius_r, 0), (radius_c, 0)]
+    for _ in range(len(input_shape) - 2):
+        padding.append((0, 0))
+
+    padded = jnp.pad(grid, padding, constant_values=padding_value)
+
+    # translate the grid such that the agent is `radius` away from the top and left edges
+    translated = jnp.roll(padded, -jnp.asarray(origin), axis=(0, 1))
+
+    # crop such that the agent is in the centre of the grid
+    # cropped = translated[: 2 * radius + 1, : 2 * radius + 1]
+
+    # cropped = rotated.at[: radius + 1].get(fill_value=padding_value)
+    return jnp.asarray(translated, dtype=grid.dtype)
+
 if __name__ == "__main__":
     grid = jnp.array([
         [1, 1, 1, 0, 0, 0],

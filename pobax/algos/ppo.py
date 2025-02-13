@@ -252,7 +252,6 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
         init_hstate = ScannedRNN.initialize_carry(args.num_envs, args.hidden_size)
 
         if not args.env.startswith("craftax"):
-            print(args.env)
             # We first need to populate our LogEnvState stats.
             rng, _rng = jax.random.split(rng)
             init_rng = jax.random.split(_rng, args.num_envs)
@@ -460,7 +459,6 @@ if __name__ == "__main__":
     make_train_rng, rng = jax.random.split(rng)
     rngs = jax.random.split(rng, args.n_seeds)
     train_fn = make_train(args, make_train_rng)
-    print(rngs.shape)
     train_args = list(inspect.signature(train_fn).parameters.keys())
 
     vmaps_train = train_fn
