@@ -58,7 +58,9 @@ env_name_to_x_upper_lim = {
 }
 
 fully_observable_to_base = {
-    'Navix-DMLab-Maze-F-02-v0': 'Navix-DMLab-Maze-02-v0'
+    'Navix-DMLab-Maze-F-03-v0': 'Navix-DMLab-Maze-03-v0',
+    'Navix-DMLab-Maze-F-02-v0': 'Navix-DMLab-Maze-02-v0',
+    'Navix-DMLab-Maze-F-01-v0': 'Navix-DMLab-Maze-01-v0',
 }
 
 def plot_reses(all_reses: list[tuple], n_rows: int = 2,
@@ -177,7 +179,7 @@ def find_file_in_dir(file_name: str, base_dir: Path) -> Path:
             return path
 
 if __name__ == "__main__":
-    env_name = 'navix_02_ppo'
+    env_name = 'navix_01_ppo'
 
 
     # normal
