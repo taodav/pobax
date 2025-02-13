@@ -1,7 +1,6 @@
 from typing import Union
 
 import gymnasium as gym
-import gymnax.environments.spaces
 from gymnax.environments import environment, spaces
 
 from pobax.envs.jax.battleship import Battleship
@@ -82,3 +81,26 @@ def get_network_fn(env: gym.Env,
 
     return network_fn, obs_shape, action_size
 
+
+def get_transformer_network_fn(env: environment.Environment, env_params: environment.EnvParams):
+    if isinstance(env.action_space(env_params), spaces.Discrete):
+        action_size = env.action_space(env_params).n
+
+        # Check whether we use image observations
+        obs_space_shape = env.observation_space(env_params).shape
+        if len(obs_space_shape) > 1:
+            # assert jnp.all(jnp.array(obs_space_shape[:-1]) == 5)
+            network_fn = ImageDiscreteActorCriticTransformer
+        else:
+            network_fn = DiscreteActorCriticTransformer
+    elif isinstance(env.action_space(env_params), spaces.Box):
+        action_size = env.action_space(env_params).shape[0]
+        obs_space_shape = env.observation_space(env_params).shape
+        if len(obs_space_shape) > 1:
+            # assert jnp.all(jnp.array(obs_space_shape[:-1]) == 5)
+            network_fn = ImageContinuousActorCriticTransformer
+        else:
+            network_fn = ContinuousActorCriticTransformer
+    else:
+        raise NotImplementedError
+    return network_fn, action_size
