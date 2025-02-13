@@ -4,7 +4,6 @@ from typing import Tuple, Optional, Union
 import jax
 import jax.numpy as jnp
 import chex
-from flax import struct
 from gymnax.environments import environment, spaces
 import navix as nx
 from navix.environments import Environment as NavixEnvironment
