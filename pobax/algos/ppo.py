@@ -415,34 +415,31 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
         metric = jax.tree.map(update_filter, metric)
 
         # TODO: offline eval here.
-        # final_train_state = runner_state[0]
+        final_train_state = runner_state[0]
 
-        # if not args.env.startswith("craftax"):
-        #     reset_rng = jax.random.split(_rng, args.num_envs)
-        # else:
-        #     reset_rng, _rng = jax.random.split(_rng)
-        # eval_obsv, eval_env_state = env.reset(reset_rng, env_params)
+        if not args.env.startswith("craftax"):
+            reset_rng = jax.random.split(_rng, args.num_envs)
+        else:
+            reset_rng, _rng = jax.random.split(_rng)
+        eval_obsv, eval_env_state = env.reset(reset_rng, env_params)
 
-        # eval_init_hstate = ScannedRNN.initialize_carry(args.num_envs, args.hidden_size)
+        eval_init_hstate = ScannedRNN.initialize_carry(args.num_envs, args.hidden_size)
 
-        # eval_runner_state = (
-        #     final_train_state,
-        #     eval_env_state,
-        #     eval_obsv,
-        #     jnp.zeros((args.num_envs), dtype=bool),
-        #     eval_init_hstate,
-        #     _rng,
-        # )
+        eval_runner_state = (
+            final_train_state,
+            eval_env_state,
+            eval_obsv,
+            jnp.zeros((args.num_envs), dtype=bool),
+            eval_init_hstate,
+            _rng,
+        )
 
         # COLLECT EVAL TRAJECTORIES
-        # eval_runner_state, eval_traj_batch = jax.lax.scan(
-        #     _env_step, eval_runner_state, None, env_params.max_steps_in_episode
-        # )
-        # eval_runner_state, eval_traj_batch = jax.lax.scan(
-        #     _env_step, eval_runner_state, None, 5
-        # )
-        res = {"runner_state": runner_state, "metric": metric}
-        # res = {"runner_state": runner_state, "metric": metric, 'final_eval_metric': eval_traj_batch.info}
+        eval_runner_state, eval_traj_batch = jax.lax.scan(
+            _env_step, eval_runner_state, None, env_params.max_steps_in_episode
+        )
+        # res = {"runner_state": runner_state, "metric": metric}
+        res = {"runner_state": runner_state, "metric": metric, 'final_eval_metric': eval_traj_batch.info}
 
         return res
 
