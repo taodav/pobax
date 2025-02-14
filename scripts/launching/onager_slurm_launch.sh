@@ -1,6 +1,6 @@
 cd ../../
 
-PRELAUNCH_NAMES='navix_01_ppo navix_01_ppo_memoryless navix_01_ppo_observable'
+PRELAUNCH_NAMES='navix_01_ppo navix_01_ppo_memoryless navix_01_ppo_LD navix_02_ppo navix_02_ppo_memoryless navix_02_ppo_LD navix_03_ppo navix_03_ppo_memoryless navix_03_ppo_LD'
 
 for item in $PRELAUNCH_NAMES;
 do
