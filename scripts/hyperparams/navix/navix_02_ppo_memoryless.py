@@ -25,12 +25,12 @@ hparams = {
             'lambda1': ' '.join(map(str, lambda1s)),
             'alpha': ' '.join(map(str, alphas)),
             'ld_weight': ' '.join(map(str, ld_weights)),
-            'entropy_coeff': 0.01,
+            'entropy_coeff': 0.2,
             'num_steps': 128,
             'num_envs': 32,
             'total_steps': int(2e7),
             'seed': 2024,
-            'n_seeds': 10,
+            'n_seeds': 5,
             'platform': 'gpu',
             'study_name': exp_name
         }

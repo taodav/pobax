@@ -179,7 +179,7 @@ def find_file_in_dir(file_name: str, base_dir: Path) -> Path:
             return path
 
 if __name__ == "__main__":
-    env_name = 'navix_01_ppo'
+    env_name = 'navix_02_ppo'
 
 
     # normal
