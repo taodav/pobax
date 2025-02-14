@@ -2,11 +2,12 @@ from pathlib import Path
 
 exp_name = Path(__file__).stem
 
-lrs = [2.5e-3, 2.5e-4, 2.5e-5, 2.5e-6]
-lambda0s = [0.1, 0.5, 0.7, 0.9, 0.95]
-lambda1s = [0.5]
+lrs = [2.5e-4, 2.5e-5]  # Learning rates
+lambda0s = [0.1, 0.95]
+lambda1s = [0.5, 0.7, 0.95]
 alphas = [1]
-ld_weights = [0]
+ld_weights = [0.25, 0.5]
+vf_coeffs = [0.5]  # Value function coefficients
 
 hparams = {
     'file_name':
@@ -16,8 +17,8 @@ hparams = {
         {
             'env': 'Navix-DMLab-Maze-02-v0',
             'double_critic': False,
-            'memoryless': True,
-            'action_concat': False,
+            'memoryless': False,
+            'action_concat': True,
             'lr': lrs,
             'anneal_lr': True,
             'hidden_size': 512,

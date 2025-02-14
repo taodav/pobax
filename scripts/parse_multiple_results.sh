@@ -1,4 +1,4 @@
-RESULTS_PATHS='../results/navix_02_ppo ../results/navix_02_ppo_memoryless ../results/navix_02_ppo_observable'
+RESULTS_PATHS='../results/navix_01_ppo_memoryless'
 
 for item in $RESULTS_PATHS;
 do
