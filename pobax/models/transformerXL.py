@@ -139,7 +139,6 @@ class Transformer(nn.Module):
         i=0
         for layer in self.tf_layers:
             #out_memory=out_memory.at[:,layer].set(x)
-            
             memory=jnp.concatenate([memories[:,:,i],x[:,None],],axis=-2)
             #memory=jnp.concatenate([memories[:,:,i],x[:,None],],axis=1)
             x = layer(values_keys=memory,queries=x[:,None],pos_embed=pos_embed, mask=mask)

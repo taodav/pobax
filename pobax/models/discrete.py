@@ -390,15 +390,20 @@ class ImageDiscreteActorCriticTransformer(nn.Module):
     
     @nn.compact
     def __call__(self, memories,obs,mask):
-        embedding = FullImageCNN(hidden_size=self.hidden_size)(obs)
+        if obs.shape[-2] >= 20:
+            embedding = FullImageCNN(hidden_size=self.hidden_size)(obs)
+        else:
+            embedding = SmallImageCNN(hidden_size=self.hidden_size)(obs)
         embedding = nn.relu(embedding)
+        embedding = embedding.squeeze(1)
 
         transformer = Transformer(
                                 encoder_size=self.encoder_size,
                                 num_heads=self.num_heads,
                                 qkv_features=self.qkv_features,
                                 num_layers=self.num_layers,gating=self.gating,gating_bias=self.gating_bias)
-        embedding, memory_out = transformer(memories,obs,mask)
+        
+        embedding, memory_out = transformer(memories,embedding,mask)
         actor = DiscreteActor(self.action_dim, hidden_size=self.hidden_size)
         pi = actor(embedding)
 
@@ -418,15 +423,19 @@ class ImageDiscreteActorCriticTransformer(nn.Module):
     @nn.compact
     def model_forward_eval(self, memories,obs,mask):
         """Used during environment rollout (single timestep of obs). And return the memory"""
-        embedding = FullImageCNN(hidden_size=self.hidden_size)(obs)
+        if obs.shape[-2] >= 20:
+            embedding = FullImageCNN(hidden_size=self.hidden_size)(obs)
+        else:
+            embedding = SmallImageCNN(hidden_size=self.hidden_size)(obs)
         embedding = nn.relu(embedding)
+        embedding = embedding.squeeze(1)
 
         transformer = Transformer(
                                 encoder_size=self.encoder_size,
                                 num_heads=self.num_heads,
                                 qkv_features=self.qkv_features,
                                 num_layers=self.num_layers,gating=self.gating,gating_bias=self.gating_bias)
-        embedding,memory_out = transformer.forward_eval(memories,obs,mask)
+        embedding,memory_out = transformer.forward_eval(memories,embedding,mask)
 
         actor = DiscreteActor(self.action_dim, hidden_size=self.hidden_size)
         pi = actor(embedding)
@@ -448,7 +457,10 @@ class ImageDiscreteActorCriticTransformer(nn.Module):
     @nn.compact
     def model_forward_train(self, memories,obs,mask): 
         """Used during training: a window of observation is sent. And don't return the memory"""
-        embedding = FullImageCNN(hidden_size=self.hidden_size)(obs)
+        if obs.shape[-2] >= 20:
+            embedding = FullImageCNN(hidden_size=self.hidden_size)(obs)
+        else:
+            embedding = SmallImageCNN(hidden_size=self.hidden_size)(obs)
         embedding = nn.relu(embedding)
 
         transformer = Transformer(
@@ -456,7 +468,7 @@ class ImageDiscreteActorCriticTransformer(nn.Module):
                                 num_heads=self.num_heads,
                                 qkv_features=self.qkv_features,
                                 num_layers=self.num_layers,gating=self.gating,gating_bias=self.gating_bias)
-        embedding = transformer.forward_train(memories,obs,mask)
+        embedding = transformer.forward_train(memories,embedding,mask)
 
         actor = DiscreteActor(self.action_dim, hidden_size=self.hidden_size)
         pi = actor(embedding)
