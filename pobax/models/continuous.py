@@ -336,7 +336,10 @@ class ImageContinuousActorCriticTransformer(nn.Module):
     @nn.compact
     def model_forward_train(self, memories,obs,mask): 
         """Used during training: a window of observation is sent. And don't return the memory"""
-        embedding = FullImageCNN(hidden_size=self.hidden_size)(obs)
+        if obs.shape[-2] >= 20:
+            embedding = FullImageCNN(hidden_size=self.hidden_size)(obs)
+        else:
+            embedding = SmallImageCNN(hidden_size=self.hidden_size)(obs)
         embedding = nn.relu(embedding)
 
         transformer = Transformer(
