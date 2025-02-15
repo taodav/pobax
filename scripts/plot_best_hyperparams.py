@@ -57,6 +57,12 @@ env_name_to_x_upper_lim = {
     'tmaze_5': 2e6
 }
 
+fully_observable_to_base = {
+    'Navix-DMLab-Maze-F-03-v0': 'Navix-DMLab-Maze-03-v0',
+    'Navix-DMLab-Maze-F-02-v0': 'Navix-DMLab-Maze-02-v0',
+    'Navix-DMLab-Maze-F-01-v0': 'Navix-DMLab-Maze-01-v0',
+}
+
 def plot_reses(all_reses: list[tuple], n_rows: int = 2,
                individual_runs: bool = False):
     plt.rcParams.update({'font.size': 32})
@@ -173,17 +179,18 @@ def find_file_in_dir(file_name: str, base_dir: Path) -> Path:
             return path
 
 if __name__ == "__main__":
-    env_name = 'test'
+    env_name = 'navix_01_ppo'
+
 
     # normal
     study_paths = [
         # ('$\lambda$-discrepancy + Quantile PPO', Path(ROOT_DIR, 'results', f'{env_name}_quantile_LD_ppo'), 'green'),
         # ('$\lambda$-discrepancy + PPO', Path(ROOT_DIR, 'results', f'{env_name}_LD_ppo'), 'dark gray'),
-        # ('PPO + RNN', Path(ROOT_DIR, 'results', f'{env_name}_ppo'), 'purple'),
+        ('PPO + RNN', Path(ROOT_DIR, 'results', f'{env_name}'), 'purple'),
         # ('PPO + RNN + LD', Path(ROOT_DIR, 'results', f'{env_name}_ppo_LD'), 'blue'),
-        # ('PPO + MEMORYLESS', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_ppo'), 'dark gray'),
-        # ('PPO + MEMORYLESS + No frame', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_ppo_no_frame'), 'green'),
-        ('PPO', Path(ROOT_DIR, 'results', f'test_craftax_1M'), 'blue'),
+        ('Memoryless PPO', Path(ROOT_DIR, 'results', f'{env_name}_memoryless'), 'dark gray'),
+        ('PPO + STATE', Path(ROOT_DIR, 'results', f'{env_name}_observable'), 'green'),
+        # ('PPO', Path(ROOT_DIR, 'results', f'test_craftax_1M'), 'blue'),
         # ('Perfect Memory PPO (NN)', Path(ROOT_DIR, 'results', f'{env_name}_perfect_mem_ppo'), 'pink'),
         # ('PPO (RNN)', Path(ROOT_DIR, 'results', f'{env_name}_ppo'), 'blue'),
         # ('PPO (NN)', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_ppo'), 'dark gray'),
@@ -216,6 +223,15 @@ if __name__ == "__main__":
 
         with open(study_path / fname, "rb") as f:
             best_res = pickle.load(f)
+            new_envs = []
+            for env in best_res['envs']:
+                if env in fully_observable_to_base:
+                    best_res['hyperparams'][fully_observable_to_base[env]] = best_res['hyperparams'][env]
+                    del best_res['hyperparams'][env]
+                    new_envs.append(fully_observable_to_base[env])
+                else:
+                    new_envs.append(env)
+            best_res['envs'] = new_envs
 
         all_reses.append((name, best_res, color))
 

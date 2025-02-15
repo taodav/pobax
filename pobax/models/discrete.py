@@ -100,10 +100,10 @@ class ImageDiscreteActorCritic(nn.Module):
     def __call__(self, _, x):
         obs, dones = x
 
-        # if obs.shape[-2] >= 64:
-        embedding = FullImageCNN(hidden_size=self.hidden_size)(obs)
-        # else:
-        #     embedding = SmallImageCNN(hidden_size=self.hidden_size)(obs)
+        if obs.shape[-2] >= 20:
+            embedding = FullImageCNN(hidden_size=self.hidden_size)(obs)
+        else:
+            embedding = SmallImageCNN(hidden_size=self.hidden_size)(obs)
         embedding = nn.relu(embedding)
 
         actor = DiscreteActor(self.action_dim, hidden_size=self.hidden_size)
@@ -402,6 +402,7 @@ class ImageDiscreteActorCriticTransformer(nn.Module):
                                 num_heads=self.num_heads,
                                 qkv_features=self.qkv_features,
                                 num_layers=self.num_layers,gating=self.gating,gating_bias=self.gating_bias)
+        
         embedding, memory_out = transformer(memories,embedding,mask)
         actor = DiscreteActor(self.action_dim, hidden_size=self.hidden_size)
         pi = actor(embedding)

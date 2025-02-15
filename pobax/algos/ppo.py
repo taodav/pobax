@@ -22,7 +22,7 @@ from pobax.config import PPOHyperparams
 from pobax.envs import get_env
 from pobax.envs.wrappers.gymnax import LogEnvState
 from pobax.models import get_gymnax_network_fn, ScannedRNN
-from pobax.utils.file_system import get_results_path
+from pobax.utils.file_system import get_results_path, numpyify
 
 
 class Transition(NamedTuple):
@@ -167,6 +167,7 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
     env, env_params = get_env(args.env, env_key, args.num_envs,
                                      gamma=args.gamma,
                                      normalize_image=False,
+                                     perfect_memory=args.perfect_memory,
                                      action_concat=args.action_concat)
 
     if hasattr(env, 'gamma'):
@@ -253,7 +254,6 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
         init_hstate = ScannedRNN.initialize_carry(args.num_envs, args.hidden_size)
 
         if not args.env.startswith("craftax"):
-            print(args.env)
             # We first need to populate our LogEnvState stats.
             rng, _rng = jax.random.split(rng)
             init_rng = jax.random.split(_rng, args.num_envs)
@@ -380,10 +380,16 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
                     timesteps = (
                             info["timestep"][info["returned_episode"]] * args.num_envs
                     )
-                    avg_return_values = jnp.mean(info["returned_episode_returns"][info["returned_episode"]])
+                    if args.show_discounted:
+                        show_str = "avg discounted return"
+                        avg_return_values = jnp.mean(info["returned_discounted_episode_returns"][info["returned_episode"]])
+                    else:
+                        show_str = "avg episodic return"
+                        avg_return_values = jnp.mean(info["returned_episode_returns"][info["returned_episode"]])
+
                     if len(timesteps) > 0:
                         print(
-                            f"timesteps={timesteps[0]} - {timesteps[-1]}, avg episodic return={avg_return_values:.2f}"
+                            f"timesteps={timesteps[0]} - {timesteps[-1]}, {show_str}={avg_return_values:.2f}"
                         )
 
                 jax.debug.callback(callback, metric)
@@ -455,7 +461,6 @@ if __name__ == "__main__":
     make_train_rng, rng = jax.random.split(rng)
     rngs = jax.random.split(rng, args.n_seeds)
     train_fn = make_train(args, make_train_rng)
-    print(rngs.shape)
     train_args = list(inspect.signature(train_fn).parameters.keys())
 
     vmaps_train = train_fn
@@ -482,7 +487,8 @@ if __name__ == "__main__":
 
     # our final_eval_metric returns max_num_steps.
     # we can filter that down by the max episode length amongst the runs.
-    # final_eval = out['final_eval_metric']
+    final_eval = out['final_eval_metric']
+    final_train_state = out['runner_state'][0]
 
     # # the +1 at the end is to include the done step
     # largest_episode = final_eval['returned_episode'].argmax(axis=-2).max() + 1
@@ -501,9 +507,11 @@ if __name__ == "__main__":
         'argument_order': train_args,
         'out': out,
         'args': args.as_dict(),
-        'total_runtime': total_runtime, 
+        'total_runtime': total_runtime,
         'final_train_state': final_train_state
     }
+
+    all_results = jax.tree.map(numpyify, all_results)
 
     # Save all results with Orbax
     orbax_checkpointer = orbax.checkpoint.PyTreeCheckpointer()

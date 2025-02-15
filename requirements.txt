@@ -13,3 +13,4 @@ brax
 gymnax
 distrax
 jumanji
+navix

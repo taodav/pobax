@@ -12,6 +12,7 @@ from jumanji.environments.routing.pac_man import PacMan, State
 from jumanji.environments.routing.pac_man.generator import AsciiGenerator
 import numpy as np
 
+from pobax.utils.grid import agent_centric_map
 from pobax.envs.wrappers.gymnax import GymnaxWrapper
 
 # It's important for [0, 0] to be an unreachable spot,
@@ -123,7 +124,7 @@ class PerfectMemoryWrapper(GymnaxWrapper):
 
         # Ghosts
         x, y = jnp.ogrid[:prev_ghost_map.shape[0], :prev_ghost_map.shape[1]]
-        distance = np.abs(x - pos_row) + np.abs(y - pos_col)
+        distance = jnp.abs(x - pos_row) + jnp.abs(y - pos_col)
         ghost_map = prev_ghost_map.at[distance <= 2].set(obs[5])
         ghost_map = ghost_map.at[pos_row, :pos_col].set(obs[6])
         ghost_map = ghost_map.at[:pos_row, pos_col].set(obs[7])
@@ -202,10 +203,59 @@ class PerfectMemoryWrapper(GymnaxWrapper):
         return obs, next_state, reward, done, info
 
 
-class StateWrapper(GymnaxWrapper):
+class PocManStateWrapper(GymnaxWrapper):
 
     def observation_space(self, params: EnvParams):
-        return gymnax.environments.spaces.Box(0, 1, (11,))
+        one_side = 2 * max(self._env.x_size, self._env.y_size) - 1
+        return gymnax.environments.spaces.Box(0, 1, (one_side, one_side, 2))
+
+    def get_obs(self, state: State) -> jnp.ndarray:
+        """
+        For get_obs, we need a few channels:
+        player positions
+        ghost positions
+        pellet occupancy
+        """
+        pellet_locs, ghost_locs = state.pellet_locations, state.ghost_locations
+
+        # grid with -1 for walls
+        grid = state.grid * (-1)
+
+        # +1 for pellets
+        grid_with_pellets = grid.at[pellet_locs[:, 0], pellet_locs[:, 1]].set(1)
+
+        # separate channel for ghost locs
+        ghost_grid = jnp.zeros_like(grid).at[ghost_locs[:, 0], ghost_locs[:, 1]].set(1)
+
+        # stack em
+        combined_grids = jnp.stack((grid_with_pellets, ghost_grid), axis=-1)
+
+        # always have player at center
+        position_encoded_grids = agent_centric_map(combined_grids, state.player_locations, jnp.array(3))
+        return position_encoded_grids
+
+    @partial(jax.jit, static_argnums=(0,-1))
+    def reset(
+            self, key: chex.PRNGKey, params: Optional[environment.EnvParams] = None
+    ) -> Tuple[chex.Array, environment.EnvState]:
+        _, state = self._env.reset(key, params)
+        obs = self.get_obs(state)
+        return obs, state
+
+    @partial(jax.jit, static_argnums=(0, -1))
+    def step(
+            self,
+            key: chex.PRNGKey,
+            state: environment.EnvState,
+            action: Union[int, float, jnp.ndarray],
+            params: Optional[environment.EnvParams] = None,
+    ) -> Tuple[chex.Array, environment.EnvState, float, bool, dict]:
+        _, state, reward, done, info = self._env.step(
+            key, state, action, params
+        )
+        obs = self.get_obs(state)
+
+        return obs, state, reward, done, info
 
 
 class PocMan(PacMan, Environment):

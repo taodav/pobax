@@ -286,6 +286,7 @@ class ImageContinuousActorCriticTransformer(nn.Module):
                                 num_heads=self.num_heads,
                                 qkv_features=self.qkv_features,
                                 num_layers=self.num_layers,gating=self.gating,gating_bias=self.gating_bias)
+        
         embedding, memory_out = transformer(memories,embedding,mask)
         actor = ContinuousActor(self.action_dim, hidden_size=self.hidden_size,
                                 activation=self.activation)
@@ -319,6 +320,7 @@ class ImageContinuousActorCriticTransformer(nn.Module):
                                 num_heads=self.num_heads,
                                 qkv_features=self.qkv_features,
                                 num_layers=self.num_layers,gating=self.gating,gating_bias=self.gating_bias)
+        
         embedding,memory_out = transformer.forward_eval(memories,embedding,mask)
 
         actor = ContinuousActor(self.action_dim, hidden_size=self.hidden_size,
@@ -353,6 +355,7 @@ class ImageContinuousActorCriticTransformer(nn.Module):
                                 num_heads=self.num_heads,
                                 qkv_features=self.qkv_features,
                                 num_layers=self.num_layers,gating=self.gating,gating_bias=self.gating_bias)
+        
         embedding = transformer.forward_train(memories,embedding,mask)
 
         actor = ContinuousActor(self.action_dim, hidden_size=self.hidden_size,
