@@ -274,7 +274,10 @@ class ImageContinuousActorCriticTransformer(nn.Module):
     
     @nn.compact
     def __call__(self, memories,obs,mask):
-        embedding = FullImageCNN(hidden_size=self.hidden_size)(obs)
+        if obs.shape[-2] >= 20:
+            embedding = FullImageCNN(hidden_size=self.hidden_size)(obs)
+        else:
+            embedding = SmallImageCNN(hidden_size=self.hidden_size)(obs)
         embedding = nn.relu(embedding)
         embedding = embedding.squeeze(1)
 
@@ -304,7 +307,10 @@ class ImageContinuousActorCriticTransformer(nn.Module):
     @nn.compact
     def model_forward_eval(self, memories,obs,mask):
         """Used during environment rollout (single timestep of obs). And return the memory"""
-        embedding = FullImageCNN(hidden_size=self.hidden_size)(obs)
+        if obs.shape[-2] >= 20:
+            embedding = FullImageCNN(hidden_size=self.hidden_size)(obs)
+        else:
+            embedding = SmallImageCNN(hidden_size=self.hidden_size)(obs)
         embedding = nn.relu(embedding)
         embedding = embedding.squeeze(1)
 
