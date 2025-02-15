@@ -1,6 +1,6 @@
-PRELAUNCH_PATHS='hyperparams/navix/navix_01_ppo.py hyperparams/navix/navix_01_ppo_memoryless.py hyperparams/navix/navix_01_ppo_LD.py hyperparams/navix/navix_02_ppo.py hyperparams/navix/navix_02_ppo_memoryless.py hyperparams/navix/navix_02_ppo_LD.py hyperparams/navix/navix_03_ppo.py hyperparams/navix/navix_03_ppo_memoryless.py hyperparams/navix/navix_03_ppo_LD.py'
+PRELAUNCH_PATHS='battleship/battleship_10_ppo.py battleship/battleship_10_ppo_LD.py battleship/battleship_10_ppo_memoryless.py battleship/battleship_10_ppo_perfect_memory_memoryless.py battleship/battleship_10_ppo_perfect_memory.py'
 
 for item in $PRELAUNCH_PATHS;
 do
-  python onager_write_jobs.py "$item"
+  python onager_write_jobs.py "hyperparams/$item"
 done
