@@ -487,8 +487,7 @@ if __name__ == "__main__":
 
     # our final_eval_metric returns max_num_steps.
     # we can filter that down by the max episode length amongst the runs.
-    final_eval = out['final_eval_metric']
-    final_train_state = out['runner_state'][0]
+    # final_eval = out['final_eval_metric']
 
     # # the +1 at the end is to include the done step
     # largest_episode = final_eval['returned_episode'].argmax(axis=-2).max() + 1
