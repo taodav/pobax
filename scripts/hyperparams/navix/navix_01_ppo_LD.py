@@ -26,7 +26,7 @@ hparams = {
             'lambda1': ' '.join(map(str, lambda1s)),
             'alpha': ' '.join(map(str, alphas)),
             'ld_weight': ' '.join(map(str, ld_weights)),
-            'entropy_coeff': 0.01,
+            'entropy_coeff': 0.02,
             'num_steps': 128,
             'num_envs': 32,
             'total_steps': int(1e7),
