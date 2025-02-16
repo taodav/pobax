@@ -11,7 +11,7 @@ ld_weights = [0]
 hparams = {
     'file_name':
         f'runs_{exp_name}.txt',
-    'entry': 'batch_run_ppo.py',
+    'entry': '-m pobax.algos.ppo',
     'args': [{
         'env': 'rocksample_15_15',
         'double_critic': False,
