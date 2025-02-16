@@ -16,7 +16,7 @@ hparams = {
         {
             'env': 'battleship_10',
             'double_critic': False,
-            'action_concat': True,
+            'action_concat': False,
             'memoryless': True,
             'lr': lrs,
             'lambda0': ' '.join(map(str, lambda0s)),
@@ -29,7 +29,7 @@ hparams = {
             'update_log_freq': 10,
             'total_steps': int(1e7),
             'seed': 2024,
-            'n_seeds': 5,
+            'n_seeds': 10,
             'platform': 'gpu',
             'study_name': exp_name
         }

@@ -16,7 +16,7 @@ hparams = {
     'args': [
         {
             'env': 'Navix-DMLab-Maze-01-v0',
-            'double_critic': False,
+            'double_critic': True,
             'memoryless': False,
             'action_concat': True,
             'lr': lrs,
@@ -28,10 +28,10 @@ hparams = {
             'ld_weight': ' '.join(map(str, ld_weights)),
             'entropy_coeff': 0.01,
             'num_steps': 128,
-            'num_envs': 16,
+            'num_envs': 32,
             'total_steps': int(1e7),
-            'seed': 2024,
-            'n_seeds': 5,
+            'seed': 2025,
+            'n_seeds': 10,
             'platform': 'gpu',
             'study_name': exp_name
         }

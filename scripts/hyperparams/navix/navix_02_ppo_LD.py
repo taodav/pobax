@@ -16,7 +16,7 @@ hparams = {
     'args': [
         {
             'env': 'Navix-DMLab-Maze-02-v0',
-            'double_critic': False,
+            'double_critic': True,
             'memoryless': False,
             'action_concat': True,
             'lr': lrs,
@@ -25,13 +25,13 @@ hparams = {
             'lambda0': lambda0s,
             'lambda1': lambda1s,
             'alpha': ' '.join(map(str, alphas)),
-            'ld_weight': ' '.join(map(str, ld_weights)),
+            'ld_weight': ld_weights,
             'entropy_coeff': 0.01,
             'num_steps': 128,
-            'num_envs': 32,
+            'num_envs': 64,
             'total_steps': int(2e7),
-            'seed': 2024,
-            'n_seeds': 5,
+            'seed': 2025,
+            'n_seeds': 10,
             'platform': 'gpu',
             'study_name': exp_name
         }

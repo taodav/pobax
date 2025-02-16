@@ -179,17 +179,19 @@ def find_file_in_dir(file_name: str, base_dir: Path) -> Path:
             return path
 
 if __name__ == "__main__":
-    env_name = 'navix_01_ppo'
+    env_name = 'battleship_10_ppo'
+    super_dir = 'battleship'
 
 
     # normal
     study_paths = [
         # ('$\lambda$-discrepancy + Quantile PPO', Path(ROOT_DIR, 'results', f'{env_name}_quantile_LD_ppo'), 'green'),
         # ('$\lambda$-discrepancy + PPO', Path(ROOT_DIR, 'results', f'{env_name}_LD_ppo'), 'dark gray'),
-        ('PPO + RNN', Path(ROOT_DIR, 'results', f'{env_name}'), 'purple'),
-        # ('PPO + RNN + LD', Path(ROOT_DIR, 'results', f'{env_name}_ppo_LD'), 'blue'),
-        ('Memoryless PPO', Path(ROOT_DIR, 'results', f'{env_name}_memoryless'), 'dark gray'),
-        ('PPO + STATE', Path(ROOT_DIR, 'results', f'{env_name}_observable'), 'green'),
+        ('PPO + RNN', Path(ROOT_DIR, 'results', super_dir, f'{env_name}'), 'purple'),
+        ('PPO + RNN + LD', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_LD'), 'blue'),
+        ('Memoryless PPO', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_memoryless'), 'dark gray'),
+        ('PPO + STATE', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_perfect_memory'), 'green'),
+        # ('PPO + STATE', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_observable'), 'green'),
         # ('PPO', Path(ROOT_DIR, 'results', f'test_craftax_1M'), 'blue'),
         # ('Perfect Memory PPO (NN)', Path(ROOT_DIR, 'results', f'{env_name}_perfect_mem_ppo'), 'pink'),
         # ('PPO (RNN)', Path(ROOT_DIR, 'results', f'{env_name}_ppo'), 'blue'),
