@@ -14,7 +14,7 @@ hparams = {
     'entry': '-m pobax.algos.ppo',
     'args': [
         {
-            'env': 'Navix-DMLab-Maze-02-v0',
+            'env': 'Navix-DMLab-Maze-03-v0',
             'double_critic': False,
             'memoryless': False,
             'action_concat': True,
@@ -27,8 +27,8 @@ hparams = {
             'ld_weight': ' '.join(map(str, ld_weights)),
             'entropy_coeff': 0.01,
             'num_steps': 128,
-            'num_envs': 32,
-            'total_steps': int(2e7),
+            'num_envs': 64,
+            'total_steps': int(3e7),
             'seed': 2024,
             'n_seeds': 5,
             'platform': 'gpu',
