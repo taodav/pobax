@@ -13,7 +13,7 @@ hparams = {
         {
             'env': 'battleship_10',
             'action_concat': False,
-            'perfect_memory': False,
+            'perfect_memory': True,
             'memoryless': False,
             'lr': lrs,
             'lambda0': ' '.join(map(str, lambda0s)),

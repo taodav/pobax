@@ -179,8 +179,8 @@ def find_file_in_dir(file_name: str, base_dir: Path) -> Path:
             return path
 
 if __name__ == "__main__":
-    env_name = 'rocksample_11_11_ppo'
-    super_dir = 'rocksample_11_11'
+    env_name = 'battleship_10_ppo'
+    super_dir = 'battleship'
 
 
     # normal
