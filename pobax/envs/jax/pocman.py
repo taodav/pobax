@@ -206,8 +206,9 @@ class PerfectMemoryWrapper(GymnaxWrapper):
 class PocManStateWrapper(GymnaxWrapper):
 
     def observation_space(self, params: EnvParams):
-        one_side = 2 * max(self._env.x_size, self._env.y_size) - 1
-        return gymnax.environments.spaces.Box(0, 1, (one_side, one_side, 2))
+        # one_side = 2 * max(self._env.x_size, self._env.y_size) - 1
+        # return gymnax.environments.spaces.Box(0, 1, (one_side, one_side, 2))
+        return gymnax.environments.spaces.Box(0, 1, (self._env.x_size, self._env.y_size, 3))
 
     def get_obs(self, state: State) -> jnp.ndarray:
         """
@@ -224,15 +225,19 @@ class PocManStateWrapper(GymnaxWrapper):
         # +1 for pellets
         grid_with_pellets = grid.at[pellet_locs[:, 0], pellet_locs[:, 1]].set(1)
 
+        # position
+        position_grid = jnp.zeros_like(grid).at[state.player_locations[0], state.player_locations[1]].set(1)
+
         # separate channel for ghost locs
         ghost_grid = jnp.zeros_like(grid).at[ghost_locs[:, 0], ghost_locs[:, 1]].set(1)
 
         # stack em
-        combined_grids = jnp.stack((grid_with_pellets, ghost_grid), axis=-1)
+        combined_grids = jnp.stack((grid_with_pellets, ghost_grid, position_grid), axis=-1)
 
         # always have player at center
-        position_encoded_grids = agent_centric_map(combined_grids, state.player_locations, jnp.array(3))
-        return position_encoded_grids
+        # position_encoded_grids = agent_centric_map(combined_grids, state.player_locations, jnp.array(3))
+        # return position_encoded_grids
+        return combined_grids
 
     @partial(jax.jit, static_argnums=(0,-1))
     def reset(
