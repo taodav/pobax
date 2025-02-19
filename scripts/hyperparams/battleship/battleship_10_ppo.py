@@ -23,6 +23,7 @@ hparams = {
             'alpha': ' '.join(map(str, alphas)),
             'ld_weight': ' '.join(map(str, ld_weights)),
             'hidden_size': 512,
+            'num_envs': 64,
             'entropy_coeff': 0.05,
             'steps_log_freq': 8,
             'update_log_freq': 10,
