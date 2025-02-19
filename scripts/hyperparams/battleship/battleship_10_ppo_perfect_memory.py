@@ -16,7 +16,7 @@ hparams = {
             'perfect_memory': True,
             'memoryless': False,
             'lr': lrs,
-            'lambda0': ' '.join(map(str, lambda0s)),
+            'lambda0': lambda0s,
             'hidden_size': 512,
             'num_envs': 64,
             'entropy_coeff': 0.05,

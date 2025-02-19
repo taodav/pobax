@@ -1,6 +1,6 @@
 cd ../../
 
-PRELAUNCH_NAMES='navix_01_ppo navix_01_ppo_memoryless navix_01_ppo_LD navix_02_ppo navix_02_ppo_memoryless navix_02_ppo_LD navix_03_ppo navix_03_ppo_memoryless navix_03_ppo_LD'
+PRELAUNCH_NAMES='battleship_10_ppo battleship_10_ppo_memoryless battleship_10_ppo_LD battleship_10_ppo_perfect_memory battleship_10_ppo_perfect_memory_memoryless'
 
 for item in $PRELAUNCH_NAMES;
 do
@@ -13,6 +13,6 @@ do
       --venv venv \
       --gpus 1 \
       --partition 3090-gcondo \
-      -x gpu2106,gpu2257 \
+      -x gpu2106,gpu2257,gpu2505 \
       # --tasks-per-node 5
 done
