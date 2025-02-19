@@ -179,16 +179,17 @@ def find_file_in_dir(file_name: str, base_dir: Path) -> Path:
             return path
 
 if __name__ == "__main__":
-    env_name = 'battleship_10_ppo'
-    super_dir = 'battleship'
+    env_name = 'rocksample_15_15'
+    super_dir = 'rocksample_15_15'
 
 
     # normal
     study_paths = [
-        ('PPO + RNN', Path(ROOT_DIR, 'results', super_dir, f'{env_name}'), 'purple'),
-        ('PPO + RNN + LD', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_LD'), 'blue'),
-        ('Memoryless PPO', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_memoryless'), 'dark gray'),
-        ('PPO + STATE', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_perfect_memory'), 'green'),
+        ('RNN', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo'), 'purple'),
+        ('RNN + LD', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_LD'), 'blue'),
+        ('Memoryless', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_memoryless'), 'dark gray'),
+        ('STATE', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_perfect_memory'), 'green'),
+        # ('TRANFORMER', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_transformer'), 'cyan'),
     ]
 
     # best
@@ -232,6 +233,8 @@ if __name__ == "__main__":
 
         if 'all_hyperparams' in best_res:
             step_multiplier = best_res['all_hyperparams']['total_steps'] // best_res['scores'].shape[0]
+        elif 'total_steps' in best_res['hyperparams']:
+            step_multiplier = best_res['hyperparams']['total_steps'] // best_res['scores'].shape[0]
         else:
             hyperparams_dir = study_path.parent.parent / 'scripts' / 'hyperparams'
             study_hparam_filename = study_path.stem + '.py'
