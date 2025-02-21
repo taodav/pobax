@@ -3,7 +3,7 @@ import importlib
 
 exp_name = Path(__file__).stem
 
-lrs = [2.5e-4]
+lrs = [2.5e-3, 2.5e-4, 2.5e-5, 2.5e-6]
 lambda0s = [0.95]
 lambda1s = [0.95]
 alphas = [1]
@@ -15,7 +15,7 @@ hparams = {
     'entry': '-m pobax.algos.ppo',
     'args': [{
         'env': [
-            'Pendulum-F-v0', 'Hopper-F-v0', 'Walker-F-v0', 'Ant-F-v0', 'HalfCheetah-F-v0',
+            'CartPole-F-v0', 'Pendulum-F-v0', 'Hopper-F-v0', 'Walker-F-v0', 'Ant-F-v0', 'HalfCheetah-F-v0',
         ],
         'double_critic': False,
         'memoryless': True,
@@ -28,8 +28,8 @@ hparams = {
         'steps_log_freq': 16,
         'update_log_freq': 20,
         'total_steps': int(5e7),
-        'seed': 2030,
-        'n_seeds': 30,
+        'seed': 2024,
+        'n_seeds': 5,
         'platform': 'gpu',
         'study_name': exp_name
     }]

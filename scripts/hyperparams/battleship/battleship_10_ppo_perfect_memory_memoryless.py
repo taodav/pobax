@@ -18,7 +18,7 @@ hparams = {
             'lr': lrs,
             'lambda0': lambda0s,
             'hidden_size': 512,
-            'num_envs': 64,
+            'num_envs': 32,
             'entropy_coeff': 0.05,
             'steps_log_freq': 8,
             'update_log_freq': 10,
