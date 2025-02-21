@@ -138,14 +138,14 @@ def env_step(runner_state, unused, agent: PPO, env, env_params):
 
 def calculate_gae(traj_batch, last_val, last_done, gae_lambda, gamma):
     def _get_advantages(carry, transition):
-        gae, next_value, next_done, gae_lambda = carry
+        gae, next_value, gae_lambda = carry
         done, value, reward = transition.done, transition.value, transition.reward
-        delta = reward + gamma * next_value * (1 - next_done) - value
-        gae = delta + gamma * gae_lambda * (1 - next_done) * gae
-        return (gae, value, done, gae_lambda), gae
+        delta = reward + gamma * next_value * (1 - done) - value
+        gae = delta + gamma * gae_lambda * (1 - done) * gae
+        return (gae, value, gae_lambda), gae
 
     _, advantages = jax.lax.scan(_get_advantages,
-                                 (jnp.zeros_like(last_val), last_val, last_done, gae_lambda),
+                                 (jnp.zeros_like(last_val), last_val, gae_lambda),
                                  traj_batch, reverse=True, unroll=16)
     target = advantages + traj_batch.value
     return advantages, target
