@@ -206,6 +206,7 @@ def get_env(env_name: str,
         nx_env = nx.make(env_name)
         env = NavixGymnaxWrapper(nx_env)
         env_params = env.default_params
+        # env = FlattenObservationWrapper(env)
         if 'RGB' in env_name:
             print("FoV masking is not implemented yet for RGB features.")
         elif '-F-' not in env_name:
@@ -221,7 +222,7 @@ def get_env(env_name: str,
         print(f"Overwriting args gamma {gamma} with env gamma {env.gamma}.")
         gamma = env.gamma
 
-    if action_concat:
+    if action_concat and not env_name.startswith('craftax'):
         env = ActionConcatWrapper(env)
 
     env = LogWrapper(env, gamma=gamma)
@@ -239,6 +240,7 @@ def get_env(env_name: str,
         env = NormalizeVecReward(env, gamma)
     elif 'rocksample' in env_name:
         env = NormalizeVecReward(env, gamma)
+    print('obs', env.observation_space(env_params).shape)
     return env, env_params
 
 

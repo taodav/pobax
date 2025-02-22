@@ -22,7 +22,7 @@ from pobax.config import TransformerHyperparams
 from pobax.envs import get_env
 from pobax.envs.wrappers.gymnax import LogEnvState
 from pobax.models import get_transformer_network_fn
-from pobax.utils.file_system import get_results_path
+from pobax.utils.file_system import get_results_path, numpyify_and_save
 
 class Transition(NamedTuple):
     done: jnp.ndarray
@@ -119,11 +119,11 @@ class PPO:
         return total_loss, (value_loss, loss_actor, entropy)
 
 def env_step(runner_state, unused, env, network, env_params, args: TransformerHyperparams):
-    train_state, env_state,memories,memories_mask,memories_mask_idx, last_obs,done,step_env_currentloop, rng = runner_state
-                
+    train_state, env_state, memories, memories_mask, memories_mask_idx, last_obs, done, step_env_currentloop, rng = runner_state
+
     # reset memories mask and mask idx in cask of done otherwise mask will consider one more stepif not filled (if filled= 
-    memories_mask_idx=jnp.where(done,args.window_mem ,jnp.clip(memories_mask_idx-1,0,args.window_mem))
-    memories_mask=jnp.where(done[:,None,None,None],jnp.zeros((args.num_envs,args.num_heads,1,args.window_mem+1),dtype=jnp.bool_),memories_mask)
+    memories_mask_idx = jnp.where(done,args.window_mem ,jnp.clip(memories_mask_idx-1,0,args.window_mem))
+    memories_mask = jnp.where(done[:,None,None,None],jnp.zeros((args.num_envs,args.num_heads,1,args.window_mem+1),dtype=jnp.bool_), memories_mask)
                 
     #Update memories mask with the potential additional step taken into account at this step
     memories_mask_idx_ohot=jax.nn.one_hot(memories_mask_idx,args.window_mem+1)
@@ -162,8 +162,8 @@ def calculate_gae(traj_batch, last_val, last_done, gae_lambda, gamma):
     def _get_advantages(carry, transition):
         gae, next_value, next_done, gae_lambda = carry
         done, value, reward = transition.done, transition.value, transition.reward
-        delta = reward + gamma * next_value * (1 - next_done) - value
-        gae = delta + gamma * gae_lambda * (1 - next_done) * gae
+        delta = reward + gamma * next_value * (1 - done) - value
+        gae = delta + gamma * gae_lambda * (1 - done) * gae
         return (gae, value, done, gae_lambda), gae
 
     _, advantages = jax.lax.scan(_get_advantages,
@@ -248,8 +248,8 @@ def make_train(args: TransformerHyperparams, rand_key: jax.random.PRNGKey):
         init_memory=jnp.zeros((2,args.window_mem,args.num_layers,args.embed_size))
         init_mask=jnp.zeros((2,args.num_heads,1,args.window_mem+1),dtype=jnp.bool_)
         network_params = network.init(_rng, init_memory,init_obs,init_mask)
-        # param_count = sum(x.size for x in jax.tree_leaves(network_params))
-        # print('Network params number:', param_count)
+        param_count = sum(x.size for x in jax.tree_leaves(network_params))
+        print('Network params number:', param_count)
 
         if args.anneal_lr:
             tx = optax.chain(
@@ -364,10 +364,16 @@ def make_train(args: TransformerHyperparams, rand_key: jax.random.PRNGKey):
                     timesteps = (
                             info["timestep"][info["returned_episode"]] * args.num_envs
                     )
-                    avg_return_values = jnp.mean(info["returned_episode_returns"][info["returned_episode"]])
+                    if args.show_discounted:
+                        show_str = "avg discounted return"
+                        avg_return_values = jnp.mean(info["returned_discounted_episode_returns"][info["returned_episode"]])
+                    else:
+                        show_str = "avg episodic return"
+                        avg_return_values = jnp.mean(info["returned_episode_returns"][info["returned_episode"]])
+
                     if len(timesteps) > 0:
                         print(
-                            f"timesteps={timesteps[0]} - {timesteps[-1]}, avg episodic return={avg_return_values:.2f}"
+                            f"timesteps={timesteps[0]} - {timesteps[-1]}, {show_str}={avg_return_values:.2f}"
                         )
 
                 jax.debug.callback(callback, metric)
@@ -384,7 +390,7 @@ def make_train(args: TransformerHyperparams, rand_key: jax.random.PRNGKey):
         memories_mask_idx= jnp.zeros((args.num_envs,),dtype=jnp.int32)+(args.window_mem+1)
         done=jnp.zeros((args.num_envs,),dtype=jnp.bool_)
         
-        runner_state = (train_state, env_state,memories,memories_mask,memories_mask_idx, obsv,done,0, _rng)
+        runner_state = (train_state, env_state, memories, memories_mask, memories_mask_idx, obsv,done, 0, _rng)
         runner_state, metric = jax.lax.scan(
             _update_step, runner_state, jnp.arange(num_updates), num_updates
         )
@@ -440,7 +446,7 @@ if __name__ == "__main__":
         'out': out,
         'args': args.as_dict(),
         'total_runtime': total_runtime, 
-        'final_train_state': final_train_state
+        # 'final_train_state': final_train_state
     }
 
     # Save all results with Orbax
@@ -448,5 +454,6 @@ if __name__ == "__main__":
     save_args = orbax_utils.save_args_from_target(all_results)
 
     print(f"Saving results to {results_path}")
+    # numpyify_and_save(results_path, all_results)
     orbax_checkpointer.save(results_path, all_results, save_args=save_args)
     print("Done.")

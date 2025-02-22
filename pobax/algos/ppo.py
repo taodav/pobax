@@ -140,8 +140,8 @@ def calculate_gae(traj_batch, last_val, last_done, gae_lambda, gamma):
     def _get_advantages(carry, transition):
         gae, next_value, next_done, gae_lambda = carry
         done, value, reward = transition.done, transition.value, transition.reward
-        delta = reward + gamma * next_value * (1 - next_done) - value
-        gae = delta + gamma * gae_lambda * (1 - next_done) * gae
+        delta = reward + gamma * next_value * (1 - done) - value
+        gae = delta + gamma * gae_lambda * (1 - done) * gae
         return (gae, value, done, gae_lambda), gae
 
     _, advantages = jax.lax.scan(_get_advantages,

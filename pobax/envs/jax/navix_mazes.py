@@ -488,7 +488,7 @@ nx.register_env(
         height=27,
         width=41,
         max_steps=6000,
-        spec="nav_maze_random_goal_3",
+        spec="nav_maze_random_goal_03",
         *args,
     ),
 )
