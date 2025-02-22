@@ -20,6 +20,8 @@ hparams = {
             'lr': lrs,
             'anneal_lr': True,
             'hidden_size': 512,
+            'embed_size': 220,
+            'window_mem': 256,
             'lambda0': lambda0s,
             'lambda1': ' '.join(map(str, lambda1s)),
             'alpha': ' '.join(map(str, alphas)),
