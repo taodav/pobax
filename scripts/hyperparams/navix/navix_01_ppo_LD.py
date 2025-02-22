@@ -28,7 +28,7 @@ hparams = {
             'ld_weight': ld_weights,
             'entropy_coeff': 0.01,
             'num_steps': 128,
-            'num_envs': 16,
+            'num_envs': 256,
             'total_steps': int(1e7),
             'seed': 2024,
             'n_seeds': 5,

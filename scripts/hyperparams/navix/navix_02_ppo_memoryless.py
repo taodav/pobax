@@ -19,7 +19,7 @@ hparams = {
             'memoryless': True,
             'action_concat': False,
             'lr': lrs,
-            'anneal_lr': False,
+            'anneal_lr': True,
             'hidden_size': 512,
             'lambda0': lambda0s,
             'lambda1': ' '.join(map(str, lambda1s)),
@@ -27,10 +27,10 @@ hparams = {
             'ld_weight': ' '.join(map(str, ld_weights)),
             'entropy_coeff': 0.01,
             'num_steps': 128,
-            'num_envs': 32,
-            'total_steps': int(2e7),
-            'seed': 2024,
-            'n_seeds': 5,
+            'num_envs': 256,
+            'total_steps': int(1e8),
+            'seed': [2024 + i for i in range(5)],
+            'n_seeds': 1,
             'platform': 'gpu',
             'study_name': exp_name
         }
