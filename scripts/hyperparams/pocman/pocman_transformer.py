@@ -18,7 +18,7 @@ hparams = {
             'double_critic': False,
             'action_concat': True,
             'lr': lrs,
-            'lambda0': ' '.join(map(str, lambda0s)),
+            'lambda0': lambda0s,
             'lambda1': ' '.join(map(str, lambda1s)),
             'alpha': ' '.join(map(str, alphas)),
             'ld_weight': ' '.join(map(str, ld_weights)),
