@@ -75,7 +75,10 @@ class SmallImageCNN(nn.Module):
 
     @nn.compact
     def __call__(self, x):
-        num_dims = len(x.shape) - 2
+        if len(x.shape) == 4:
+            num_dims = 3
+        else:
+            num_dims = len(x.shape) - 2  # b x num_envs
         # 10x10 2 dimensions
         if num_dims == 2 and x.shape[-2] == x.shape[-1] and x.shape[-2] == 10:
             out1 = nn.Conv(features=self.hidden_size, kernel_size=5, strides=1, padding=0)(x)
@@ -176,8 +179,10 @@ class FullImageCNN(nn.Module):
 
     @nn.compact
     def __call__(self, x):
-        num_dims = len(x.shape) - 2  # b x num_envs
-
+        if len(x.shape) == 4:
+            num_dims = 3
+        else:
+            num_dims = len(x.shape) - 2  # b x num_envs
         out1 = nn.Conv(features=self.num_channels, kernel_size=(7, 7), strides=4)(x)
         out1 = nn.relu(out1)
         out2 = nn.Conv(features=self.num_channels, kernel_size=(5, 5), strides=2)(out1)
@@ -185,7 +190,6 @@ class FullImageCNN(nn.Module):
         out3 = nn.Conv(features=self.num_channels, kernel_size=(3, 3), strides=2)(out2)
         out3 = nn.relu(out3)
         out4 = nn.Conv(features=self.num_channels, kernel_size=(3, 3), strides=2)(out3)
-
         flat_out = out4.reshape((*out4.shape[:-num_dims], -1))  # Flatten
         flat_out = nn.relu(flat_out)
 
