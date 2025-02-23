@@ -21,7 +21,7 @@ hparams = {
         'action_concat': True,
         'memoryless': False,
         'lr': ' '.join(map(str, lrs)),
-        'lambda0': ' '.join(map(str, lambda0s)),
+        'lambda0': lambda0s,
         'lambda1': ' '.join(map(str, lambda1s)),
         'alpha': ' '.join(map(str, alphas)),
         'ld_weight': ' '.join(map(str, ld_weights)),
