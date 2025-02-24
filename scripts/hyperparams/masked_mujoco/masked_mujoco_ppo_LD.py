@@ -15,8 +15,7 @@ hparams = {
     'entry': '-m pobax.algos.ppo',
     'args': [{
         'env': [
-            'CartPole-P-v0', 'Pendulum-P-v0', 'Hopper-P-v0', 'Walker-P-v0', 'Ant-P-v0', 'HalfCheetah-P-v0',
-            'CartPole-V-v0', 'Pendulum-V-v0', 'Hopper-V-v0', 'Walker-V-v0', 'Ant-V-v0', 'HalfCheetah-V-v0',
+            'Walker-V-v0', 'HalfCheetah-V-v0',
         ],
         'double_critic': True,
         'action_concat': True,
