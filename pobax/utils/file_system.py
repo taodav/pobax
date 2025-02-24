@@ -160,3 +160,8 @@ def get_inner_fn_arguments(fn: FunctionType, inner_fn_name: str = 'train'):
     # Get the arguments of the nested function
     args = inspect.signature(nested_function).parameters
     return list(args.keys())
+
+def numpyify(leaf):
+    if isinstance(leaf, jnp.ndarray):
+        return np.array(leaf)
+    return leaf

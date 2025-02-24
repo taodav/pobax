@@ -75,7 +75,10 @@ class SmallImageCNN(nn.Module):
 
     @nn.compact
     def __call__(self, x):
-        num_dims = len(x.shape) - 2
+        if len(x.shape) == 4:
+            num_dims = 3
+        else:
+            num_dims = len(x.shape) - 2  # b x num_envs
         # 10x10 2 dimensions
         if num_dims == 2 and x.shape[-2] == x.shape[-1] and x.shape[-2] == 10:
             out1 = nn.Conv(features=self.hidden_size, kernel_size=5, strides=1, padding=0)(x)
@@ -106,6 +109,37 @@ class SmallImageCNN(nn.Module):
             out2 = nn.relu(out2)
             conv_out = nn.Conv(features=self.hidden_size, kernel_size=(3, 3), strides=1, padding=0)(out2)
 
+        elif x.shape[-2] == 7 and x.shape[-3] == 4:
+            out1 = nn.Conv(features=64, kernel_size=(2, 4), strides=1, padding=0)(x)
+            out1 = nn.relu(out1)
+            out2 = nn.Conv(features=128, kernel_size=(2, 3), strides=1, padding=0)(out1)
+            out2 = nn.relu(out2)
+            conv_out = nn.Conv(features=self.hidden_size, kernel_size=(2, 2), strides=1, padding=0)(out2)
+        elif x.shape[-2] == 5 and x.shape[-3] == 3:
+            out1 = nn.Conv(features=64, kernel_size=(2, 3), strides=1, padding=0)(x)
+            out1 = nn.relu(out1)
+            conv_out = nn.Conv(features=128, kernel_size=(2, 2), strides=1, padding=0)(out1)
+            # out2 = nn.relu(out2)
+            # conv_out = nn.Conv(features=self.hidden_size, kernel_size=(2, 2), strides=1, padding=0)(out2)
+
+        elif x.shape[-2] == 3 and x.shape[-3] == 2:
+            out1 = nn.Conv(features=64, kernel_size=(1, 1), strides=1, padding=0)(x)
+            out1 = nn.relu(out1)
+            conv_out = nn.Conv(features=128, kernel_size=(2, 2), strides=1, padding=0)(out1)
+
+        elif x.shape[-2] >= 14:
+            out1 = nn.Conv(features=64, kernel_size=(6, 6), strides=1, padding=0)(x)
+            out1 = nn.relu(out1)
+            out2 = nn.Conv(features=64, kernel_size=(5, 5), strides=1, padding=0)(out1)
+            out2 = nn.relu(out2)
+
+            final_out = out2
+            # if x.shape[-2] >= 20:
+            #     out3 = nn.Conv(features=64, kernel_size=(3, 3), strides=1, padding=0)(out2)
+            #     out3 = nn.relu(out3)
+            #     final_out = out3
+            conv_out = nn.Conv(features=64, kernel_size=(2, 2), strides=1, padding=0)(final_out)
+
         else:
             raise NotImplementedError
 
@@ -132,6 +166,10 @@ class SimpleNN(nn.Module):
         out = nn.Dense(
             self.hidden_size, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
         )(out)
+        out = nn.relu(out)
+        out = nn.Dense(
+            self.hidden_size, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
+        )(out)
         return out
 
 
@@ -141,8 +179,10 @@ class FullImageCNN(nn.Module):
 
     @nn.compact
     def __call__(self, x):
-        num_dims = len(x.shape) - 2  # b x num_envs
-
+        if len(x.shape) == 4:
+            num_dims = 3
+        else:
+            num_dims = len(x.shape) - 2  # b x num_envs
         out1 = nn.Conv(features=self.num_channels, kernel_size=(7, 7), strides=4)(x)
         out1 = nn.relu(out1)
         out2 = nn.Conv(features=self.num_channels, kernel_size=(5, 5), strides=2)(out1)
@@ -150,10 +190,11 @@ class FullImageCNN(nn.Module):
         out3 = nn.Conv(features=self.num_channels, kernel_size=(3, 3), strides=2)(out2)
         out3 = nn.relu(out3)
         out4 = nn.Conv(features=self.num_channels, kernel_size=(3, 3), strides=2)(out3)
-
         flat_out = out4.reshape((*out4.shape[:-num_dims], -1))  # Flatten
         flat_out = nn.relu(flat_out)
 
-        final_out = nn.Dense(features=self.hidden_size)(flat_out)
-        return final_out
+        dense_out = nn.Dense(features=self.hidden_size)(flat_out)
+        dense_out = nn.relu(dense_out)
 
+        final_out = nn.Dense(features=self.hidden_size)(dense_out)
+        return final_out
