@@ -1,0 +1,15 @@
+## SLURM PROLOG ###############################################################
+##    Job ID : 8517071
+##  Job Name : runs_pocman_transformer
+##  Nodelist : gpu2103
+##      CPUs : 
+##  Mem/Node : 32768 MB
+## Directory : /oscar/home/kguo32/pobax/scripts/launching
+##   Job Started : Sat Feb 22 04:11:12 PM EST 2025
+###############################################################################
+Overwriting args gamma 0.99 with env gamma 0.95.
+obs (15,)
+Network params number: 2157309
+Total runtime: 1162.9660007953644
+Saving results to /oscar/home/kguo32/pobax/results/pocman_transformer/pocman_seed(2025)_time(20250222-163044)_64af4c40e9b59bcc4a4357f11b04d9bc
+Done.

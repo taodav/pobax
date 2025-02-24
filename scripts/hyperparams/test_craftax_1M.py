@@ -33,7 +33,7 @@ hparams = {
             'num_envs': 256,
             'total_steps': int(1e6),
             'seed': 2020,
-            'n_seeds': 30,
+            'n_seeds': 3,
             'platform': 'gpu',
             'debug': True,
             'study_name': exp_name

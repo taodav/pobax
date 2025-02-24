@@ -1,0 +1,14 @@
+  0%|          | 0/25 [00:00<?, ?it/s]  0%|          | 0/25 [00:00<?, ?it/s]
+Traceback (most recent call last):
+  File "/oscar/home/kguo32/pobax/scripts/parse_single_seed.py", line 138, in <module>
+    parsed_res = parse_exp_dir(study_path, study_hparam_path, discounted=args.discounted)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/oscar/home/kguo32/pobax/scripts/parse_single_seed.py", line 44, in parse_exp_dir
+    restored = orbax_checkpointer.restore(results_path)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/oscar/home/kguo32/pobax_baseline/lib/python3.11/site-packages/orbax/checkpoint/_src/checkpointers/checkpointer.py", line 234, in restore
+    if not utils.is_checkpoint_finalized(directory):
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/oscar/home/kguo32/pobax_baseline/lib/python3.11/site-packages/orbax/checkpoint/_src/path/step.py", line 550, in is_checkpoint_finalized
+    raise ValueError(f'Path {path} is not a directory. Not a valid checkpoint')
+ValueError: Path /oscar/home/kguo32/pobax/results/rocksample_15_15_transformer/best_hyperparam_per_env_res.pkl is not a directory. Not a valid checkpoint

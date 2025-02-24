@@ -2,9 +2,9 @@ from pathlib import Path
 
 exp_name = Path(__file__).stem
 
-lrs = [0.0003]
-lambda0s = [0.8]
-lambda1s = [0.95]
+lrs = [2.5e-4]
+lambda0s = [0.95]
+lambda1s = [0.5]
 alphas = [1]
 ld_weights = [0]
 
@@ -14,27 +14,25 @@ hparams = {
     'entry': '-m pobax.algos.transformer_xl',
     'args': [
         {
-            'env': 'halfcheetah',
+            'env': 'pocman',
             'double_critic': False,
-            'action_concat': True,
-            'lr': lrs,
+            'action_concat': False,
+            'lr': ' '.join(map(str, lrs)),
             'anneal_lr': True,
             'hidden_size': 256,
-            'lambda0': lambda0s,
+            'lambda0': ' '.join(map(str, lambda0s)),
             'lambda1': ' '.join(map(str, lambda1s)),
             'alpha': ' '.join(map(str, alphas)),
             'ld_weight': ' '.join(map(str, ld_weights)),
             'entropy_coeff': 0.01,
-            'steps_log_freq': 4,
-            'update_log_freq': 8,
-            'num_minibatches': 4,
             'num_steps': 128,
             'num_envs': 4,
             'total_steps': int(1e6),
-            'seed': 2020,
-            'n_seeds': 1,
-            'platform': 'cpu',
+            'seed': 2024,
             'debug': True,
+            'show_discounted': True,
+            'n_seeds': 1,
+            'platform': 'gpu',
             'study_name': exp_name
         }
     ]

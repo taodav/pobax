@@ -11,28 +11,29 @@ ld_weights = [0]
 hparams = {
     'file_name':
         f'runs_{exp_name}.txt',
-    'entry': '-m pobax.algos.ppo',
+    'entry': '-m pobax.algos.transformer_xl',
     'args': [
         {
-            'env': 'Navix-DMLab-Maze-01-v0',
+            'env': 'Navix-DMLab-Maze-02-v0',
             'double_critic': False,
             'memoryless': False,
-            'action_concat': True,
+            'action_concat': False,
             'lr': ' '.join(map(str, lrs)),
             'anneal_lr': True,
-            'hidden_size': 256,
+            'hidden_size': 512,
             'lambda0': ' '.join(map(str, lambda0s)),
             'lambda1': ' '.join(map(str, lambda1s)),
             'alpha': ' '.join(map(str, alphas)),
             'ld_weight': ' '.join(map(str, ld_weights)),
             'entropy_coeff': 0.01,
             'num_steps': 128,
-            'num_envs': 16,
-            'total_steps': int(5e6),
+            'num_envs': 512,
+            'total_steps': int(5e8),
             'seed': 2024,
-            'n_seeds': 5,
-            'platform': 'gpu',
             'debug': True,
+            'n_seeds': 1,
+            'show_discounted': True,
+            'platform': 'gpu',
             'study_name': exp_name
         }
     ]

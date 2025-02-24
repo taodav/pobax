@@ -131,7 +131,7 @@ def parse_exp_dir(study_path, study_hparam_path, discounted: bool = False):
         if discounted:
             online_disc_returns = online_eval['returned_discounted_episode_returns']
 
-        final_eval = restored['out']['final_eval_metric']
+        final_eval = restored['out']['metric']
         # we take the mean over axis=-2 here, since this dimension might be different
         # for the final eval.
         final_n_episodes = final_eval['returned_episode'].sum(axis=-2, keepdims=True)
@@ -302,7 +302,7 @@ def parse_exp_dir(study_path, study_hparam_path, discounted: bool = False):
     parsed_res = {
         'envs': envs,
         'scores': stacked_scores,
-        'final_scores': stacked_final_scores,
+        # 'final_scores': stacked_final_scores,
         'dim_ref': dim_ref,
         'hyperparams': swept_hparams,
         'all_hyperparams': all_hparams

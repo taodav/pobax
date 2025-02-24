@@ -1,0 +1,15 @@
+## SLURM PROLOG ###############################################################
+##    Job ID : 8514325
+##  Job Name : runs_navix_01_ppo
+##  Nodelist : gpu2602
+##      CPUs : 
+##  Mem/Node : 32768 MB
+## Directory : /oscar/home/kguo32/pobax/scripts/launching
+##   Job Started : Sat Feb 22 01:10:32 AM EST 2025
+###############################################################################
+Overwriting args gamma 0.99 with env gamma 0.99.
+obs (2, 3, 5)
+Network params number: 2433828
+Total runtime: 481.09061098098755
+Saving results to /oscar/home/kguo32/pobax/results/navix_01_ppo/Navix-DMLab-Maze-01-v0_seed(2024)_time(20250222-011843)_ca019b0fa7129df4fc5f270fd0484c24
+Done.

@@ -29,7 +29,7 @@ def combine_seeds_and_envs(x: jnp.ndarray):
     mean_over_num_envs = envs_seeds_swapped.mean(axis=-1)
     return mean_over_num_envs
 
-def parse_exp_dir(study_path, study_hparam_path):
+def parse_exp_dir(study_path, study_hparam_path, discounted: bool = False):
     # TODO: THIS
     train_sign_hparams = ['vf_coeff', 'lambda0', 'lr', 'lambda1', 'ld_weight', 'alpha']
     study_paths = list(study_path.iterdir())
@@ -47,7 +47,10 @@ def parse_exp_dir(study_path, study_hparam_path):
         args_tuple = tuple(float(args[train_hparam].item()) for train_hparam in train_sign_hparams)
         # Get online metrics
         online_eval = restored['out']['metric']
-        online_disc_returns = online_eval['returned_episode_returns']
+        if discounted:
+            online_disc_returns = online_eval['returned_discounted_episode_returns']
+        else:
+            online_disc_returns = online_eval['returned_episode_returns']
         # online disc returns has shape (num_updates // update_frequency, num_steps // step_frequency, n_envs)
 
         # final_eval = restored['out']['final_eval_metric']
@@ -95,7 +98,7 @@ def parse_exp_dir(study_path, study_hparam_path):
     envs.append(best_hyperparams['env'])
     # only take the last four dimensions.
     print(max_score.shape)
-    for i in range(len(train_sign_hparams) + 1):
+    for i in range(len(train_sign_hparams)):
         max_score = jnp.squeeze(max_score, axis=0)
     max_score = jnp.expand_dims(max_score, axis=-1)
     parsed_res = {
@@ -111,6 +114,8 @@ def parse_exp_dir(study_path, study_hparam_path):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('study_path', type=str)
+    parser.add_argument('--discounted', action='store_true',
+                        help='Do we discount returns?')
     args = parser.parse_args()
 
     study_path = Path(args.study_path)
@@ -118,7 +123,7 @@ if __name__ == "__main__":
 
     parsed_res_path = study_path / "best_hyperparam_per_env_res.pkl"
 
-    parsed_res = parse_exp_dir(study_path, study_hparam_path)
+    parsed_res = parse_exp_dir(study_path, study_hparam_path, args.discounted)
 
     print(f"Saving parsed results to {parsed_res_path}")
     with open(parsed_res_path, 'wb') as f:
