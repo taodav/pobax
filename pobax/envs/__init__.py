@@ -101,7 +101,7 @@ def load_brax_env(env_str: str, num_envs: int = 4,
     env = BraxGymnaxWrapper(env_str)
     env_params = EnvParams(max_steps_in_episode=env.max_steps_in_episode)
 
-    env = ClipAction(env)
+    # env = ClipAction(env)
 
     return env, env_params
 

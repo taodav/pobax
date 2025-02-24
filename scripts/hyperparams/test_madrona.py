@@ -11,7 +11,7 @@ ld_weights = [0]
 hparams = {
     'file_name':
         f'runs_{exp_name}.txt',
-    'entry': '-m pobax.algos.ppo',
+    'entry': '-m pobax.algos.ppo_madrona',
     'args': [
         {
             'env': 'halfcheetah_pixels',
@@ -27,8 +27,9 @@ hparams = {
             'entropy_coeff': 0.01,
             'steps_log_freq': 8,
             'update_log_freq': 10,
-            'total_steps': int(5e6),
+            'total_steps': int(1e6),
             'seed': 2024,
+            'n_seeds': 1,
             'platform': 'gpu',
             'debug': True,
             'study_name': exp_name

@@ -11,10 +11,10 @@ ld_weights = [0]
 hparams = {
     'file_name':
         f'runs_{exp_name}.txt',
-    'entry': '-m pobax.algos.ppo_no_jit_env',
+    'entry': '-m pobax.algos.ppo_madrona',
     'args': [
         {
-            'env': 'ant_pixels',
+            'env': 'hopper',
             'double_critic': False,
             'memoryless': True,
             'action_concat': True,
@@ -24,11 +24,13 @@ hparams = {
             'alpha': ' '.join(map(str, alphas)),
             'ld_weight': ' '.join(map(str, ld_weights)),
             'hidden_size': 512,
+            'num_envs': 32,
             'entropy_coeff': 0.01,
             'steps_log_freq': 8,
             'update_log_freq': 10,
-            'total_steps': int(5e6),
-            'seed': [2024 + i for i in range(10)],
+            'total_steps': int(1e7),
+            'seed': [2024 + i for i in range(3)],
+            'n_seeds': 1,
             'platform': 'gpu',
             'debug': True,
             'study_name': exp_name

@@ -506,6 +506,51 @@ class ActionConcatWrapper(GymnaxWrapper):
 
         obs = jnp.concatenate([obs, action_vec])
         return obs, state, reward, done, info
+    
+# def _identity_randomization_fn(
+#     sys: System, num_worlds: int
+# ) -> Tuple[System, System]:
+#   """Tile the necessary axes for the Madrona BatchRenderer."""
+#   in_axes = jax.tree_util.tree_map(lambda x: None, sys)
+#   in_axes = in_axes.tree_replace({
+#       'geom_rgba': 0,
+#       'geom_matid': 0,
+#       'geom_size': 0,
+#       'light_pos': 0,
+#       'light_dir': 0,
+#       'light_directional': 0,
+#       'light_castshadow': 0,
+#       'light_cutoff': 0,
+#   })
+
+#   sys = sys.tree_replace({
+#       'geom_rgba': jnp.repeat(
+#           jnp.expand_dims(sys.geom_rgba, 0), num_worlds, axis=0
+#       ),
+#       'geom_matid': jnp.repeat(
+#           jnp.expand_dims(sys.geom_matid, 0), num_worlds, axis=0
+#       ),
+#       'geom_size': jnp.repeat(
+#           jnp.expand_dims(sys.geom_size, 0), num_worlds, axis=0
+#       ),
+#       'light_pos': jnp.repeat(
+#           jnp.expand_dims(sys.light_pos, 0), num_worlds, axis=0
+#       ),
+#       'light_dir': jnp.repeat(
+#           jnp.expand_dims(sys.light_dir, 0), num_worlds, axis=0
+#       ),
+#       'light_directional': jnp.repeat(
+#           jnp.expand_dims(sys.light_directional, 0), num_worlds, axis=0
+#       ),
+#       'light_castshadow': jnp.repeat(
+#           jnp.expand_dims(sys.light_castshadow, 0), num_worlds, axis=0
+#       ),
+#       'light_cutoff': jnp.repeat(
+#           jnp.expand_dims(sys.light_cutoff, 0), num_worlds, axis=0
+#       ),
+#   })
+
+#   return sys, in_axes
 
 def _identity_randomization_fn(
     sys: System, num_worlds: int
@@ -516,7 +561,7 @@ def _identity_randomization_fn(
   return sys, in_axes
 
 
-class MadronaWrapper(Wrapper):
+class MadronaWrapper(GymnaxWrapper):
   """Wrapper to Vmap an environment that uses the Madrona BatchRenderer.
 
   Madrona expects certain MjModel axes to be batched so that the buffers can
@@ -541,6 +586,7 @@ class MadronaWrapper(Wrapper):
           _identity_randomization_fn, num_worlds=num_worlds
       )
     self.sys = self._unwrapped._env.sys
+    print(f'geom_groups: {self.sys.geom_group}')
     self._sys_v, self._in_axes = randomization_fn(self.sys)
 
   def _env_fn(self, sys: System) -> Env:

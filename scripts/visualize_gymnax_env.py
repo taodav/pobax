@@ -14,7 +14,7 @@ import os
 from pobax.envs import get_env
 
 class CollectHyperparams(Tap):
-    env: str = 'ant_pixels'
+    env: str = 'halfcheetah_pixels'
 
     update_idx_to_take: int = None
 
@@ -91,15 +91,9 @@ def make_collect(args: CollectHyperparams, key: chex.PRNGKey):
             env_params
         )
 
-        # runner_state, dataset = jax.lax.scan(
-        #     _env_step, init_runner_state, jnp.arange(steps_to_collect), steps_to_collect
-        # )
-        dataset = []
-        for i in range(steps_to_collect):
-            runner_state, data = _env_step(runner_state, i)
-            dataset.append(data)
-
-        dataset = jax.tree.map(lambda *leaves: jnp.stack(leaves), *dataset)
+        runner_state, dataset = jax.lax.scan(
+            _env_step, runner_state, jnp.arange(steps_to_collect), steps_to_collect
+        )
 
         return dataset
 

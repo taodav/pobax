@@ -1,14 +1,22 @@
 from typing import NamedTuple
-from time import time
+
 from collections import deque
 from dataclasses import replace
 from functools import partial
 import inspect
 import os
+from time import time
 
 # Set the MUJOCO_GL environment variable to use EGL
 # os.environ['MUJOCO_GL'] = 'egl'
-# os.environ['MADRONA_DISABLE_CUDA_HEAP_SIZE'] = '1'
+def limit_jax_mem(limit):
+  os.environ['XLA_PYTHON_CLIENT_MEM_FRACTION'] = f'{limit:.2f}'
+os.environ['MADRONA_DISABLE_CUDA_HEAP_SIZE'] = '1'
+limit_jax_mem(0.1)
+# Tell XLA to use Triton GEMM
+xla_flags = os.environ.get('XLA_FLAGS', '')
+xla_flags += ' --xla_gpu_triton_gemm_any=True'
+os.environ['XLA_FLAGS'] = xla_flags
 import chex
 import flax.training.train_state
 from flax.training.train_state import TrainState
@@ -24,6 +32,7 @@ from pobax.envs import get_env
 from pobax.envs.wrappers.gymnax import LogEnvState
 from pobax.models import get_gymnax_network_fn, ScannedRNN
 from pobax.utils.file_system import get_results_path
+
 
 class Transition(NamedTuple):
     done: jnp.ndarray
@@ -140,8 +149,8 @@ def calculate_gae(traj_batch, last_val, last_done, gae_lambda, gamma):
     def _get_advantages(carry, transition):
         gae, next_value, next_done, gae_lambda = carry
         done, value, reward = transition.done, transition.value, transition.reward
-        delta = reward + gamma * next_value * (1 - next_done) - value
-        gae = delta + gamma * gae_lambda * (1 - next_done) * gae
+        delta = reward + gamma * next_value * (1 - done) - value
+        gae = delta + gamma * gae_lambda * (1 - done) * gae
         return (gae, value, done, gae_lambda), gae
 
     _, advantages = jax.lax.scan(_get_advantages,
@@ -415,32 +424,32 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
         metric = jax.tree.map(update_filter, metric)
 
         # TODO: offline eval here.
-        final_train_state = runner_state[0]
+        # final_train_state = runner_state[0]
 
-        eval_rng = jax.random.split(_rng, args.num_envs)
+        # eval_rng = jax.random.split(_rng, args.num_envs)
         # Probably keep args.num_eval_envs = args.num_envs. It will be faster.
-        eval_obsv, eval_env_state = env.reset(eval_rng, env_params)
+        # eval_obsv, eval_env_state = env.reset(eval_rng, env_params)
 
-        eval_init_hstate = ScannedRNN.initialize_carry(args.num_envs, args.hidden_size)
+        # eval_init_hstate = ScannedRNN.initialize_carry(args.num_envs, args.hidden_size)
 
-        eval_runner_state = (
-            final_train_state,
-            eval_env_state,
-            eval_obsv,
-            jnp.zeros((args.num_envs), dtype=bool),
-            eval_init_hstate,
-            _rng,
-        )
+        # eval_runner_state = (
+        #     final_train_state,
+        #     eval_env_state,
+        #     eval_obsv,
+        #     jnp.zeros((args.num_envs), dtype=bool),
+        #     eval_init_hstate,
+        #     _rng,
+        # )
 
         # COLLECT EVAL TRAJECTORIES
         # eval_runner_state, eval_traj_batch = jax.lax.scan(
         #     _env_step, eval_runner_state, None, env_params.max_steps_in_episode
         # )
-        eval_runner_state, eval_traj_batch = jax.lax.scan(
-            _env_step, eval_runner_state, None, 50
-        )
+        # eval_runner_state, eval_traj_batch = jax.lax.scan(
+        #     _env_step, eval_runner_state, None, 50
+        # )
 
-        res = {"runner_state": runner_state, "metric": metric, 'final_eval_metric': eval_traj_batch.info}
+        res = {"runner_state": runner_state, "metric": metric}
 
         return res
 
@@ -466,16 +475,15 @@ if __name__ == "__main__":
     # we need to go backwards, since JAX returns indices
     # in the order in which they're vmapped.
     for i, arg in reversed(list(enumerate(train_args))):
-        dims = [None] * len(train_args)
-        dims[i] = 0
-        vmaps_train = jax.vmap(vmaps_train, in_axes=dims)
         if arg == 'rng':
-            swept_args.appendleft(rngs)
+            swept_args.appendleft(rng)
         else:
             assert hasattr(args, arg)
-            swept_args.appendleft(getattr(args, arg))
-
+            train_arg = getattr(args, arg)
+            swept_args.appendleft(train_arg[0])
+        
     train_jit = jax.jit(vmaps_train)
+
     t = time()
     out = train_jit(*swept_args)
     new_t = time()
@@ -484,15 +492,16 @@ if __name__ == "__main__":
 
     # our final_eval_metric returns max_num_steps.
     # we can filter that down by the max episode length amongst the runs.
-    final_eval = out['final_eval_metric']
+    # final_eval = out['final_eval_metric']
 
     # the +1 at the end is to include the done step
-    largest_episode = final_eval['returned_episode'].argmax(axis=-2).max() + 1
+    # largest_episode = final_eval['returned_episode'].argmax(axis=-2).max() + 1
 
-    def get_first_n_filter(x):
-        return x[..., :largest_episode, :]
-    out['final_eval_metric'] = jax.tree.map(get_first_n_filter, final_eval)
+    # def get_first_n_filter(x):
+    #     return x[..., :largest_episode, :]
+    # out['final_eval_metric'] = jax.tree.map(get_first_n_filter, final_eval)
 
+    final_train_state = out['runner_state'][0]
     if not args.save_runner_state:
         del out['runner_state']
 
@@ -502,7 +511,8 @@ if __name__ == "__main__":
         'argument_order': train_args,
         'out': out,
         'args': args.as_dict(),
-        'total_runtime': total_runtime
+        'total_runtime': total_runtime, 
+        'final_train_state': final_train_state
     }
 
     # Save all results with Orbax

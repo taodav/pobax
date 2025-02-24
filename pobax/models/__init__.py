@@ -33,9 +33,16 @@ def get_gymnax_network_fn(env: environment.Environment, env_params: environment.
                 network_fn = DiscreteActorCritic
     elif isinstance(env.action_space(env_params), spaces.Box):
         action_size = env.action_space(env_params).shape[0]
-        network_fn = ContinuousActorCriticRNN
-        if memoryless:
-            network_fn = ContinuousActorCritic
+        obs_space_shape = env.observation_space(env_params).shape
+        if len(obs_space_shape) > 1:
+            # assert jnp.all(jnp.array(obs_space_shape[:-1]) == 5)
+            network_fn = ImageContinuousActorCriticRNN
+            if memoryless:
+                network_fn = ImageContinuousActorCritic
+        else:
+            network_fn = ContinuousActorCriticRNN
+            if memoryless:
+                network_fn = ContinuousActorCritic
     else:
         raise NotImplementedError
     return network_fn, action_size

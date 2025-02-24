@@ -10,4 +10,4 @@ cd ..
 # Activate the virtual environment
 source ~/pobax/bin/activate
 
-python parse_no_frame_experiments.py ../results/ant_memoryless_ppo_no_frame
+python parse_no_frame_experiments.py ../results/walker2d_memoryless_ppo_no_frame_madrona

@@ -246,7 +246,7 @@ class MadronaEnvState:
 
 class PixelMadronaVecEnvWrapper(GymnaxWrapper):
     def __init__(self, env: MadronaWrapper,
-                 num_worlds: int,
+                 num_worlds: int = 4,
                  size: int = 128,
                  normalize: bool = False,
                  zoom_factor: float = 1.):
@@ -261,6 +261,7 @@ class PixelMadronaVecEnvWrapper(GymnaxWrapper):
         self.zoom_factor = zoom_factor
 
         self.enabled_cameras = np.array([0])
+        self.enabled_geom_groups = np.arange(len(self.sys.geom_group))
         self.renderer = BatchRenderer(
             self.sys,
             0,
@@ -269,6 +270,7 @@ class PixelMadronaVecEnvWrapper(GymnaxWrapper):
             self.size,
             enabled_cameras = self.enabled_cameras,
             )
+        self.init_data, self.render_token, self.init_image_obs, _ = self.init(self._sys_v)
 
     def observation_space(self, params):
         low, high = 0, 255
@@ -280,24 +282,27 @@ class PixelMadronaVecEnvWrapper(GymnaxWrapper):
             shape=(self.size, self.size, 3),
         )
 
-    def init(self, rng, env_state, model):
-        def init_(rng, env_state, model):
+    def init(self, model):
+        def init_(model):
             data = mjx.make_data(model)
-            env_state = unwrap_env_state(env_state)
-            data = data.replace(qpos=env_state.pipeline_state.q, qvel=env_state.pipeline_state.qd)  
+            # env_state = unwrap_env_state(env_state)
+            # data = data.replace(qpos=env_state.pipeline_state.q, qvel=env_state.pipeline_state.qd)  
             data = mjx.forward(model, data)
             render_token, rgb, depth = self.renderer.init(data, model)
             return data, render_token, rgb, depth
 
-        return jax.vmap(init_, in_axes=[0, 0, self._in_axes])(rng, env_state, model)
+        return jax.vmap(init_, in_axes=[self._in_axes])(model)
     
     def reset(
             self, key: chex.PRNGKey, params: Optional[environment.EnvParams] = None
     ) -> Tuple[chex.Array, environment.EnvState]:
         _, env_state = self._env.reset(key, params)
-        init_data, self.render_token, image_obs, depth = self.init(key, env_state, self._sys_v)
-        env_state = MadronaEnvState(env_state=env_state, data=init_data)
+        render = jax.vmap(self.render, in_axes=(self._in_axes, 0, 0))
+        new_data, image_obs, depth = render(self._sys_v, env_state, self.init_data)
+        env_state = MadronaEnvState(env_state=env_state, data=new_data)
         image_obs = image_obs.squeeze(1)
+        if image_obs.shape[-1] == 4:
+            image_obs = image_obs[..., :3]
         if self.normalize:
             image_obs /= 255.
         return image_obs, env_state
@@ -312,18 +317,20 @@ class PixelMadronaVecEnvWrapper(GymnaxWrapper):
         _, env_state, reward, done, info = self._env.step(
             key, state.env_state, action, params
         )
-        render = jax.vmap(self.render, in_axes=(self._in_axes, 0, 0, 0))
+        render = jax.vmap(self.render, in_axes=(self._in_axes, 0, 0))
         data = state.data
-        new_data, image_obs, depth = render(self._sys_v, self.render_token, env_state, data)
+        new_data, image_obs, depth = render(self._sys_v, env_state, data)
         image_obs = image_obs.squeeze(1)
         states = MadronaEnvState(env_state=env_state, data=new_data)
+        if image_obs.shape[-1] == 4:
+            image_obs = image_obs[..., :3]
         if self.normalize:
             image_obs /= 255.
         return image_obs, states, reward, done, info
 
-    def render(self, model, render_token, env_state, data, mode='rgb_array'):
+    def render(self, model, env_state, data, mode='rgb_array'):
         env_state = unwrap_env_state(env_state)
         data = data.replace(qpos=env_state.pipeline_state.q, qvel=env_state.pipeline_state.qd)
         new_data = mjx.forward(model, data)
-        _, images, depth = self.renderer.render(render_token, new_data)
+        _, images, depth = self.renderer.render(self.render_token, new_data)
         return new_data, images, depth

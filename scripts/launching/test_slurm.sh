@@ -12,7 +12,4 @@ cd ..
 source ~/pobax/bin/activate
 
 # Use this when you want to rerun the scripts a lot of times
-# MADRONA_MWGPU_KERNEL_CACHE=../../madrona_mjx/build/kernel_cache
-# MADRONA_BVH_KERNEL_CACHE=./../madrona_mjx/build/bvh_cache
-
 python visualize_gymnax_env.py
