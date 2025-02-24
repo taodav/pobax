@@ -171,4 +171,3 @@ class OnlineReturnsLogWrapper(Wrapper):
             # **info
         }
         return obs, reward, done, truncation, info
-

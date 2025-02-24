@@ -16,6 +16,7 @@ from brax.base import System
 from brax.envs.base import Env
 from brax.envs.base import State
 from brax.envs.base import Wrapper
+from sympy.physics.units import action
 
 
 class GymnaxWrapper(object):
@@ -59,7 +60,7 @@ class MaskObservationWrapper(GymnaxWrapper):
             dtype=self._env.observation_space(params).dtype,
         )
 
-    @partial(jax.jit, static_argnums=(0,))
+    @partial(jax.jit, static_argnums=(0,-1))
     def reset(
             self, key: chex.PRNGKey, params: Optional[environment.EnvParams] = None
     ) -> Tuple[chex.Array, environment.EnvState]:
@@ -67,7 +68,7 @@ class MaskObservationWrapper(GymnaxWrapper):
         obs = obs[self.mask_dims]
         return obs, state
 
-    @partial(jax.jit, static_argnums=(0,))
+    @partial(jax.jit, static_argnums=(0,-1))
     def step(
             self,
             key: chex.PRNGKey,
@@ -97,7 +98,7 @@ class FlattenObservationWrapper(GymnaxWrapper):
             dtype=self._env.observation_space(params).dtype,
         )
 
-    @partial(jax.jit, static_argnums=(0,))
+    @partial(jax.jit, static_argnums=(0,-1))
     def reset(
             self, key: chex.PRNGKey, params: Optional[environment.EnvParams] = None
     ) -> Tuple[chex.Array, environment.EnvState]:
@@ -105,7 +106,7 @@ class FlattenObservationWrapper(GymnaxWrapper):
         obs = jnp.reshape(obs, (-1,))
         return obs, state
 
-    @partial(jax.jit, static_argnums=(0,))
+    @partial(jax.jit, static_argnums=(0,-1))
     def step(
             self,
             key: chex.PRNGKey,
@@ -142,7 +143,7 @@ class LogWrapper(GymnaxWrapper):
             self, key: chex.PRNGKey, params: Optional[environment.EnvParams] = None
     ) -> Tuple[chex.Array, environment.EnvState]:
         obs, env_state = self._env.reset(key, params)
-        state = LogEnvState(env_state, 0, 0, 0, 0, 0, 0, 0)
+        state = LogEnvState(env_state, 0.0, 0.0, 0, 0.0, 0.0, 0, 0)
         return obs, state
 
     @partial(jax.jit, static_argnums=(0, -1))
@@ -214,11 +215,13 @@ class BraxGymnaxWrapper:
             high=1.0,
             shape=(self._env.action_size,),
         )
-    
+
+
 @struct.dataclass
 class CraftEnvParams:
     max_steps_in_episode: int = 1
     craft_env_params: environment.EnvParams = None
+
 
 class CraftaxGymnaxWrapper:
     def __init__(self, env_name):
@@ -229,10 +232,12 @@ class CraftaxGymnaxWrapper:
         self._env = env
         self.env_params = CraftEnvParams(max_steps_in_episode=self.max_steps_in_episode, craft_env_params=env.default_params)
 
+    @partial(jax.jit, static_argnums=(0,-1))
     def reset(self, key, params=None):
         obs, state = self._env.reset_env(key, params.craft_env_params)
         return obs, state
 
+    @partial(jax.jit, static_argnums=(0,-1))
     def step(self, key, state, action, params=None):
         # Pixel value is already normalized
         next_obs, next_state, reward, done, info = self._env.step_env(key, state, action, params.craft_env_params)
@@ -244,6 +249,7 @@ class CraftaxGymnaxWrapper:
 
     def action_space(self, params):
         return self._env.action_space(params.craft_env_params)
+
 
 class ClipAction(GymnaxWrapper):
     def __init__(self, env, low=-1.0, high=1.0):
@@ -470,25 +476,42 @@ class ActionConcatWrapper(GymnaxWrapper):
     def observation_space(self, params) -> spaces.Box:
         og_obs_space_shape = self._env.observation_space(params).shape
 
-        if len(og_obs_space_shape) > 1:
+        if len(og_obs_space_shape) == 1:
+            shape = (og_obs_space_shape[0] + self.action_size(params),)
+        elif len(og_obs_space_shape) == 3:
+            # images
+            shape = (og_obs_space_shape[0], og_obs_space_shape[1], og_obs_space_shape[2] + self.action_size(params))
+        else:
             raise NotImplementedError
 
         return spaces.Box(
             low=self._env.observation_space(params).low,
             high=self._env.observation_space(params).high,
-            shape=(og_obs_space_shape[0] + self.action_size(params),),
+            shape=shape,
             dtype=self._env.observation_space(params).dtype,
         )
 
-    @partial(jax.jit, static_argnums=(0,))
+    @partial(jax.jit, static_argnums=(0,-1))
     def reset(
             self, key: chex.PRNGKey, params: Optional[environment.EnvParams] = None
     ) -> Tuple[chex.Array, environment.EnvState]:
         action_vec = jnp.zeros(self.action_size(params))
         obs, state = self._env.reset(key, params)
-        return jnp.concatenate([obs, action_vec]), state
+        obs_shape = self.observation_space(params).shape
+        if len(obs_shape) == 1:
+            obs = jnp.concatenate([obs, action_vec])
 
-    @partial(jax.jit, static_argnums=(0,))
+        elif len(obs_shape) == 3:
+            action_vec = action_vec[None, None, ...]
+            h, w, c = obs_shape
+            action_img = action_vec.repeat(h, axis=0).repeat(w, axis=1)
+            obs = jnp.concatenate([obs, action_img], axis=-1)
+        else:
+            raise NotImplementedError
+
+        return obs, state
+
+    @partial(jax.jit, static_argnums=(0,-1))
     def step(
             self,
             key: chex.PRNGKey,
@@ -504,53 +527,86 @@ class ActionConcatWrapper(GymnaxWrapper):
         if isinstance(action_space, spaces.Discrete):
             action_vec = jnp.eye(action_space.n)[action]
 
-        obs = jnp.concatenate([obs, action_vec])
+        obs_shape = self.observation_space(params).shape
+        if len(obs_shape) == 1:
+            obs = jnp.concatenate([obs, action_vec])
+
+        elif len(obs_shape) == 3:
+            action_vec = action_vec[None, None, ...]
+            h, w, c = obs_shape
+            action_img = action_vec.repeat(h, axis=0).repeat(w, axis=1)
+            obs = jnp.concatenate([obs, action_img], axis=-1)
+        else:
+            raise NotImplementedError
         return obs, state, reward, done, info
-    
-# def _identity_randomization_fn(
-#     sys: System, num_worlds: int
-# ) -> Tuple[System, System]:
-#   """Tile the necessary axes for the Madrona BatchRenderer."""
-#   in_axes = jax.tree_util.tree_map(lambda x: None, sys)
-#   in_axes = in_axes.tree_replace({
-#       'geom_rgba': 0,
-#       'geom_matid': 0,
-#       'geom_size': 0,
-#       'light_pos': 0,
-#       'light_dir': 0,
-#       'light_directional': 0,
-#       'light_castshadow': 0,
-#       'light_cutoff': 0,
-#   })
 
-#   sys = sys.tree_replace({
-#       'geom_rgba': jnp.repeat(
-#           jnp.expand_dims(sys.geom_rgba, 0), num_worlds, axis=0
-#       ),
-#       'geom_matid': jnp.repeat(
-#           jnp.expand_dims(sys.geom_matid, 0), num_worlds, axis=0
-#       ),
-#       'geom_size': jnp.repeat(
-#           jnp.expand_dims(sys.geom_size, 0), num_worlds, axis=0
-#       ),
-#       'light_pos': jnp.repeat(
-#           jnp.expand_dims(sys.light_pos, 0), num_worlds, axis=0
-#       ),
-#       'light_dir': jnp.repeat(
-#           jnp.expand_dims(sys.light_dir, 0), num_worlds, axis=0
-#       ),
-#       'light_directional': jnp.repeat(
-#           jnp.expand_dims(sys.light_directional, 0), num_worlds, axis=0
-#       ),
-#       'light_castshadow': jnp.repeat(
-#           jnp.expand_dims(sys.light_castshadow, 0), num_worlds, axis=0
-#       ),
-#       'light_cutoff': jnp.repeat(
-#           jnp.expand_dims(sys.light_cutoff, 0), num_worlds, axis=0
-#       ),
-#   })
 
-#   return sys, in_axes
+class OptimisticResetVecEnvWrapper(GymnaxWrapper):
+    """
+    Provides efficient 'optimistic' resets.
+    The wrapper also necessarily handles the batching of environment steps and resetting.
+    reset_ratio: the number of environment workers per environment reset.  Higher means more efficient but a higher
+    chance of duplicate resets.
+    """
+
+    def __init__(self, env, num_envs: int, reset_ratio: int):
+        super().__init__(env)
+
+        self.num_envs = num_envs
+        self.reset_ratio = reset_ratio
+        assert (
+            num_envs % reset_ratio == 0
+        ), "Reset ratio must perfectly divide num envs."
+        self.num_resets = self.num_envs // reset_ratio
+
+        self.reset_fn = jax.vmap(self._env.reset, in_axes=(0, None))
+        self.step_fn = jax.vmap(self._env.step, in_axes=(0, 0, 0, None))
+
+    @partial(jax.jit, static_argnums=(0, 2))
+    def reset(self, rng, params=None):
+        rng, _rng = jax.random.split(rng)
+        rngs = jax.random.split(_rng, self.num_envs)
+        obs, env_state = self.reset_fn(rngs, params)
+        return obs, env_state
+
+    @partial(jax.jit, static_argnums=(0, 4))
+    def step(self, rng, state, action, params=None):
+
+        rng, _rng = jax.random.split(rng)
+        rngs = jax.random.split(_rng, self.num_envs)
+        obs_st, state_st, reward, done, info = self.step_fn(rngs, state, action, params)
+
+        rng, _rng = jax.random.split(rng)
+        rngs = jax.random.split(_rng, self.num_resets)
+        obs_re, state_re = self.reset_fn(rngs, params)
+
+        rng, _rng = jax.random.split(rng)
+        reset_indexes = jnp.arange(self.num_resets).repeat(self.reset_ratio)
+
+        being_reset = jax.random.choice(
+            _rng,
+            jnp.arange(self.num_envs),
+            shape=(self.num_resets,),
+            p=done,
+            replace=False,
+        )
+        reset_indexes = reset_indexes.at[being_reset].set(jnp.arange(self.num_resets))
+
+        obs_re = obs_re[reset_indexes]
+        state_re = jax.tree_map(lambda x: x[reset_indexes], state_re)
+
+        # Auto-reset environment based on termination
+        def auto_reset(done, state_re, state_st, obs_re, obs_st):
+            state = jax.tree_map(
+                lambda x, y: jax.lax.select(done, x, y), state_re, state_st
+            )
+            obs = jax.lax.select(done, obs_re, obs_st)
+
+            return state, obs
+
+        state, obs = jax.vmap(auto_reset)(done, state_re, state_st, obs_re, obs_st)
+
+        return obs, state, reward, done, info
 
 def _identity_randomization_fn(
     sys: System, num_worlds: int

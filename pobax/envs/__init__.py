@@ -3,6 +3,7 @@ from pathlib import Path
 
 import gymnax
 from jax import random
+import navix as nx
 
 from definitions import ROOT_DIR
 
@@ -34,6 +35,7 @@ from pobax.envs.wrappers.gymnax import (
 )
 from pobax.envs.wrappers.pixel import PixelBraxVecEnvWrapper, PixelTMazeVecEnvWrapper, PixelSimpleChainVecEnvWrapper, PixelCraftaxVecEnvWrapper, PixelMadronaVecEnvWrapper
 from pobax.envs.wrappers.gymnasium import GymnaxToGymWrapper
+from pobax.envs.wrappers.nx import NavixGymnaxWrapper, MazeFoVWrapper
 
 masked_gymnax_env_map = {
     'Pendulum-F-v0': {'env_str': 'Pendulum-v1', 'mask_dims': [0, 1, 2]},
@@ -115,11 +117,9 @@ def load_craftax_env(env_str: str,
     env_params = env.env_params
     return env, env_params
 
-
 def get_env(env_name: str,
             rand_key: random.PRNGKey,
-            num_envs: int = 4,
-            image_size: int = 64,
+            num_envs: int,
             normalize_env: bool = False,
             normalize_image: bool = True,
             gamma: float = 0.99,
@@ -183,7 +183,7 @@ def get_env(env_name: str,
         env_params = env.default_params
 
     elif env_name in brax_envs:
-        env, env_params = load_brax_env(env_name, num_envs, gamma=gamma)
+        env, env_params = load_brax_env(env_name, gamma=gamma)
     
     elif env_name in craftax_envs:
         env, env_params = load_craftax_env(env_name, gamma=gamma)
@@ -199,6 +199,17 @@ def get_env(env_name: str,
         if perfect_memory:
             env = RSPerfectMemoryWrapper(env)
 
+    elif env_name.startswith('Navix-DMLab'):
+        nx_env = nx.make(env_name)
+        env = NavixGymnaxWrapper(nx_env)
+        env_params = env.default_params
+        if 'RGB' in env_name:
+            print("FoV masking is not implemented yet for RGB features.")
+        elif '-F-' not in env_name:
+            env = MazeFoVWrapper(env)
+            # env = FlattenObservationWrapper(env)
+        # else:
+
     else:
         env, env_params = gymnax.make(env_name)
         env = FlattenObservationWrapper(env)
@@ -207,7 +218,7 @@ def get_env(env_name: str,
         print(f"Overwriting args gamma {gamma} with env gamma {env.gamma}.")
         gamma = env.gamma
 
-    if action_concat and len(env.observation_space(env_params).shape) == 1:
+    if action_concat:
         env = ActionConcatWrapper(env)
 
     env = LogWrapper(env, gamma=gamma)
@@ -224,6 +235,7 @@ def get_env(env_name: str,
         env = PixelCraftaxVecEnvWrapper(env, normalize=normalize_image)
     if env_name in brax_envs and env_name.endswith('pixels'):
         env = PixelMadronaVecEnvWrapper(env, num_worlds=num_envs, normalize=normalize_image, size=image_size)
+
     if normalize_env:
         env = NormalizeVecObservation(env)
         env = NormalizeVecReward(env, gamma)

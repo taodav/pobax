@@ -92,6 +92,7 @@ class PixelBraxVecEnvWrapper(GymnaxWrapper):
     def render(self, states, mode='rgb_array'):
         states = unwrap_env_state(states)
         sys = self._unwrapped._env.sys
+        print(type(sys.mj_model))
         n = len(self.renderer)
         def get_image(state: base.State, i: int):
             d = mujoco.MjData(sys.mj_model)
@@ -125,14 +126,15 @@ class PixelCraftaxVecEnvWrapper(GymnaxWrapper):
     def __init__(self, env: VecEnv,
                  normalize: bool = False):
         super().__init__(env)
-        self._env.reset = jax.jit(self._env.reset)
-        self._env.step = jax.jit(self._env.step)
+        # self._env.reset = jax.jit(self._env.reset, static_argnums=(0, -1))
+        # self._env.step = jax.jit(self._env.step, static_argnums=(0, -1))
 
         self.renderer = None
 
         self.normalize = normalize
         self.size = 110
 
+    @functools.partial(jax.jit, static_argnums=(0,-1))
     def reset(
             self, key: chex.PRNGKey, params: Optional[environment.EnvParams] = None
     ) -> Tuple[chex.Array, environment.EnvState]:
@@ -141,6 +143,7 @@ class PixelCraftaxVecEnvWrapper(GymnaxWrapper):
         image_obs = self.get_obs(image_obs, self.normalize)
         return image_obs, env_state
     
+    @functools.partial(jax.jit, static_argnums=(0,-1))
     def step(
             self,
             key: chex.PRNGKey,
@@ -154,12 +157,12 @@ class PixelCraftaxVecEnvWrapper(GymnaxWrapper):
         image_obs = self.get_obs(image_obs, self.normalize)
         return image_obs, env_state, reward, done, info
 
+    @functools.partial(jax.jit, static_argnums=(0, 2))
     def get_obs(self, obs, normalize):
         if not normalize:
             obs *= 255
         assert len(obs.shape) == 4
-        assert obs.shape[1] == 130
-        obs = obs[:,:90, :, :]
+        obs = obs[:,:27, :, :]
         return obs
     
     def observation_space(self, params):
@@ -169,7 +172,11 @@ class PixelCraftaxVecEnvWrapper(GymnaxWrapper):
         return spaces.Box(
             low=low,
             high=high,
-            shape=(110, 90, 3),
+            shape=(
+                27,
+                33,
+                3,
+            ),
         )
 
 
