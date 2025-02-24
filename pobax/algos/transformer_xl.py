@@ -408,6 +408,16 @@ if __name__ == "__main__":
     # jax.disable_jit(True)
     args = TransformerHyperparams().parse_args()
     jax.config.update('jax_platform_name', args.platform)
+    if args.env in brax_envs:
+        print(f'{args.env} is using madrona')
+        def limit_jax_mem(limit):
+            os.environ['XLA_PYTHON_CLIENT_MEM_FRACTION'] = f'{limit:.2f}'
+        os.environ['MADRONA_DISABLE_CUDA_HEAP_SIZE'] = '1'
+        limit_jax_mem(0.1)
+        # Tell XLA to use Triton GEMM
+        xla_flags = os.environ.get('XLA_FLAGS', '')
+        xla_flags += ' --xla_gpu_triton_gemm_any=True'
+        os.environ['XLA_FLAGS'] = xla_flags
 
     rng = jax.random.PRNGKey(args.seed)
     make_train_rng, rng = jax.random.split(rng)
@@ -429,16 +439,6 @@ if __name__ == "__main__":
                 assert hasattr(args, arg)
                 swept_args.appendleft(getattr(args, arg))
     else:
-        print(f'{args.env} is using madrona')
-        print(f'{args.env} is using madrona')
-        def limit_jax_mem(limit):
-            os.environ['XLA_PYTHON_CLIENT_MEM_FRACTION'] = f'{limit:.2f}'
-        os.environ['MADRONA_DISABLE_CUDA_HEAP_SIZE'] = '1'
-        limit_jax_mem(0.1)
-        # Tell XLA to use Triton GEMM
-        xla_flags = os.environ.get('XLA_FLAGS', '')
-        xla_flags += ' --xla_gpu_triton_gemm_any=True'
-        os.environ['XLA_FLAGS'] = xla_flags
         for i, arg in reversed(list(enumerate(train_args))):
             if arg == 'rng':
                 swept_args.appendleft(rng)
