@@ -11,10 +11,10 @@ ld_weights = [0]
 hparams = {
     'file_name':
         f'runs_{exp_name}.txt',
-    'entry': '-m pobax.algos.ppo_no_jit_env',
+    'entry': '-m pobax.algos.ppo',
     'args': [
         {
-            'env': 'ant_pixels',
+            'env': 'halfcheetah_pixels',
             'double_critic': False,
             'action_concat': True,
             'lr': lrs,
@@ -27,7 +27,8 @@ hparams = {
             'steps_log_freq': 8,
             'update_log_freq': 10,
             'total_steps': int(5e6),
-            'seed': [2024 + i for i in range(10)],
+            'seed': [2024 + i for i in range(3)],
+            'n_seeds': 1,
             'platform': 'gpu',
             'debug': True,
             'study_name': exp_name

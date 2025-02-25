@@ -22,8 +22,6 @@ def combine_seeds_and_envs(x: jnp.ndarray):
     # dim=-4 is n_seeds.
     # We take the mean and std_err to the mean over dimensions -1 and -4.
     x = jnp.array(x)
-    if len(x.shape) == 5:
-        x = jnp.squeeze(x, axis=1)
     envs_seeds_swapped = jnp.swapaxes(x, -2, -4).swapaxes(-3, -4)
     print(f"Env seeds swapped shape: {envs_seeds_swapped.shape}")
 
@@ -31,7 +29,7 @@ def combine_seeds_and_envs(x: jnp.ndarray):
     mean_over_num_envs = envs_seeds_swapped.mean(axis=-1)
     return mean_over_num_envs
 
-def parse_exp_dir(study_path, study_hparam_path):
+def parse_exp_dir(study_path, study_hparam_path, discounted: bool = False):
     # TODO: THIS
     train_sign_hparams = ['vf_coeff', 'lambda0', 'lr', 'lambda1', 'ld_weight', 'alpha']
     study_paths = list(study_path.iterdir())
@@ -47,9 +45,15 @@ def parse_exp_dir(study_path, study_hparam_path):
 
         args = restored['args']
         args_tuple = tuple(float(args[train_hparam].item()) for train_hparam in train_sign_hparams)
+        print(args_tuple)
         # Get online metrics
         online_eval = restored['out']['metric']
-        online_disc_returns = online_eval['returned_episode_returns']
+        if discounted:
+            online_disc_returns = online_eval['returned_discounted_episode_returns']
+        else:
+            online_disc_returns = online_eval['returned_episode_returns']
+        online_disc_returns = np.array(online_disc_returns)
+            
         # online disc returns has shape (num_updates // update_frequency, num_steps // step_frequency, n_envs)
 
         # final_eval = restored['out']['final_eval_metric']
@@ -73,7 +77,7 @@ def parse_exp_dir(study_path, study_hparam_path):
     
     # combine the seeds
     for args_tuple, online_disc_returns in eval_dict.items():
-        eval_dict[args_tuple] = np.stack(online_disc_returns, axis=0)
+        eval_dict[args_tuple] = np.concatenate(online_disc_returns, axis=-4)
     
     # for args_tuple, final_disc_returns in final_eval_dict.items():
     #     final_eval_dict[args_tuple] = np.stack(final_disc_returns, axis=0)
@@ -101,6 +105,7 @@ def parse_exp_dir(study_path, study_hparam_path):
             # final_max_score = final_scores[args_tuple]
             best_hyperparams = hyperparams[args_tuple]
             max_score = score
+    print(max_mean_score)
     print(f"Best hyperparams: {best_hyperparams}")
     envs.append(best_hyperparams['env'])
     max_score = jnp.expand_dims(max_score, axis=-1)
@@ -118,6 +123,8 @@ def parse_exp_dir(study_path, study_hparam_path):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('study_path', type=str)
+    parser.add_argument('--discounted', action='store_true',
+                        help='Do we discount returns?')
     args = parser.parse_args()
 
     study_path = Path(args.study_path)
@@ -125,7 +132,7 @@ if __name__ == "__main__":
 
     parsed_res_path = study_path / "best_hyperparam_per_env_res.pkl"
 
-    parsed_res = parse_exp_dir(study_path, study_hparam_path)
+    parsed_res = parse_exp_dir(study_path, study_hparam_path, discounted=args.discounted)
 
     print(f"Saving parsed results to {parsed_res_path}")
     with open(parsed_res_path, 'wb') as f:
