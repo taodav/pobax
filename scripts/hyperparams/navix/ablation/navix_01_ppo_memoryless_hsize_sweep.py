@@ -20,7 +20,7 @@ hparams = {
             'action_concat': False,
             'lr': ' '.join(map(str, lrs)),
             'anneal_lr': True,
-            'hidden_size': [32, 64, 128, 256, 512],
+            'hidden_size': [32, 64, 128, 256],
             'lambda0': lambda0s,
             'lambda1': ' '.join(map(str, lambda1s)),
             'alpha': ' '.join(map(str, alphas)),
