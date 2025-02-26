@@ -13,7 +13,7 @@ hparams = {
         f'runs_{exp_name}.txt',
     'entry': '-m pobax.algos.ppo',
     'args': [{
-        'env': 'Walker-P-v0',
+        'env': 'Walker-V-v0',
         'action_concat': True,
         'double_critic': False,
         'lr': ' '.join(map(str, lrs)),
