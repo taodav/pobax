@@ -473,7 +473,6 @@ if __name__ == "__main__":
     rngs = jax.random.split(rng, args.n_seeds)
     train_fn = make_train(args, make_train_rng)
     train_args = list(inspect.signature(train_fn).parameters.keys())
-
     vmaps_train = train_fn
     swept_args = deque()
 
@@ -507,8 +506,8 @@ if __name__ == "__main__":
 
     # our final_eval_metric returns max_num_steps.
     # we can filter that down by the max episode length amongst the runs.
-    final_eval = out['final_eval_metric']
-    final_train_state = out['runner_state'][0]
+    # final_eval = out['final_eval_metric']
+    # final_train_state = out['runner_state'][0]
 
     # # the +1 at the end is to include the done step
     # largest_episode = final_eval['returned_episode'].argmax(axis=-2).max() + 1
