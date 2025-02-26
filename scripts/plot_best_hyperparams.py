@@ -64,7 +64,9 @@ fully_observable_to_base = {
 }
 
 def plot_reses(all_reses: list[tuple], n_rows: int = 2,
-               individual_runs: bool = False):
+               individual_runs: bool = False,
+               plot_title: str = None,
+               discounted: bool = False):
     plt.rcParams.update({'font.size': 32})
 
     # check to see that all our envs are the same across all reses.
@@ -129,7 +131,9 @@ def plot_reses(all_reses: list[tuple], n_rows: int = 2,
             else:
                 ax.fill_between(x, env_mean - env_std_err, env_mean + env_std_err,
                                 color=colors[color], alpha=0.35)
-            ax.set_title(env_name_to_title.get(env, env))
+            if plot_title is None:
+                plot_title = env_name_to_title.get(env, env)
+            ax.set_title(plot_title)
             if x_upper_lim is not None:
                 ax.set_xlim(right=x_upper_lim)
             # ax.margins(x=0.015)
@@ -148,7 +152,10 @@ def plot_reses(all_reses: list[tuple], n_rows: int = 2,
     #     line.set_markersize(20)  # Increase the marker size
 
     fig.supxlabel('Environment steps')
-    fig.supylabel(f'Online discounted returns ({n_seeds} runs)')
+    if discounted:
+        fig.supylabel(f'Online discounted returns ({n_seeds} runs)')
+    else:
+        fig.supylabel(f'Online returns ({n_seeds} runs)')
     #
     fig.tight_layout()
 
@@ -179,18 +186,35 @@ def find_file_in_dir(file_name: str, base_dir: Path) -> Path:
             return path
 
 if __name__ == "__main__":
-    env_name = 'battleship_10'
-    super_dir = 'battleship'
+
+    discounted = False
+    hyperparam_type = 'per_env'  # (all_env | per_env)
+
+    env_name = 'masked_mujoco'
+    super_dir = 'masked_mujoco'
 
 
     # normal
     study_paths = [
         ('RNN', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo'), 'purple'),
-        ('RNN + LD', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_LD'), 'blue'),
+        # ('RNN + LD', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_LD'), 'blue'),
         ('Memoryless', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_memoryless'), 'dark gray'),
-        ('STATE', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_perfect_memory'), 'green'),
+        ('STATE', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_perfect_memory_memoryless'), 'green'),
         # ('TRANFORMER', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_transformer'), 'cyan'),
     ]
+
+    # env_name = 'rocksample_11_11'
+    # sweep_var = 'hsize'
+    # nenvs = 128
+    #
+    #
+    # study_paths = [
+    #     ('RNN', Path(ROOT_DIR, 'results', f'{env_name}_{sweep_var}_sweep/{env_name}_ppo_{sweep_var}_sweep', f'{env_name}_ppo_{sweep_var}_sweep_{sweep_var}_{nenvs}'), 'purple'),
+    #     # ('RNN + LD', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_LD'), 'blue'),
+    #     ('Memoryless', Path(ROOT_DIR, 'results', f'{env_name}_{sweep_var}_sweep/{env_name}_ppo_memoryless_{sweep_var}_sweep', f'{env_name}_ppo_memoryless_{sweep_var}_sweep_{sweep_var}_{nenvs}'), 'dark gray'),
+    #     ('STATE', Path(ROOT_DIR, 'results', f'{env_name}_{sweep_var}_sweep/{env_name}_ppo_perfect_memory_{sweep_var}_sweep', f'{env_name}_ppo_perfect_memory_{sweep_var}_sweep_{sweep_var}_{nenvs}'), 'green'),
+    #     # ('TRANFORMER', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_transformer'), 'cyan'),
+    # ]
 
     # best
     # study_paths = [
@@ -199,8 +223,8 @@ if __name__ == "__main__":
     #     # ('Memoryless PPO', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_ppo_best'), 'dark gray'),
     # ]
 
-    hyperparam_type = 'per_env'  # (all_env | per_env)
     plot_name = f'{env_name}_{hyperparam_type}'
+    # plot_name = f'{env_name}_{hyperparam_type}_{sweep_var}_{nenvs}'
 
     if study_paths[0][1].stem.endswith('best'):
         plot_name += '_best'
@@ -216,6 +240,8 @@ if __name__ == "__main__":
                 fname = 'best_hyperparam_res_F_split.pkl'
         elif hyperparam_type == 'per_env':
             fname = "best_hyperparam_per_env_res.pkl"
+            if discounted:
+                fname = "best_hyperparam_per_env_res_discounted.pkl"
 
         with open(study_path / fname, "rb") as f:
             best_res = pickle.load(f)
@@ -242,9 +268,11 @@ if __name__ == "__main__":
             step_multiplier = get_total_steps_multiplier(best_res['scores'].shape[0], hyperparam_path)
         best_res['step_multiplier'] = [step_multiplier] * len(best_res['envs'])
 
-    fig, axes = plot_reses(all_reses, individual_runs=False, n_rows=3)
+    fig, axes = plot_reses(all_reses, individual_runs=False, n_rows=3, plot_title=plot_name,
+                           discounted=discounted)
 
-    save_plot_to = Path(ROOT_DIR, 'results', f'{plot_name}.pdf')
+    discount_str = '_discounted' if discounted else ''
+    save_plot_to = Path(ROOT_DIR, 'results', f'{plot_name}{discount_str}.pdf')
 
     fig.savefig(save_plot_to, bbox_inches='tight')
     print(f"Saved figure to {save_plot_to}")

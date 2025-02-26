@@ -65,10 +65,14 @@ if __name__ == "__main__":
         'scores': max_scores,
         'dim_ref': parsed_res['dim_ref'][len(max_idxes) - 1:],
         'envs': parsed_res['envs'],
-        'all_hyperparams': parsed_res['all_hyperparams']
+        'all_hyperparams': parsed_res['all_hyperparams'],
+        'discounted': parsed_res['discounted']
     }
 
-    best_hparam_path = parsed_path.parent / "best_hyperparam_per_env_res.pkl"
+    file_name = "best_hyperparam_per_env_res.pkl"
+    if best_hparam_res['discounted']:
+        file_name = "best_hyperparam_per_env_res_discounted.pkl"
+    best_hparam_path = parsed_path.parent / file_name
     with open(best_hparam_path, 'wb') as f:
         pickle.dump(best_hparam_res, f)
 

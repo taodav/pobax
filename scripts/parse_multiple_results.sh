@@ -1,4 +1,4 @@
-RESULTS_DIR='../results/pendulum'
+RESULTS_DIR='../results/masked_mujoco'
 #RESULTS_PATHS='navix/navix_01_ppo navix/navix_01_ppo_LD navix_01_ppo_memoryless navix_02_ppo navix_02_ppo_LD navix_03_ppo_memoryless navix_03_ppo_LD navix_03_ppo_memoryless'
 
 for item in $RESULTS_DIR/*/;
@@ -6,6 +6,7 @@ do
   printf "\n"
   echo "Parsing $item"
   python parse_batch_experiments.py --discounted "$item"
-#  python parse_batch_experiments.py "$item"
+  python best_hyperparams_per_env.py "$item/parsed_hparam_scores_discounted.pkl"
+  python parse_batch_experiments.py "$item"
   python best_hyperparams_per_env.py "$item/parsed_hparam_scores.pkl"
 done

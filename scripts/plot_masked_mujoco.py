@@ -32,8 +32,8 @@ colors = {
 env_info = {
     # 'CartPole-P-v0': {'F': 'CartPole-F-v0'},
     # 'CartPole-V-v0': {'F': 'CartPole-F-v0'},
-    'Pendulum-P-v0': {'F': 'Pendulum-F-v0'},
-    'Pendulum-V-v0': {'F': 'Pendulum-F-v0'},
+    # 'Pendulum-P-v0': {'F': 'Pendulum-F-v0'},
+    # 'Pendulum-V-v0': {'F': 'Pendulum-F-v0'},
     'Hopper-P-v0': {'F': 'Hopper-F-v0'},
     'Hopper-V-v0': {'F': 'Hopper-F-v0'},
     'Walker-P-v0': {'F': 'Walker-F-v0'},
@@ -104,14 +104,15 @@ def calc_means_and_confidences(all_reses: list[tuple],
 
 
 def plot_res(means_and_confidences: dict,
-             n_rows: int = 2):
+             n_rows: int = 2,
+             discounted: bool = False):
     plt.rcParams.update({'font.size': 32})
 
     envs = list(sorted(means_and_confidences.keys()))
 
     n_rows = min(n_rows, len(envs))
     n_cols = max((len(envs) + 1) // n_rows, 1) if len(envs) > 1 else 1
-    fig, axes = plt.subplots(n_rows, n_cols, figsize=(50, 20))
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(30, 12))
 
     for k, env in enumerate(envs):
         row = k // n_cols - 1
@@ -137,7 +138,7 @@ def plot_res(means_and_confidences: dict,
         ax.spines[['right', 'top']].set_visible(False)
 
     # Customize legend to use square markers
-    legend = plt.legend(loc='lower right')
+    legend = plt.legend(loc='center right')
 
     # # Change line in legend to square
     # for line in legend.get_lines():
@@ -147,19 +148,25 @@ def plot_res(means_and_confidences: dict,
     #     line.set_markersize(20)  # Increase the marker size
 
     fig.supxlabel('Environment steps')
-    fig.supylabel(f'Online discounted returns ({res["seeds"]} runs)')
-    #
+    if discounted:
+        fig.supylabel(f'Online discounted returns ({res["seeds"]} runs)')
+    else:
+        fig.supylabel(f'Online returns ({res["seeds"]} runs)')
+
     fig.tight_layout()
 
     plt.show()
     return fig, axes
 
 if __name__ == "__main__":
+    discounted = True
+
+
     study_paths = [
-        ('PPO + RNN', Path(ROOT_DIR, 'results', f'masked_mujoco_ppo'), 'purple'),
-        # ('PPO + RNN + LD', Path(ROOT_DIR, 'results', f'{env_name}_ppo_LD'), 'blue'),
-        ('PPO + MEMORYLESS', Path(ROOT_DIR, 'results', f'masked_mujoco_ppo_memoryless'), 'dark gray'),
-        ('PPO + STATE', Path(ROOT_DIR, 'results', f'masked_mujoco_ppo_observable'), 'green'),
+        ('RNN + OBSERVATION', Path(ROOT_DIR, 'results', 'masked_mujoco', f'masked_mujoco_ppo'), 'purple'),
+        # ('PPO + RNN + LD', Path(ROOT_DIR, 'results', 'masked_mujoco', f'{env_name}_ppo_LD'), 'blue'),
+        ('OBSERVATION', Path(ROOT_DIR, 'results', 'masked_mujoco', f'masked_mujoco_ppo_memoryless'), 'dark gray'),
+        ('FULL STATE', Path(ROOT_DIR, 'results', 'masked_mujoco', f'masked_mujoco_ppo_perfect_memory'), 'green'),
     ]
     plot_name = study_paths[0][1].stem
 
@@ -168,6 +175,8 @@ if __name__ == "__main__":
 
     for name, study_path, color in study_paths:
         fname = "best_hyperparam_per_env_res.pkl"
+        if discounted:
+            fname = "best_hyperparam_per_env_res_discounted.pkl"
 
         with open(study_path / fname, "rb") as f:
             best_res = pickle.load(f)
@@ -176,15 +185,17 @@ if __name__ == "__main__":
         step_multiplier = best_res['all_hyperparams']['total_steps'] // best_res['scores'].shape[0]
         best_res['step_multiplier'] = [step_multiplier] * len(best_res['envs'])
 
-        if name == 'PPO + STATE':
+        if 'STATE' in name:
             all_F_reses.append((name, best_res, color))
         else:
             all_reses.append((name, best_res, color))
 
     means_and_confidences = calc_means_and_confidences(all_reses, all_F_reses)
-    fig, axes = plot_res(means_and_confidences, n_rows=2)
+    fig, axes = plot_res(means_and_confidences, n_rows=2,
+                         discounted=discounted)
 
-    save_plot_to = Path(ROOT_DIR, 'results', f'{plot_name}.pdf')
+    discount_str = '_discounted' if discounted else ''
+    save_plot_to = Path(ROOT_DIR, 'results', f'{plot_name}{discount_str}.pdf')
 
     fig.savefig(save_plot_to, bbox_inches='tight')
     print(f"Saved figure to {save_plot_to}")

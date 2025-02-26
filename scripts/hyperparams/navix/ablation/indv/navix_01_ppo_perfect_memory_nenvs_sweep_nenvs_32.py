@@ -14,11 +14,11 @@ hparams = {
     'entry': '-m pobax.algos.ppo',
     'args': [
         {
-            'env': 'Navix-DMLab-Maze-01-v0',
+            'env': 'Navix-DMLab-Maze-F-01-v0',
             'double_critic': False,
             'memoryless': False,
             'action_concat': True,
-            'lr': ' '.join(map(str, lrs)),
+            'lr': lrs,
             'anneal_lr': True,
             'hidden_size': 256,
             'lambda0': lambda0s,
@@ -27,7 +27,7 @@ hparams = {
             'ld_weight': ' '.join(map(str, ld_weights)),
             'entropy_coeff': 0.02,
             'num_steps': 128,
-            'num_envs': [16, 32, 64],
+            'num_envs': 32,
             'total_steps': int(1e7),
             'seed': 2025,
             'n_seeds': 5,

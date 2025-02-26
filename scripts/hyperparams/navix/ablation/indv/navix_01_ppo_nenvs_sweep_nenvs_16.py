@@ -27,7 +27,7 @@ hparams = {
             'ld_weight': ' '.join(map(str, ld_weights)),
             'entropy_coeff': 0.02,
             'num_steps': 128,
-            'num_envs': [16, 32, 64],
+            'num_envs': 16,
             'total_steps': int(1e7),
             'seed': 2025,
             'n_seeds': 5,
