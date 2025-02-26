@@ -1,4 +1,4 @@
-RESULTS_DIR='../results/navix_01_nenvs_sweep'
+RESULTS_DIR='../results/walker_v_hsize_sweep'
 #RESULTS_PATHS='navix/navix_01_ppo navix/navix_01_ppo_LD navix_01_ppo_memoryless navix_02_ppo navix_02_ppo_LD navix_03_ppo_memoryless navix_03_ppo_LD navix_03_ppo_memoryless'
 
 for nested_dir in $RESULTS_DIR/*/;

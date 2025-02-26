@@ -1,6 +1,7 @@
 import importlib
 import pickle
 from pathlib import Path
+from typing import Tuple
 
 import numpy as np
 from matplotlib import rc
@@ -66,7 +67,8 @@ fully_observable_to_base = {
 def plot_reses(all_reses: list[tuple], n_rows: int = 2,
                individual_runs: bool = False,
                plot_title: str = None,
-               discounted: bool = False):
+               discounted: bool = False,
+               ylims: Tuple[float, float] = None):
     plt.rcParams.update({'font.size': 32})
 
     # check to see that all our envs are the same across all reses.
@@ -83,7 +85,7 @@ def plot_reses(all_reses: list[tuple], n_rows: int = 2,
 
     n_rows = min(n_rows, len(envs))
     n_cols = max((len(envs) + 1) // n_rows, 1) if len(envs) > 1 else 1
-    fig, axes = plt.subplots(n_rows, n_cols, figsize=(30, 20))
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(15, 10))
 
     for k, (study_name, res, color) in enumerate(all_reses):
         scores = res['scores']
@@ -136,6 +138,8 @@ def plot_reses(all_reses: list[tuple], n_rows: int = 2,
             ax.set_title(plot_title)
             if x_upper_lim is not None:
                 ax.set_xlim(right=x_upper_lim)
+            if ylims is not None:
+                ax.set_ylim(bottom=ylims[0], top=ylims[1])
             # ax.margins(x=0.015)
             ax.locator_params(axis='x', nbins=3, min_n_ticks=3)
             ax.locator_params(axis='y', nbins=3)
@@ -190,30 +194,31 @@ if __name__ == "__main__":
     discounted = True
     hyperparam_type = 'per_env'  # (all_env | per_env)
 
-    env_name = 'masked_mujoco'
-    super_dir = 'masked_mujoco'
-
-    # normal
-    study_paths = [
-        ('RNN', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo'), 'purple'),
-        # ('RNN + LD', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_LD'), 'blue'),
-        ('Memoryless', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_memoryless'), 'dark gray'),
-        ('STATE', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_perfect_memory_memoryless'), 'green'),
-        # ('TRANFORMER', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_transformer'), 'cyan'),
-    ]
-
-    # env_name = 'rocksample_11_11'
-    # sweep_var = 'hsize'
-    # nenvs = 128
+    # env_name = 'masked_mujoco'
+    # super_dir = 'masked_mujoco'
     #
-    #
+    # # normal
     # study_paths = [
-    #     ('RNN', Path(ROOT_DIR, 'results', f'{env_name}_{sweep_var}_sweep/{env_name}_ppo_{sweep_var}_sweep', f'{env_name}_ppo_{sweep_var}_sweep_{sweep_var}_{nenvs}'), 'purple'),
+    #     ('RNN', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo'), 'purple'),
     #     # ('RNN + LD', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_LD'), 'blue'),
-    #     ('Memoryless', Path(ROOT_DIR, 'results', f'{env_name}_{sweep_var}_sweep/{env_name}_ppo_memoryless_{sweep_var}_sweep', f'{env_name}_ppo_memoryless_{sweep_var}_sweep_{sweep_var}_{nenvs}'), 'dark gray'),
-    #     ('STATE', Path(ROOT_DIR, 'results', f'{env_name}_{sweep_var}_sweep/{env_name}_ppo_perfect_memory_{sweep_var}_sweep', f'{env_name}_ppo_perfect_memory_{sweep_var}_sweep_{sweep_var}_{nenvs}'), 'green'),
+    #     ('Memoryless', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_memoryless'), 'dark gray'),
+    #     ('STATE', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_perfect_memory_memoryless'), 'green'),
     #     # ('TRANFORMER', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_transformer'), 'cyan'),
     # ]
+
+    env_name = 'navix_01'
+    sweep_var = 'nenvs'
+    nenvs = 32
+    ylims = (0., 0.68)
+
+
+    study_paths = [
+        ('RNN', Path(ROOT_DIR, 'results', f'{env_name}_{sweep_var}_sweep/{env_name}_ppo_{sweep_var}_sweep', f'{env_name}_ppo_{sweep_var}_sweep_{sweep_var}_{nenvs}'), 'purple'),
+        # ('RNN + LD', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_LD'), 'blue'),
+        ('Memoryless', Path(ROOT_DIR, 'results', f'{env_name}_{sweep_var}_sweep/{env_name}_ppo_memoryless_{sweep_var}_sweep', f'{env_name}_ppo_memoryless_{sweep_var}_sweep_{sweep_var}_{nenvs}'), 'dark gray'),
+        ('STATE', Path(ROOT_DIR, 'results', f'{env_name}_{sweep_var}_sweep/{env_name}_ppo_perfect_memory_{sweep_var}_sweep', f'{env_name}_ppo_perfect_memory_{sweep_var}_sweep_{sweep_var}_{nenvs}'), 'green'),
+        # ('TRANFORMER', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_transformer'), 'cyan'),
+    ]
 
     # best
     # study_paths = [
@@ -222,8 +227,8 @@ if __name__ == "__main__":
     #     # ('Memoryless PPO', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_ppo_best'), 'dark gray'),
     # ]
 
-    plot_name = f'{env_name}_{hyperparam_type}'
-    # plot_name = f'{env_name}_{hyperparam_type}_{sweep_var}_{nenvs}'
+    # plot_name = f'{env_name}_{hyperparam_type}'
+    plot_name = f'{env_name}_{hyperparam_type}_{sweep_var}_{nenvs}'
 
     if study_paths[0][1].stem.endswith('best'):
         plot_name += '_best'
@@ -247,8 +252,9 @@ if __name__ == "__main__":
             new_envs = []
             for env in best_res['envs']:
                 if env in fully_observable_to_base:
-                    best_res['hyperparams'][fully_observable_to_base[env]] = best_res['hyperparams'][env]
-                    del best_res['hyperparams'][env]
+                    if fully_observable_to_base[env] in best_res['hyperparams']:
+                        best_res['hyperparams'][fully_observable_to_base[env]] = best_res['hyperparams'][env]
+                        del best_res['hyperparams'][env]
                     new_envs.append(fully_observable_to_base[env])
                 else:
                     new_envs.append(env)
@@ -268,7 +274,7 @@ if __name__ == "__main__":
         best_res['step_multiplier'] = [step_multiplier] * len(best_res['envs'])
 
     fig, axes = plot_reses(all_reses, individual_runs=False, n_rows=3, plot_title=plot_name,
-                           discounted=discounted)
+                           discounted=discounted, ylims=ylims)
 
     discount_str = '_discounted' if discounted else ''
     save_plot_to = Path(ROOT_DIR, 'results', f'{plot_name}{discount_str}.pdf')

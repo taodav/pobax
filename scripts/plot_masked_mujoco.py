@@ -169,7 +169,7 @@ if __name__ == "__main__":
         ('RNN', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo'), 'purple'),
         # ('RNN + LD', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_LD'), 'blue'),
         ('OBSERVATION', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_memoryless'), 'dark gray'),
-        ('FULL STATE', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_perfect_memory'), 'green'),
+        ('FULL STATE', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_perfect_memory_memoryless'), 'green'),
     ]
     plot_name = study_paths[0][1].stem
 
