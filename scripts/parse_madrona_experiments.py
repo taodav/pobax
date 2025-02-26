@@ -53,7 +53,7 @@ def parse_exp_dir(study_path, study_hparam_path, discounted: bool = False):
         else:
             online_disc_returns = online_eval['returned_episode_returns']
         online_disc_returns = np.array(online_disc_returns)
-            
+        print(online_disc_returns.shape)
         # online disc returns has shape (num_updates // update_frequency, num_steps // step_frequency, n_envs)
 
         # final_eval = restored['out']['final_eval_metric']
@@ -76,8 +76,10 @@ def parse_exp_dir(study_path, study_hparam_path, discounted: bool = False):
 
     
     # combine the seeds
+    # for args_tuple, online_disc_returns in eval_dict.items():
+    #     eval_dict[args_tuple] = np.concatenate(online_disc_returns, axis=-4)
     for args_tuple, online_disc_returns in eval_dict.items():
-        eval_dict[args_tuple] = np.concatenate(online_disc_returns, axis=-4)
+        eval_dict[args_tuple] = np.stack(online_disc_returns, axis=0)
     
     # for args_tuple, final_disc_returns in final_eval_dict.items():
     #     final_eval_dict[args_tuple] = np.stack(final_disc_returns, axis=0)
@@ -105,10 +107,10 @@ def parse_exp_dir(study_path, study_hparam_path, discounted: bool = False):
             # final_max_score = final_scores[args_tuple]
             best_hyperparams = hyperparams[args_tuple]
             max_score = score
-    print(max_mean_score)
     print(f"Best hyperparams: {best_hyperparams}")
     envs.append(best_hyperparams['env'])
     max_score = jnp.expand_dims(max_score, axis=-1)
+    print(max_score.shape)
 
     parsed_res = {
         'envs': envs,
