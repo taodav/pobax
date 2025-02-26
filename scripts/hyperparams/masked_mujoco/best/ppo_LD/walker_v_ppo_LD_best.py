@@ -14,9 +14,8 @@ hparams = {
         f'runs_{exp_name}.txt',
     'entry': '-m pobax.algos.ppo',
     'args': [{
-        'env': [
-            'Walker-V-v0', 'HalfCheetah-V-v0',
-        ],
+        'env':
+            'Walker-V-v0',
         'double_critic': True,
         'action_concat': True,
         'lr': ' '.join(map(str, lrs)),
