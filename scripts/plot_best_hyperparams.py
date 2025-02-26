@@ -187,12 +187,11 @@ def find_file_in_dir(file_name: str, base_dir: Path) -> Path:
 
 if __name__ == "__main__":
 
-    discounted = False
+    discounted = True
     hyperparam_type = 'per_env'  # (all_env | per_env)
 
     env_name = 'masked_mujoco'
     super_dir = 'masked_mujoco'
-
 
     # normal
     study_paths = [

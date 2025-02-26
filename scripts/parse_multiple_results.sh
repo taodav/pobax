@@ -1,4 +1,4 @@
-RESULTS_DIR='../results/masked_mujoco'
+RESULTS_DIR='../results/halfcheetah_v'
 #RESULTS_PATHS='navix/navix_01_ppo navix/navix_01_ppo_LD navix_01_ppo_memoryless navix_02_ppo navix_02_ppo_LD navix_03_ppo_memoryless navix_03_ppo_LD navix_03_ppo_memoryless'
 
 for item in $RESULTS_DIR/*/;

@@ -61,8 +61,9 @@ def mean_confidence_interval(data, confidence=0.95, axis=-1):
 
 def calc_means_and_confidences(all_reses: list[tuple],
                                all_F_reses: list[tuple]) -> dict:
+    envs = [env for env in all_reses[0][1]['envs'] if env in env_info]
     final_res = {}
-    for env in sorted(env_info.keys()):
+    for env in sorted(envs):
         if env not in final_res:
             final_res[env] = {}
 
@@ -160,13 +161,15 @@ def plot_res(means_and_confidences: dict,
 
 if __name__ == "__main__":
     discounted = True
+    super_dir = 'masked_mujoco'
+    env_name = 'masked_mujoco'
 
 
     study_paths = [
-        ('RNN + OBSERVATION', Path(ROOT_DIR, 'results', 'masked_mujoco', f'masked_mujoco_ppo'), 'purple'),
-        # ('PPO + RNN + LD', Path(ROOT_DIR, 'results', 'masked_mujoco', f'{env_name}_ppo_LD'), 'blue'),
-        ('OBSERVATION', Path(ROOT_DIR, 'results', 'masked_mujoco', f'masked_mujoco_ppo_memoryless'), 'dark gray'),
-        ('FULL STATE', Path(ROOT_DIR, 'results', 'masked_mujoco', f'masked_mujoco_ppo_perfect_memory'), 'green'),
+        ('RNN', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo'), 'purple'),
+        # ('RNN + LD', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_LD'), 'blue'),
+        ('OBSERVATION', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_memoryless'), 'dark gray'),
+        ('FULL STATE', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_perfect_memory'), 'green'),
     ]
     plot_name = study_paths[0][1].stem
 
