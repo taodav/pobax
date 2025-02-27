@@ -1,0 +1,9 @@
+## SLURM PROLOG ###############################################################
+##    Job ID : 8744815
+##  Job Name : runs_walker_v_transformer_best
+##  Nodelist : gpu2105
+##      CPUs : 
+##  Mem/Node : 32768 MB
+## Directory : /oscar/home/kguo32/pobax/scripts/launching
+##   Job Started : Wed Feb 26 06:49:06 PM EST 2025
+###############################################################################

@@ -1,9 +1,0 @@
-## SLURM PROLOG ###############################################################
-##    Job ID : 8524803
-##  Job Name : best_parse_batch_experiments
-##  Nodelist : gpu2008
-##      CPUs : 
-##  Mem/Node : 65536 MB
-## Directory : /oscar/home/kguo32/pobax/scripts/launching
-##   Job Started : Sat Feb 22 12:51:59 AM EST 2025
-###############################################################################

@@ -10,7 +10,5 @@
 cd ..
 # Activate the virtual environment
 source ~/pobax_baseline/bin/activate
-RESULTS_PATHS='../results/navix_02_ppo_best'
 
-python parse_batch_experiments.py "$RESULTS_PATHS"
-python best_hyperparams_per_env.py "$RESULTS_PATHS/parsed_hparam_scores_undiscounted.pkl"
+python parse_single_seed.py ../results/halfcheetah_p_transformer --discounted
