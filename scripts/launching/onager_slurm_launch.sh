@@ -9,10 +9,10 @@ do
       --jobname "$item" \
       --mem 32 \
       --cpus 3 \
-      --duration 0-12:00:00 \
+      --duration 2-00:00:00 \
       --venv venv \
       --gpus 1 \
       --partition 3090-gcondo \
-      -x gpu2106,gpu2257,gpu2505 \
+      #-x gpu2106,gpu2257,gpu2505 \
       # --tasks-per-node 5
 done
