@@ -29,8 +29,8 @@ hparams = {
             'steps_log_freq': 8,
             'update_log_freq': 10,
             'total_steps': int(1e7),
-            'seed': 2025,
-            'n_seeds': 5,
+            'seed': 2026,
+            'n_seeds': 30,
             'platform': 'gpu',
             'study_name': exp_name
         }
