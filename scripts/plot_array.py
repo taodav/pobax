@@ -3,6 +3,7 @@ import pickle
 
 import matplotlib.pyplot as plt
 from matplotlib import rc
+from matplotlib.lines import Line2D
 import numpy as np
 
 from pobax.utils.plot import mean_confidence_interval, colors
@@ -143,7 +144,7 @@ def plot_array(all_res: dict):
     n_rows, n_cols = (np.array([res['position'] for res in all_res.values()]) + 1).max(axis=0)
     fig, axes = plt.subplots(n_rows, n_cols, figsize=(10 * n_rows, 5 * n_cols))
 
-    lines, labels = [], []
+    all_titles_and_colors = []
 
     for name, info in all_res.items():
         row, col = info['position']
@@ -177,8 +178,9 @@ def plot_array(all_res: dict):
             ax.plot(x, mean, label=algo_name, color=colors[color])
             ax.fill_between(x, mean - conf, mean + conf, color=colors[color], alpha=0.35)
 
-        if not lines:
-            lines, labels = ax.get_legend_handles_labels()
+            title_color_entry = (algo_name, colors[color])
+            if title_color_entry not in all_titles_and_colors:
+                all_titles_and_colors.append(title_color_entry)
 
     # We add extraneous plots here.
     # plot battleship optimal policy
@@ -195,11 +197,9 @@ def plot_array(all_res: dict):
     axes[-1, -1].set_axis_off()
 
     # first set the handles symbols to something else
-    for l in lines:
-        l.set_marker('s')
-        l.set_markersize(16)
-        l.set_linestyle('None')
-
+    lines = [Line2D([], [], color=color, marker='s', markersize=16, linestyle='None')
+             for (_, color) in all_titles_and_colors]
+    labels = [label for (label, _) in all_titles_and_colors]
     plt.figlegend(lines, labels, loc=(0.78, 0.13))
 
     fig.supxlabel('Environment steps')
