@@ -102,7 +102,6 @@ def parse_exp_dir(study_path, study_hparam_path):
     print(f"Best hyperparams: {best_hyperparams}")
     envs.append(best_hyperparams['env'])
     max_score = jnp.expand_dims(max_score, axis=-1)
-
     parsed_res = {
         'envs': envs,
         'scores': max_score,

@@ -33,7 +33,8 @@ def parse_exp_dir(study_path, study_hparam_path, discounted: bool = False):
     # TODO: THIS
     train_sign_hparams = ['vf_coeff', 'lambda0', 'lr', 'lambda1', 'ld_weight', 'alpha']
     study_paths = list(study_path.iterdir())
-
+    files_to_remove = {"best_hyperparam_per_env_res_discounted.pkl", "best_hyperparam_per_env_res_undiscounted.pkl"}
+    study_paths = [path for path in study_paths if path.name not in files_to_remove]
     scores, final_scores, envs, hyperparams, eval_dict, final_eval_dict = {}, {}, [], {}, {}, {}
     for results_path in tqdm(study_paths):
         results_path = Path(results_path).resolve()
@@ -45,7 +46,6 @@ def parse_exp_dir(study_path, study_hparam_path, discounted: bool = False):
 
         args = restored['args']
         args_tuple = tuple(float(args[train_hparam].item()) for train_hparam in train_sign_hparams)
-        print(args_tuple)
         # Get online metrics
         online_eval = restored['out']['metric']
         if discounted:
@@ -53,6 +53,7 @@ def parse_exp_dir(study_path, study_hparam_path, discounted: bool = False):
         else:
             online_disc_returns = online_eval['returned_episode_returns']
         online_disc_returns = np.array(online_disc_returns)
+        print(online_disc_returns.shape)
             
         # online disc returns has shape (num_updates // update_frequency, num_steps // step_frequency, n_envs)
 
@@ -133,7 +134,7 @@ if __name__ == "__main__":
     study_path = Path(args.study_path)
     study_hparam_path = Path(ROOT_DIR, 'scripts', 'hyperparams', study_path.stem + '.py')
 
-    parsed_res_path = study_path / "best_hyperparam_per_env_res.pkl"
+    parsed_res_path = study_path / f"best_hyperparam_per_env_res_{'discounted' if args.discounted else 'undiscounted'}.pkl"
 
     parsed_res = parse_exp_dir(study_path, study_hparam_path, discounted=args.discounted)
 

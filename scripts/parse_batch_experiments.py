@@ -101,7 +101,8 @@ def parse_exp_dir(study_path, study_hparam_path, discounted: bool = False):
     env_order = all_hparams['env']
 
     study_paths = [s for s in study_path.iterdir() if s.is_dir()]
-
+    files_to_remove = {"best_hyperparam_per_env_res_discounted.pkl", "best_hyperparam_per_env_res_undiscounted.pkl", "best_hyperparam_per_env_res.pkl"}
+    study_paths = [path for path in study_paths if path.name not in files_to_remove]
     envs = []
     scores_by_env = {}
 
@@ -305,7 +306,8 @@ def parse_exp_dir(study_path, study_hparam_path, discounted: bool = False):
         # 'final_scores': stacked_final_scores,
         'dim_ref': dim_ref,
         'hyperparams': swept_hparams,
-        'all_hyperparams': all_hparams
+        'all_hyperparams': all_hparams,
+        'discounted': discounted
     }
     return parsed_res
 
@@ -330,7 +332,7 @@ if __name__ == "__main__":
 
     assert study_hparam_path is not None, f"Could not find {study_hparam_filename} in {hyperparams_dir}"
 
-    parsed_res_path = study_path / "parsed_hparam_scores.pkl"
+    parsed_res_path = study_path / f"parsed_hparam_scores_{'discounted' if args.discounted else 'undiscounted'}.pkl"
 
     parsed_res = parse_exp_dir(study_path, study_hparam_path, discounted=args.discounted)
 

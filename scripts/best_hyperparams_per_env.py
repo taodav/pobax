@@ -17,7 +17,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # The math says that this doesn't matter...
-    mean_order = ['seeds', 'num_update', 'num_steps']
+    mean_order = ['seed', 'seeds', 'num_update', 'num_steps']
 
     parsed_path = Path(args.parsed_study_path)
 
@@ -42,16 +42,23 @@ if __name__ == "__main__":
     # scores = scores[optimize_lambda_discrep, alpha]
 
     mean_score = scores
+    print(mean_score.shape)
     changing_mean_order = parsed_res['dim_ref'].copy()
     for axis_name in mean_order:
         axis = changing_mean_order.index(axis_name)
         mean_score = mean_score.mean(axis=axis)
+        print(mean_score.shape)
         changing_mean_order.remove(axis_name)
 
     max_idxes = argmax_last(mean_score)
-
     swapped = scores.swapaxes(len(max_idxes) - 1, -1)
-    max_scores = swapped[max_idxes].swapaxes(0, -1)
+    swapped_combined = []
+    for i in range (swapped.shape[0]):
+        swap = swapped[i]
+        swapped_combined.append(swap)
+    swapped_combined = np.concatenate(swapped_combined, axis = -2)
+    swapped = swapped_combined
+    max_scores = swapped[0, 0, 0, 0, 0, 0]
 
     best_hyperparams = {}
     for env, env_max_idx in zip(parsed_res['envs'], np.stack(max_idxes[:-1], axis=-1)):
@@ -60,6 +67,8 @@ if __name__ == "__main__":
             env_best_hparam[k] = all_hyperparams[k][idx]
         best_hyperparams[env] = env_best_hparam
 
+    print(max_scores.shape)
+    print(best_hyperparams)
     best_hparam_res = {
         'hyperparams': best_hyperparams,
         'scores': max_scores,
@@ -68,7 +77,7 @@ if __name__ == "__main__":
         'all_hyperparams': parsed_res['all_hyperparams']
     }
 
-    best_hparam_path = parsed_path.parent / "best_hyperparam_per_env_res.pkl"
+    best_hparam_path = parsed_path.parent / f"best_hyperparam_per_env_res_{'discounted' if parsed_res['discounted'] else 'undiscounted'}.pkl"
     with open(best_hparam_path, 'wb') as f:
         pickle.dump(best_hparam_res, f)
 

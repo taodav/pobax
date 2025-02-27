@@ -57,7 +57,7 @@ env_name_to_x_upper_lim = {
     'tmaze_5': 2e6
 }
 
-def plot_reses(all_reses: list[tuple], n_rows: int = 2,
+def plot_reses(all_reses: list[tuple], env_name, n_rows: int = 2,
                individual_runs: bool = False):
     plt.rcParams.update({'font.size': 32})
 
@@ -68,7 +68,7 @@ def plot_reses(all_reses: list[tuple], n_rows: int = 2,
                 x['envs'][i] = x['envs'][i][:-7]
                 print(x['envs'][i])
             if x['envs'][i].startswith('Navix-DMLab'):
-                x['envs'][i] = 'navix'
+                x['envs'][i] = env_name
                 print(x['envs'][i])
     all_envs = [set(x['envs']) for _, x, _ in all_reses]
     for envs in all_envs:
@@ -177,18 +177,18 @@ def find_file_in_dir(file_name: str, base_dir: Path) -> Path:
             return path
 
 if __name__ == "__main__":
-    env_name = 'navix_02'
+    env_name = 'craftax'
 
     # normal
     study_paths = [
         # ('$\lambda$-discrepancy + Quantile PPO', Path(ROOT_DIR, 'results', f'{env_name}_quantile_LD_ppo'), 'green'),
         # ('$\lambda$-discrepancy + PPO', Path(ROOT_DIR, 'results', f'{env_name}_LD_ppo'), 'dark gray'),
-        ('PPO + RNN', Path(ROOT_DIR, 'results', f'{env_name}_ppo'), 'purple'),
+        ('PPO + RNN', Path(ROOT_DIR, 'results', f'{env_name}_ppo_best'), 'purple'),
         # ('PPO + TRANSFORMER + No Frame', Path(ROOT_DIR, 'results', f'{env_name}_transformer'), 'yellow'),
-        ('PPO + TRANSFORMER', Path(ROOT_DIR, 'results', f'{env_name}_transformer'), 'cyan'),
-        ('PPO + RNN + LD', Path(ROOT_DIR, 'results', f'{env_name}_ppo_LD'), 'blue'),
-        ('PPO + MEMORYLESS', Path(ROOT_DIR, 'results', f'{env_name}_ppo_memoryless'), 'dark gray'),
-        ('PPO + OBSERVABLE', Path(ROOT_DIR, 'results', f'{env_name}_ppo_observable'), 'green'),
+        ('PPO + TRANSFORMER', Path(ROOT_DIR, 'results', f'{env_name}_transformer_best'), 'cyan'),
+        ('PPO + RNN + LD', Path(ROOT_DIR, 'results', f'{env_name}_ppo_LD_best'), 'blue'),
+        ('PPO + MEMORYLESS', Path(ROOT_DIR, 'results', f'{env_name}_ppo_memoryless_best'), 'dark gray'),
+        ('PPO + OBSERVABLE', Path(ROOT_DIR, 'results', f'{env_name}_ppo_observable_best'), 'green'),
         # ('TEST', Path(ROOT_DIR, 'results', f'test_tmaze'), 'blue'),
         # ('Perfect Memory PPO (NN)', Path(ROOT_DIR, 'results', f'{env_name}_perfect_mem_ppo'), 'pink'),
         # ('PPO (RNN)', Path(ROOT_DIR, 'results', f'{env_name}_ppo'), 'blue'),
@@ -218,7 +218,7 @@ if __name__ == "__main__":
             if name == 'PPO Markov':
                 fname = 'best_hyperparam_res_F_split.pkl'
         elif hyperparam_type == 'per_env':
-            fname = "best_hyperparam_per_env_res.pkl"
+            fname = "best_hyperparam_per_env_res_undiscounted.pkl"
 
         with open(study_path / fname, "rb") as f:
             best_res = pickle.load(f)
@@ -235,9 +235,9 @@ if __name__ == "__main__":
             step_multiplier = get_total_steps_multiplier(best_res['scores'].shape[0], hyperparam_path)
         best_res['step_multiplier'] = [step_multiplier] * len(best_res['envs'])
 
-    fig, axes = plot_reses(all_reses, individual_runs=False, n_rows=3)
+    fig, axes = plot_reses(all_reses, env_name, individual_runs=False, n_rows=3)
 
-    save_plot_to = Path(ROOT_DIR, 'results', f'{plot_name}.pdf')
+    save_plot_to = Path(ROOT_DIR, 'results', f'{plot_name}_discounted.pdf')
 
     fig.savefig(save_plot_to, bbox_inches='tight')
     print(f"Saved figure to {save_plot_to}")
