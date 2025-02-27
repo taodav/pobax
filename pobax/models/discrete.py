@@ -488,7 +488,7 @@ class BattleShipActorCriticTransformer(nn.Module):
 
         v = self.critic(embedding)
 
-        return hidden, pi, jnp.squeeze(v, axis=-1)
+        return pi, jnp.squeeze(v, axis=-1), memory_out
 
     def model_forward_eval(self, memories, obs, mask):
         """Used during environment rollout (single timestep of obs). And return the memory"""
@@ -522,7 +522,7 @@ class BattleShipActorCriticTransformer(nn.Module):
 
         v = self.critic(embedding)
 
-        return hidden, pi, jnp.squeeze(v, axis=-1)
+        return pi, jnp.squeeze(v, axis=-1), memory_out
     
     def model_forward_train(self, memories,obs,mask): 
         """Used during training: a window of observation is sent. And don't return the memory"""
@@ -556,4 +556,4 @@ class BattleShipActorCriticTransformer(nn.Module):
 
         v = self.critic(embedding)
 
-        return hidden, pi, jnp.squeeze(v, axis=-1)
+        return pi, jnp.squeeze(v, axis=-1)
