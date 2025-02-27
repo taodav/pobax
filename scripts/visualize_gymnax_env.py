@@ -69,7 +69,7 @@ def make_collect(args: CollectHyperparams, key: chex.PRNGKey):
     steps_to_collect = args.n_samples // args.num_envs
 
     rng = jax.random.PRNGKey(args.seed)
-    env, env_params = get_env(args.env, rng, num_envs=args.num_envs, normalize_image=False)
+    env, env_params = get_env(args.env, rng, normalize_image=False)
 
     _env_step = partial(ppo_step, num_envs=args.num_envs,
                         env=env)

@@ -122,7 +122,6 @@ def load_craftax_env(env_str: str,
 
 def get_env(env_name: str,
             rand_key: random.PRNGKey,
-            num_envs: int,
             normalize_env: bool = False,
             normalize_image: bool = True,
             gamma: float = 0.99,

@@ -189,7 +189,7 @@ def make_train(args: TransformerHyperparams, rand_key: jax.random.PRNGKey):
             args.num_envs * args.num_steps // args.num_minibatches
     )
     env_key, rand_key = jax.random.split(rand_key)
-    env, env_params = get_env(args.env, env_key, args.num_envs,
+    env, env_params = get_env(args.env, env_key,
                                      gamma=args.gamma,
                                      normalize_image=False,
                                      action_concat=args.action_concat)
