@@ -208,7 +208,7 @@ class PocManStateWrapper(GymnaxWrapper):
     def observation_space(self, params: EnvParams):
         # one_side = 2 * max(self._env.x_size, self._env.y_size) - 1
         # return gymnax.environments.spaces.Box(0, 1, (one_side, one_side, 2))
-        return gymnax.environments.spaces.Box(0, 1, (self._env.x_size, self._env.y_size, 3))
+        return gymnax.environments.spaces.Box(0, 1, (self._env.x_size, self._env.y_size, 5))
 
     def get_obs(self, state: State) -> jnp.ndarray:
         """
@@ -217,7 +217,8 @@ class PocManStateWrapper(GymnaxWrapper):
         ghost positions
         pellet occupancy
         """
-        pellet_locs, ghost_locs = state.pellet_locations, state.ghost_locations
+        pellet_locs, power_up_locs = state.pellet_locations, state.power_up_locations
+        ghost_locs, old_ghost_locs = state.ghost_locations, state.old_ghost_locations
 
         # grid with -1 for walls
         grid = state.grid * (-1)
@@ -225,14 +226,21 @@ class PocManStateWrapper(GymnaxWrapper):
         # +1 for pellets
         grid_with_pellets = grid.at[pellet_locs[:, 0], pellet_locs[:, 1]].set(1)
 
+        # +1 for power up available
+        grid_with_power_up = grid.at[power_up_locs[:, 0], power_up_locs[:, 1]].set(1)
+
         # position
         position_grid = jnp.zeros_like(grid).at[state.player_locations[0], state.player_locations[1]].set(1)
 
         # separate channel for ghost locs
-        ghost_grid = jnp.zeros_like(grid).at[ghost_locs[:, 0], ghost_locs[:, 1]].set(1)
+        ghost_position_grid = jnp.zeros_like(grid).at[ghost_locs[:, 0], ghost_locs[:, 1]].set(1)
+        old_ghost_position_grid = jnp.zeros_like(grid).at[old_ghost_locs[:, 0], old_ghost_locs[:, 1]].set(1)
+
+        ghost_grid = ((state.frightened_state_time == 0) * (-1) * ghost_position_grid + \
+                      (state.frightened_state_time != 0) * state.frightened_state_time * ghost_position_grid)
 
         # stack em
-        combined_grids = jnp.stack((grid_with_pellets, ghost_grid, position_grid), axis=-1)
+        combined_grids = jnp.stack((grid_with_pellets, grid_with_power_up, ghost_grid, old_ghost_position_grid, position_grid), axis=-1)
 
         # always have player at center
         # position_encoded_grids = agent_centric_map(combined_grids, state.player_locations, jnp.array(3))
