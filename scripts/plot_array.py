@@ -86,7 +86,7 @@ all_paths = {
         'best': False,
         'super_dir': 'craftax',
         'state_version': 'memoryless',
-        'title': 'No-Inv. Craftax'
+        'title': 'No-Inv. Crafter'
     },
 }
 
