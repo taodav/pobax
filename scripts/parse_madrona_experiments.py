@@ -33,6 +33,8 @@ def parse_exp_dir(study_path, study_hparam_path, discounted: bool = False):
     # TODO: THIS
     train_sign_hparams = ['vf_coeff', 'lambda0', 'lr', 'lambda1', 'ld_weight', 'alpha']
     study_paths = list(study_path.iterdir())
+    files_to_remove = {"best_hyperparam_per_env_res_discounted.pkl", "best_hyperparam_per_env_res_undiscounted.pkl"}
+    study_paths = [path for path in study_paths if path.name not in files_to_remove]
 
     scores, final_scores, envs, hyperparams, eval_dict, final_eval_dict = {}, {}, [], {}, {}, {}
     for results_path in tqdm(study_paths):
@@ -132,7 +134,7 @@ if __name__ == "__main__":
     study_path = Path(args.study_path)
     study_hparam_path = Path(ROOT_DIR, 'scripts', 'hyperparams', study_path.stem + '.py')
 
-    parsed_res_path = study_path / "best_hyperparam_per_env_res.pkl"
+    parsed_res_path = study_path / f"best_hyperparam_per_env_res_{'discounted' if args.discounted else 'undiscounted'}.pkl"
 
     parsed_res = parse_exp_dir(study_path, study_hparam_path, discounted=args.discounted)
 
