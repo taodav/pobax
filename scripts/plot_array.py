@@ -13,6 +13,14 @@ rc('font', **{'family': 'serif', 'serif': ['cmr10'], 'size': 32})
 rc('axes', unicode_minus=False)
 
 all_paths = {
+    'tmaze_10': {
+        'position': (0, 0),
+        'best': True,
+        'super_dir': 'tmaze_best',
+        'state_version': 'memoryless',
+        'title': 'T-Maze 10',
+        'discounted': True
+    },
     'rocksample_11_11': {
         'position': (0, 1),
         'best': True,
