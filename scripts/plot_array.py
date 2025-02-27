@@ -18,75 +18,86 @@ all_paths = {
         'best': True,
         'super_dir': 'rocksample_11_11_best',
         'state_version': 'recurrent',
-        'title': 'RockSample(11, 11)'
+        'title': 'RockSample(11, 11)',
+        'discounted': True
     },
     'rocksample_15_15': {
         'position': (0, 2),
         'best': True,
         'super_dir': 'rocksample_15_15_best',
         'state_version': 'recurrent',
-        'title': 'RockSample(15, 15)'
+        'title': 'RockSample(15, 15)',
+        'discounted': True,
     },
     'battleship_10': {
         'position': (0, 3),
         'best': True,
         'state_version': 'battleship',
         'super_dir': 'battleship_best',
-        'title': 'BattleShip'
-},
+        'title': 'BattleShip',
+        'discounted': False,
+    },
     # 'pocman': {
     #     'position': (0, 1),
     #     'best': True,
-    #     'super_dir': 'battleship_best'
+    #     'super_dir': 'pocman_best'
+    #     'discounted': False,
     # },
     'walker_v': {
         'position': (1, 0),
         'best': False,
         'super_dir': 'walker_v',
         'state_version': 'recurrent',
-        'title': 'Walker (Vel. Only)'
+        'title': 'Walker (Vel. Only)',
+        'discounted': True,
     },
     'halfcheetah_v': {
         'position': (1, 1),
         'best': False,
         'super_dir': 'halfcheetah_v',
         'state_version': 'recurrent',
-        'title': 'HalfCheetah (Vel. Only)'
+        'title': 'HalfCheetah (Vel. Only)',
+        'discounted': False,
     },
     'navix_01': {
         'position': (1, 2),
         'best': True,
         'super_dir': 'navix_01_best',
         'state_version': 'memoryless',
-        'title': 'DMLab Minigrid (01)'
+        'title': 'DMLab Minigrid (01)',
+        'discounted': True,
     },
     'navix_02': {
         'position': (1, 3),
         'best': True,
         'super_dir': 'navix_02_best',
         'state_version': 'memoryless',
-        'title': 'DMLab Minigrid (02)'
+        'title': 'DMLab Minigrid (02)',
+        'discounted': True,
     },
     'ant_pixels': {
         'position': (2, 0),
         'best': False,
         'super_dir': 'ant_pixels',
         'state_version': 'memoryless',
-        'title': 'Visual Ant'
+        'title': 'Visual Ant',
+        'discounted': True,
     },
     'halfcheetah_pixels': {
         'position': (2, 1),
         'best': False,
         'super_dir': 'halfcheetah_pixels',
         'state_version': 'memoryless',
-        'title': 'Visual HalfCheetah'
+        'title': 'Visual HalfCheetah',
+        'discounted': True,
     },
     'craftax': {
         'position': (2, 2),
-        'best': False,
-        'super_dir': 'craftax',
-        'state_version': 'memoryless',
-        'title': 'No-Inv. Crafter'
+        'best': True,
+        'super_dir': 'craftax_best',
+        'state_version': 'recurrent',
+        'title': 'No-Inv. Crafter',
+        'discounted': False,
     },
 }
 
@@ -119,8 +130,7 @@ def generate_study_paths(paths: dict):
     return all_study_paths
 
 
-def plot_array(all_res: dict,
-               discounted: bool = False):
+def plot_array(all_res: dict):
     # first figure out what size array we want
     n_rows, n_cols = (np.array([res['position'] for res in all_res.values()]) + 1).max(axis=0)
     fig, axes = plt.subplots(n_rows, n_cols, figsize=(10 * n_rows, 5 * n_cols))
@@ -185,10 +195,7 @@ def plot_array(all_res: dict,
     plt.figlegend(lines, labels, loc=(0.78, 0.13))
 
     fig.supxlabel('Environment steps')
-    if discounted:
-        fig.supylabel(f'Online discounted returns')
-    else:
-        fig.supylabel(f'Online returns')
+    fig.supylabel(f'Online returns')
 
     fig.tight_layout()
 
@@ -197,14 +204,13 @@ def plot_array(all_res: dict,
     return fig, axes
 
 
-
 if __name__ == "__main__":
-    discounted = True
     all_study_settings = generate_study_paths(all_paths)
 
     all_res = {}
     for name, info in all_study_settings.items():
         paths = info['paths']
+        discounted = info['discounted']
         del info['paths']
         env_res = {
             **info,
@@ -249,11 +255,10 @@ if __name__ == "__main__":
 
         all_res[name] = env_res
 
-    fig, axes = plot_array(all_res, discounted=discounted)
+    fig, axes = plot_array(all_res)
 
 
-    discount_str = '_discounted' if discounted else ''
-    save_plot_to = Path(ROOT_DIR, 'results', f'all_envs{discount_str}.pdf')
+    save_plot_to = Path(ROOT_DIR, 'results', f'all_envs.pdf')
 
     fig.savefig(save_plot_to, bbox_inches='tight')
     print(f"Saved figure to {save_plot_to}")

@@ -144,7 +144,8 @@ def get_env(env_name: str,
 
     if env_name.startswith('tmaze_'):
         hallway_length = int(env_name.split('_')[-1])
-        env = TMaze(hallway_length=hallway_length)
+        env = TMaze(hallway_length=hallway_length,
+                    perfect_memory=perfect_memory)
         env_params = env.default_params
 
     elif env_name in pomdp_files:
