@@ -85,7 +85,10 @@ def get_network_fn(env: gym.Env,
 
 
 def get_transformer_network_fn(env: environment.Environment, env_params: environment.EnvParams):
-    if isinstance(env.action_space(env_params), spaces.Discrete):
+    if isinstance(env, Battleship) or ((hasattr(env, '_unwrapped') and isinstance(env._unwrapped, Battleship))):
+        network_fn = BattleShipActorCriticTransformer
+        action_size = env.action_space(env_params).n
+    elif isinstance(env.action_space(env_params), spaces.Discrete):
         action_size = env.action_space(env_params).n
 
         # Check whether we use image observations

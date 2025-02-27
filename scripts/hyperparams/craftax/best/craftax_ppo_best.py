@@ -2,8 +2,8 @@ from pathlib import Path
 
 exp_name = Path(__file__).stem
 
-lrs = [2.5e-5]
-lambda0s = [0.7]
+lrs = [0.00025]
+lambda0s = [0.5]
 lambda1s = [0.95]
 alphas = [1]
 ld_weights = [0]
@@ -11,11 +11,12 @@ ld_weights = [0]
 hparams = {
     'file_name':
         f'runs_{exp_name}.txt',
-    'entry': '-m pobax.algos.transformer_xl',
+    'entry': '-m pobax.algos.ppo',
     'args': [
         {
             'env': 'craftax_pixels',
             'double_critic': False,
+            'memoryless': False,
             'action_concat': True,
             'lr': lrs,
             'anneal_lr': True,
@@ -31,7 +32,7 @@ hparams = {
             'num_steps': 64,
             'num_envs': 256,
             'total_steps': int(5e8),
-            'seed': [2024 + i for i in range(10)],
+            'seed': [2050 + i for i in range(10)],
             'n_seeds': 3,
             'platform': 'gpu',
             'debug': True,
