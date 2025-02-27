@@ -4,7 +4,8 @@ import pickle
 import numpy as np
 from matplotlib import rc
 import matplotlib.pyplot as plt
-from scipy.stats import sem, t
+
+from pobax.utils.plot import mean_confidence_interval
 
 from definitions import ROOT_DIR
 
@@ -19,6 +20,7 @@ colors = {
     'orange': '#DD8453',
     'yellow': '#f8de7c',
     'green': '#3FC57F',
+    'dark green': '#27ae60',
     'cyan': '#48dbe5',
     'blue': '#3180df',
     'purple': '#9d79cf',
@@ -43,21 +45,6 @@ env_info = {
     'HalfCheetah-P-v0': {'F': 'HalfCheetah-F-v0'},
     'HalfCheetah-V-v0': {'F': 'HalfCheetah-F-v0'},
 }
-
-env_name_to_x_upper_lim = {
-    '4x3': 1e6,
-    'cheese.95': 1e6,
-    'hallway': 2e6,
-    'network': 1e6,
-    'paint': 1e6,
-    'tiger-alt-start': 1e6,
-    'tmaze_5': 2e6
-}
-def mean_confidence_interval(data, confidence=0.95, axis=-1):
-    n = data.shape[axis]
-    m, se = data.mean(axis=axis), sem(data, axis=axis)
-    h = se * t.ppf((1 + confidence) / 2., n-1)
-    return m, h
 
 def calc_means_and_confidences(all_reses: list[tuple],
                                all_F_reses: list[tuple]) -> dict:

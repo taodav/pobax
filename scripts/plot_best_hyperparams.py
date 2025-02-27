@@ -267,10 +267,12 @@ if __name__ == "__main__":
         elif 'total_steps' in best_res['hyperparams']:
             step_multiplier = best_res['hyperparams']['total_steps'] // best_res['scores'].shape[0]
         else:
-            hyperparams_dir = study_path.parent.parent / 'scripts' / 'hyperparams'
-            study_hparam_filename = study_path.stem + '.py'
-            hyperparam_path = find_file_in_dir(study_hparam_filename, hyperparams_dir)
-            step_multiplier = get_total_steps_multiplier(best_res['scores'].shape[0], hyperparam_path)
+            raise NotImplementedError("Missing total steps")
+
+            # hyperparams_dir = study_path.parent.parent / 'scripts' / 'hyperparams'
+            # study_hparam_filename = study_path.stem + '.py'
+            # hyperparam_path = find_file_in_dir(study_hparam_filename, hyperparams_dir)
+            # step_multiplier = get_total_steps_multiplier(best_res['scores'].shape[0], hyperparam_path)
         best_res['step_multiplier'] = [step_multiplier] * len(best_res['envs'])
 
     fig, axes = plot_reses(all_reses, individual_runs=False, n_rows=3, plot_title=plot_name,
