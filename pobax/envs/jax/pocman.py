@@ -208,7 +208,7 @@ class PocManStateWrapper(GymnaxWrapper):
     def observation_space(self, params: EnvParams):
         # one_side = 2 * max(self._env.x_size, self._env.y_size) - 1
         # return gymnax.environments.spaces.Box(0, 1, (one_side, one_side, 2))
-        return gymnax.environments.spaces.Box(0, 1, (self._env.x_size, self._env.y_size, 5))
+        return gymnax.environments.spaces.Box(0, 1, (self._env.x_size, self._env.y_size, 6))
 
     def get_obs(self, state: State) -> jnp.ndarray:
         """
@@ -239,8 +239,10 @@ class PocManStateWrapper(GymnaxWrapper):
         ghost_grid = ((state.frightened_state_time == 0) * (-1) * ghost_position_grid + \
                       (state.frightened_state_time != 0) * state.frightened_state_time * ghost_position_grid)
 
+        last_direction = jnp.ones_like(grid) * state.last_direction
+
         # stack em
-        combined_grids = jnp.stack((grid_with_pellets, grid_with_power_up, ghost_grid, old_ghost_position_grid, position_grid), axis=-1)
+        combined_grids = jnp.stack((grid_with_pellets, grid_with_power_up, ghost_grid, old_ghost_position_grid, position_grid, last_direction), axis=-1)
 
         # always have player at center
         # position_encoded_grids = agent_centric_map(combined_grids, state.player_locations, jnp.array(3))

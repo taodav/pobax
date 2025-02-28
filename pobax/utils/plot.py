@@ -1,4 +1,5 @@
 from scipy.stats import sem, t
+from scipy.signal import savgol_filter
 
 colors = {
     'pink': '#ff96b6',
@@ -22,3 +23,6 @@ def mean_confidence_interval(data, confidence=0.95, axis=-1):
     m, se = data.mean(axis=axis), sem(data, axis=axis)
     h = se * t.ppf((1 + confidence) / 2., n-1)
     return m, h
+
+def smoothen(data, window: int = 30, polynomial_deg: int = 3):
+    return savgol_filter(data, window, polynomial_deg)

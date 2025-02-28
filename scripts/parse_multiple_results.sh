@@ -1,5 +1,4 @@
-RESULTS_DIR='../results/rocksample_15_15_best'
-#RESULTS_PATHS='navix/navix_01_ppo navix/navix_01_ppo_LD navix_01_ppo_memoryless navix_02_ppo navix_02_ppo_LD navix_03_ppo_memoryless navix_03_ppo_LD navix_03_ppo_memoryless'
+RESULTS_DIR='../results/pocman'
 
 for item in $RESULTS_DIR/*/;
 do

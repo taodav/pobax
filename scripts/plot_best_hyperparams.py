@@ -194,7 +194,7 @@ if __name__ == "__main__":
     discounted = True
     hyperparam_type = 'per_env'  # (all_env | per_env)
 
-    env_name = 'tmaze_10'
+    env_name = 'pocman'
     super_dir = 'tmaze'
     ylims = None
 
@@ -209,10 +209,12 @@ if __name__ == "__main__":
         # ('TRANFORMER', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_transformer'), 'cyan'),
     ]
 
-    # env_name = 'navix_01'
-    # sweep_var = 'nenvs'
+    # env_name = 'walker_v'
+    # sweep_var = 'hsize'
     # nenvs = 32
-    # ylims = (0., 0.68)
+    # # ylims = (0., 0.68)  # for navix_01 nenvs
+    # ylims = (50, 2500)  # for walker_v hsize
+    # # ylims = None
     #
     # plot_name = f'{env_name}_{hyperparam_type}_{sweep_var}_{nenvs}'
     #
@@ -261,6 +263,12 @@ if __name__ == "__main__":
                 else:
                     new_envs.append(env)
             best_res['envs'] = new_envs
+
+            assert len(best_res['envs']) == 1
+            env_name = best_res['envs'][0]
+            if '-F-' in env_name:
+                first_res = all_reses[0][1]
+                best_res['envs'] = first_res['envs']
 
         all_reses.append((name, best_res, color))
 
