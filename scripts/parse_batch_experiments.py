@@ -330,9 +330,15 @@ if __name__ == "__main__":
 
     assert study_hparam_path is not None, f"Could not find {study_hparam_filename} in {hyperparams_dir}"
 
-    parsed_res_path = study_path / "parsed_hparam_scores.pkl"
+    if args.discounted:
+        parsed_res_file = "parsed_hparam_scores_discounted.pkl"
+    else:
+        parsed_res_file = "parsed_hparam_scores.pkl"
+
+    parsed_res_path = study_path / parsed_res_file
 
     parsed_res = parse_exp_dir(study_path, study_hparam_path, discounted=args.discounted)
+    parsed_res['discounted'] = args.discounted
 
     print(f"Saving parsed results to {parsed_res_path}")
     with open(parsed_res_path, 'wb') as f:

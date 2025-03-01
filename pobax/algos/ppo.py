@@ -138,14 +138,14 @@ def env_step(runner_state, unused, agent: PPO, env, env_params):
 
 def calculate_gae(traj_batch, last_val, last_done, gae_lambda, gamma):
     def _get_advantages(carry, transition):
-        gae, next_value, next_done, gae_lambda = carry
+        gae, next_value, gae_lambda = carry
         done, value, reward = transition.done, transition.value, transition.reward
-        delta = reward + gamma * next_value * (1 - next_done) - value
-        gae = delta + gamma * gae_lambda * (1 - next_done) * gae
-        return (gae, value, done, gae_lambda), gae
+        delta = reward + gamma * next_value * (1 - done) - value
+        gae = delta + gamma * gae_lambda * (1 - done) * gae
+        return (gae, value, gae_lambda), gae
 
     _, advantages = jax.lax.scan(_get_advantages,
-                                 (jnp.zeros_like(last_val), last_val, last_done, gae_lambda),
+                                 (jnp.zeros_like(last_val), last_val, gae_lambda),
                                  traj_batch, reverse=True, unroll=16)
     target = advantages + traj_batch.value
     return advantages, target
@@ -164,7 +164,7 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
             args.num_envs * args.num_steps // args.num_minibatches
     )
     env_key, rand_key = jax.random.split(rand_key)
-    env, env_params = get_env(args.env, env_key, args.num_envs,
+    env, env_params = get_env(args.env, env_key,
                                      gamma=args.gamma,
                                      normalize_image=False,
                                      perfect_memory=args.perfect_memory,
@@ -417,34 +417,31 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
         metric = jax.tree.map(update_filter, metric)
 
         # TODO: offline eval here.
-        # final_train_state = runner_state[0]
+        final_train_state = runner_state[0]
 
-        # if not args.env.startswith("craftax"):
-        #     reset_rng = jax.random.split(_rng, args.num_envs)
-        # else:
-        #     reset_rng, _rng = jax.random.split(_rng)
-        # eval_obsv, eval_env_state = env.reset(reset_rng, env_params)
+        if not args.env.startswith("craftax"):
+            reset_rng = jax.random.split(_rng, args.num_envs)
+        else:
+            reset_rng, _rng = jax.random.split(_rng)
+        eval_obsv, eval_env_state = env.reset(reset_rng, env_params)
 
-        # eval_init_hstate = ScannedRNN.initialize_carry(args.num_envs, args.hidden_size)
+        eval_init_hstate = ScannedRNN.initialize_carry(args.num_envs, args.hidden_size)
 
-        # eval_runner_state = (
-        #     final_train_state,
-        #     eval_env_state,
-        #     eval_obsv,
-        #     jnp.zeros((args.num_envs), dtype=bool),
-        #     eval_init_hstate,
-        #     _rng,
-        # )
+        eval_runner_state = (
+            final_train_state,
+            eval_env_state,
+            eval_obsv,
+            jnp.zeros((args.num_envs), dtype=bool),
+            eval_init_hstate,
+            _rng,
+        )
 
         # COLLECT EVAL TRAJECTORIES
-        # eval_runner_state, eval_traj_batch = jax.lax.scan(
-        #     _env_step, eval_runner_state, None, env_params.max_steps_in_episode
-        # )
-        # eval_runner_state, eval_traj_batch = jax.lax.scan(
-        #     _env_step, eval_runner_state, None, 5
-        # )
-        res = {"runner_state": runner_state, "metric": metric}
-        # res = {"runner_state": runner_state, "metric": metric, 'final_eval_metric': eval_traj_batch.info}
+        eval_runner_state, eval_traj_batch = jax.lax.scan(
+            _env_step, eval_runner_state, None, env_params.max_steps_in_episode
+        )
+        # res = {"runner_state": runner_state, "metric": metric}
+        res = {"runner_state": runner_state, "metric": metric, 'final_eval_metric': eval_traj_batch.info}
 
         return res
 
