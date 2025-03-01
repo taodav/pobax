@@ -19,7 +19,7 @@ walker_hsize_paths = {
         'sweep_var': 'hsize',
         'position': (0, 0),
         'state_version': 'recurrent',
-        'title': 'Hidden Size = 32',
+        'title': 'Network Width = 32',
         'discounted': False,
         'range': (0, 2500)
     },
@@ -28,7 +28,7 @@ walker_hsize_paths = {
         'sweep_var': 'hsize',
         'position': (0, 1),
         'state_version': 'recurrent',
-        'title': 'Hidden Size = 64',
+        'title': 'Network Width = 64',
         'discounted': False,
         'range': (0, 2500)
     },
@@ -37,7 +37,7 @@ walker_hsize_paths = {
         'sweep_var': 'hsize',
         'position': (0, 2),
         'state_version': 'recurrent',
-        'title': 'Hidden Size = 256',
+        'title': 'Network Width = 256',
         'discounted': False,
         'range': (0, 2500)
     },
@@ -215,7 +215,7 @@ all_paths = {
         'title': 'Visual Ant',
         'discounted': False,
         'smoothen_curve': True,
-        'range': (-1000, 1500)
+        'range': (-1000, 2000)
     },
     'halfcheetah_pixels': {
         'position': (2, 1),
@@ -376,7 +376,7 @@ def plot_array(all_res: dict, row_mult: int = 10, col_mult: int = 5,
 
 
 if __name__ == "__main__":
-    to_plot = 'all_envs'
+    to_plot = 'ablation_walker_hsize'
 
     if to_plot == 'all_envs':
         all_study_settings = generate_study_paths(all_paths)

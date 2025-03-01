@@ -195,7 +195,7 @@ if __name__ == "__main__":
     hyperparam_type = 'per_env'  # (all_env | per_env)
 
     env_name = 'pocman'
-    super_dir = 'tmaze'
+    super_dir = 'pocman'
     ylims = None
 
     plot_name = f'{env_name}_{hyperparam_type}'
