@@ -4,34 +4,36 @@ exp_name = Path(__file__).stem
 
 lrs = [2.5e-4]
 lambda0s = [0.95]
-lambda1s = [0.5]
+lambda1s = [0.95]
 alphas = [1]
 ld_weights = [0]
 
 hparams = {
     'file_name':
         f'runs_{exp_name}.txt',
-    'entry': '-m pobax.algos.transformer_xl',
+    'entry': '-m pobax.algos.ppo',
     'args': [
         {
             'env': 'pocman',
             'double_critic': False,
             'action_concat': False,
-            'lr': ' '.join(map(str, lrs)),
-            'anneal_lr': True,
-            'hidden_size': 256,
-            'lambda0': ' '.join(map(str, lambda0s)),
+            'perfect_memory': True,
+            'memoryless': True,
+            'lr': lrs,
+            'lambda0': lambda0s,
             'lambda1': ' '.join(map(str, lambda1s)),
             'alpha': ' '.join(map(str, alphas)),
             'ld_weight': ' '.join(map(str, ld_weights)),
+            'hidden_size': 512,
+            'num_envs': 256,
             'entropy_coeff': 0.01,
-            'num_steps': 128,
-            'num_envs': 4,
+            'steps_log_freq': 8,
+            'update_log_freq': 10,
             'total_steps': int(1e6),
             'seed': 2024,
+            'n_seeds': 5,
             'debug': True,
             'show_discounted': True,
-            'n_seeds': 1,
             'platform': 'gpu',
             'study_name': exp_name
         }

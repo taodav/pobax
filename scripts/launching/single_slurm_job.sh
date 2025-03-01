@@ -1,6 +1,7 @@
 #!/bin/bash
 #SBATCH --partition=gpu         # Partition to run on
 #SBATCH --gres=gpu:1             # Request 8 GPU resources
+#SBATCH --exclude=gpu2115,gpu2106
 #SBATCH --time=12:00:00          # Request 12 hours of runtime
 #SBATCH --mem=32G                # Request 32GB of memory
 #SBATCH -J kevin        # Specify a job name
@@ -11,7 +12,7 @@
 source ~/pobax_baseline/bin/activate
 
 # Specify the filename
-input_file="../runs/runs_battleship_10_transformer.txt"
+input_file="../runs/runs_pocman_ppo.txt"
 job_name=$(basename "$input_file" .txt) # Extract the base name of the file without extension
 
 # Read commands from the file and submit each as a separate job
@@ -21,7 +22,7 @@ while IFS= read -r command; do
 #SBATCH --partition=3090-gcondo
 #SBATCH --cpus-per-task=3
 #SBATCH --gres=gpu:1
-#SBATCH --exclude=gpu2106,gpu2102
+#SBATCH --exclude=gpu2106,gpu2102,gpu2115
 #SBATCH --time=72:00:00
 #SBATCH --mem=32G
 #SBATCH -J ${job_name}

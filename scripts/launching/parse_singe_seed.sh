@@ -1,6 +1,7 @@
 #!/bin/bash
 #SBATCH --partition=gpu          # Specify the partition to run on
 #SBATCH --gres=gpu:1             # Request 1 GPU resource
+#SBATCH --exclude=gpu2115
 #SBATCH --cpus-per-task=8
 #SBATCH --time=24:00:00            # Request 1 hour of runtime
 #SBATCH --mem=64G                  # Request 8GB of memory
@@ -11,4 +12,4 @@ cd ..
 # Activate the virtual environment
 source ~/pobax_baseline/bin/activate
 
-python parse_single_seed.py ../results/halfcheetah_p_transformer --discounted
+python parse_single_seed.py ../results/pocman_perfect_memory_memoryless_ppo

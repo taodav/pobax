@@ -529,6 +529,7 @@ class ActionConcatWrapper(GymnaxWrapper):
             action_vec = action_vec[None, None, ...]
             h, w, c = obs_shape
             action_img = action_vec.repeat(h, axis=0).repeat(w, axis=1)
+            
             obs = jnp.concatenate([obs, action_img], axis=-1)
         else:
             raise NotImplementedError

@@ -177,20 +177,20 @@ def find_file_in_dir(file_name: str, base_dir: Path) -> Path:
             return path
 
 if __name__ == "__main__":
-    env_name = 'craftax'
+    env_name = 'pocman'
 
     # normal
     study_paths = [
         # ('$\lambda$-discrepancy + Quantile PPO', Path(ROOT_DIR, 'results', f'{env_name}_quantile_LD_ppo'), 'green'),
         # ('$\lambda$-discrepancy + PPO', Path(ROOT_DIR, 'results', f'{env_name}_LD_ppo'), 'dark gray'),
-        ('PPO + RNN', Path(ROOT_DIR, 'results', f'{env_name}_ppo_best'), 'purple'),
+        # ('PPO + RNN', Path(ROOT_DIR, 'results', f'{env_name}_ppo_best'), 'purple'),
         # ('PPO + TRANSFORMER + No Frame', Path(ROOT_DIR, 'results', f'{env_name}_transformer'), 'yellow'),
-        ('PPO + TRANSFORMER', Path(ROOT_DIR, 'results', f'{env_name}_transformer_best'), 'cyan'),
-        ('PPO + RNN + LD', Path(ROOT_DIR, 'results', f'{env_name}_ppo_LD_best'), 'blue'),
-        ('PPO + MEMORYLESS', Path(ROOT_DIR, 'results', f'{env_name}_ppo_memoryless_best'), 'dark gray'),
-        ('PPO + OBSERVABLE', Path(ROOT_DIR, 'results', f'{env_name}_ppo_observable_best'), 'green'),
+        # ('PPO + TRANSFORMER', Path(ROOT_DIR, 'results', f'{env_name}_transformer_best'), 'cyan'),
+        # ('PPO + RNN + LD', Path(ROOT_DIR, 'results', f'{env_name}_ppo_LD_best'), 'blue'),
+        # ('PPO + MEMORYLESS', Path(ROOT_DIR, 'results', f'{env_name}_ppo_memoryless_best'), 'dark gray'),
+        # ('PPO + OBSERVABLE', Path(ROOT_DIR, 'results', f'{env_name}_ppo_observable_best'), 'green'),
         # ('TEST', Path(ROOT_DIR, 'results', f'test_tmaze'), 'blue'),
-        # ('Perfect Memory PPO (NN)', Path(ROOT_DIR, 'results', f'{env_name}_perfect_mem_ppo'), 'pink'),
+        ('Perfect Memory PPO (NN)', Path(ROOT_DIR, 'results', f'{env_name}_perfect_memory_memoryless_ppo'), 'pink'),
         # ('PPO (RNN)', Path(ROOT_DIR, 'results', f'{env_name}_ppo'), 'blue'),
         # ('PPO (NN)', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_ppo'), 'dark gray'),
     ]
@@ -218,7 +218,7 @@ if __name__ == "__main__":
             if name == 'PPO Markov':
                 fname = 'best_hyperparam_res_F_split.pkl'
         elif hyperparam_type == 'per_env':
-            fname = "best_hyperparam_per_env_res_undiscounted.pkl"
+            fname = "best_hyperparam_per_env_res_discounted.pkl"
 
         with open(study_path / fname, "rb") as f:
             best_res = pickle.load(f)
