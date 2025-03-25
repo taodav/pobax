@@ -41,6 +41,7 @@ class PPO:
                  ld_weight: float = 0.,
                  alpha: float = 0.,
                  vf_coeff: float = 0.,
+                 ld_exploration_bonus_scale: float = 0.,
                  entropy_coeff: float = 0.01,
                  clip_eps: float = 0.2):
         self.network = network
@@ -49,6 +50,7 @@ class PPO:
         self.alpha = alpha
         self.vf_coeff = vf_coeff
         self.entropy_coeff = entropy_coeff
+        self.ld_exploration_bonus_scale = ld_exploration_bonus_scale
         self.clip_eps = clip_eps
         self.act = jax.jit(self.act)
         self.loss = jax.jit(self.loss)
@@ -70,7 +72,7 @@ class PPO:
         )
         return value, action, log_prob, hstate
 
-    def loss(self, params, init_hstate, traj_batch, gae, targets):
+    def loss(self, params, init_hstate, traj_batch, gae, targets, last_vals):
         # RERUN NETWORK
         _, pi, value = self.network.apply(
             params, init_hstate[0], (traj_batch.obs, traj_batch.done)
@@ -98,6 +100,12 @@ class PPO:
         if self.double_critic:
             gae = (self.alpha * gae[..., 0] +
                    (1 - self.alpha) * gae[..., 1])
+
+            next_values = jnp.concatenate(traj_batch.values[:, 1:], jnp.expand_dims(last_vals, axis=1))
+            ld_exploration_bonus = jnp.abs(next_values[..., 0] - next_values[..., 1])
+
+            gae += self.ld_exploration_bonus_scale * ld_exploration_bonus
+
         gae = (gae - gae.mean()) / (gae.std() + 1e-8)
         loss_actor1 = ratio * gae
         loss_actor2 = (
@@ -306,7 +314,7 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
 
                     grad_fn = jax.value_and_grad(agent.loss, has_aux=True)
                     total_loss, grads = grad_fn(
-                        train_state.params, init_hstate, traj_batch, advantages, targets
+                        train_state.params, init_hstate, traj_batch, advantages, targets, last_val
                     )
                     train_state = train_state.apply_gradients(grads=grads)
                     return train_state, total_loss
