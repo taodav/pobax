@@ -52,6 +52,7 @@ class PPOHyperparams(Tap):
     hidden_size: int = 128
     total_steps: int = int(1.5e6)
     entropy_coeff: float = 0.01
+    ld_exploration_bonus_scale: float = 0.
     clip_eps: float = 0.2
     max_grad_norm: float = 0.5
     anneal_lr: bool = True
