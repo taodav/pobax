@@ -191,40 +191,41 @@ def find_file_in_dir(file_name: str, base_dir: Path) -> Path:
 
 if __name__ == "__main__":
 
-    discounted = True
+    discounted = False
     hyperparam_type = 'per_env'  # (all_env | per_env)
 
-    env_name = 'pocman'
-    super_dir = 'pocman'
-    ylims = None
-
-    plot_name = f'{env_name}_{hyperparam_type}'
-
-    # normal
-    study_paths = [
-        ('RNN', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo'), 'purple'),
-        ('RNN + LD', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_LD'), 'blue'),
-        ('Memoryless', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_memoryless'), 'dark gray'),
-        ('STATE', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_perfect_memory_memoryless'), 'green'),
-        # ('TRANFORMER', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_transformer'), 'cyan'),
-    ]
-
-    # env_name = 'walker_v'
-    # sweep_var = 'hsize'
-    # nenvs = 32
-    # # ylims = (0., 0.68)  # for navix_01 nenvs
-    # ylims = (50, 2500)  # for walker_v hsize
-    # # ylims = None
+    # env_name = 'pocman'
+    # super_dir = 'pocman'
+    # ylims = None
     #
-    # plot_name = f'{env_name}_{hyperparam_type}_{sweep_var}_{nenvs}'
+    # plot_name = f'{env_name}_{hyperparam_type}'
     #
+    # # normal
     # study_paths = [
-    #     ('RNN', Path(ROOT_DIR, 'results', f'{env_name}_{sweep_var}_sweep/{env_name}_ppo_{sweep_var}_sweep', f'{env_name}_ppo_{sweep_var}_sweep_{sweep_var}_{nenvs}'), 'purple'),
-    #     # ('RNN + LD', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_LD'), 'blue'),
-    #     ('Memoryless', Path(ROOT_DIR, 'results', f'{env_name}_{sweep_var}_sweep/{env_name}_ppo_memoryless_{sweep_var}_sweep', f'{env_name}_ppo_memoryless_{sweep_var}_sweep_{sweep_var}_{nenvs}'), 'dark gray'),
-    #     ('STATE', Path(ROOT_DIR, 'results', f'{env_name}_{sweep_var}_sweep/{env_name}_ppo_perfect_memory_{sweep_var}_sweep', f'{env_name}_ppo_perfect_memory_{sweep_var}_sweep_{sweep_var}_{nenvs}'), 'green'),
+    #     ('RNN', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo'), 'purple'),
+    #     ('RNN + LD', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_LD'), 'blue'),
+    #     ('Memoryless', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_memoryless'), 'dark gray'),
+    #     ('STATE', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_perfect_memory_memoryless'), 'green'),
     #     # ('TRANFORMER', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_transformer'), 'cyan'),
     # ]
+
+    env_name = 'rocksample_11_11'
+    sweep_var = 'hsize'
+    nenvs = 128
+    # ylims = (0., 0.68)  # for navix_01 nenvs
+    # ylims = (50, 2500)  # for walker_v hsize
+    ylims = (0, 21)  # for rocksample_11_11 hsize
+    # ylims = None
+
+    plot_name = f'{env_name}_{hyperparam_type}_{sweep_var}_{nenvs}'
+
+    study_paths = [
+        ('RNN', Path(ROOT_DIR, 'results', f'{env_name}_{sweep_var}_sweep/{env_name}_ppo_{sweep_var}_sweep', f'{env_name}_ppo_{sweep_var}_sweep_{sweep_var}_{nenvs}'), 'purple'),
+        # ('RNN + LD', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_LD'), 'blue'),
+        ('Memoryless', Path(ROOT_DIR, 'results', f'{env_name}_{sweep_var}_sweep/{env_name}_ppo_memoryless_{sweep_var}_sweep', f'{env_name}_ppo_memoryless_{sweep_var}_sweep_{sweep_var}_{nenvs}'), 'dark gray'),
+        ('STATE', Path(ROOT_DIR, 'results', f'{env_name}_{sweep_var}_sweep/{env_name}_ppo_perfect_memory_{sweep_var}_sweep', f'{env_name}_ppo_perfect_memory_{sweep_var}_sweep_{sweep_var}_{nenvs}'), 'green'),
+        # ('TRANFORMER', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_transformer'), 'cyan'),
+    ]
 
     # best
     # study_paths = [
