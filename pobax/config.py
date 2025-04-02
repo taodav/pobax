@@ -48,12 +48,13 @@ class PPOHyperparams(Tap):
     ld_weight: list[float] = [0.0]  # How much to we weight the LD loss? only applies when double_critic is True.
     vf_coeff: list[float] = [0.5]  # How much do we weight value loss?
 
-    hidden_size: int = 128  # Hidden size of our neural net
-    total_steps: int = int(1.5e6)  # How many training steps do we run?
-    entropy_coeff: float = 0.01  # PPO policy entropy coefficient for exploration
-    clip_eps: float = 0.2  # PPO policy gradient clip epsilon
-    max_grad_norm: float = 0.5  # Maximum grad norm for updates
-    anneal_lr: bool = True  # Do we (linearly) anneal learning rate?
+    hidden_size: int = 128
+    total_steps: int = int(1.5e6)
+    entropy_coeff: float = 0.01
+    ld_exploration_bonus: float = 0.
+    clip_eps: float = 0.2
+    max_grad_norm: float = 0.5
+    anneal_lr: bool = True
 
     image_size: int = 32  # [MADRONA/CRAFTAX] what is the size of our image?
 
