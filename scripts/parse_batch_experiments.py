@@ -11,6 +11,7 @@ a file that has the best hyperparams, and the best score.
 """
 import argparse
 from collections import OrderedDict
+from copy import deepcopy
 import importlib
 import os
 from pathlib import Path
@@ -235,7 +236,11 @@ def parse_exp_dir(study_path, study_hparam_path, discounted: bool = False):
 
     if len(missing_hparams) > 0:
         to_delete_keys = []
+        prev_swept_hparams = None
         for env, score_dict in scores_by_env.items():
+            # keep track in current env the dim ref through curr_swept_hparams.
+            # We prepend the hparam key and values if we add a dimension.
+            curr_swept_hparams = deepcopy(swept_hparams)
 
             # we do reversed here to match the prepending of dimensions
             for k, v in reversed(missing_hparams.items()):
@@ -261,7 +266,7 @@ def parse_exp_dir(study_path, study_hparam_path, discounted: bool = False):
                 # Now we have to stack them, either to an existing dimension
                 # or to a new dimension
                 if k in train_sign_hparams:
-                    k_idx = train_sign_hparams.index(k)
+                    k_idx = list(curr_swept_hparams.keys()).index(k)
                     for new_score_key, new_score in new_score_dict.items():
                         score_dict[new_score_key] = (
                             np.concatenate(new_score['grouped_reses'], axis=k_idx),
@@ -277,14 +282,20 @@ def parse_exp_dir(study_path, study_hparam_path, discounted: bool = False):
                             np.stack(new_score['grouped_reses'], axis=0),
                             np.stack(new_score['final_grouped_reses'], axis=0)
                         )
+                    # Now we need to add the added dimension to the curr_swept_hparams
+                    curr_swept_hparams.update({k: v})
+                    curr_swept_hparams.move_to_end(k, last=False)
 
             scores_by_env[env] = score_dict[()]
+            if prev_swept_hparams is not None:
+                assert prev_swept_hparams == curr_swept_hparams
 
         if to_delete_keys:
             for k in to_delete_keys:
                 del missing_hparams[k]
         # add our missing hyperparams
-        swept_hparams = OrderedDict(list(missing_hparams.items()) + list(swept_hparams.items()))
+        swept_hparams = curr_swept_hparams
+        # swept_hparams = OrderedDict(list(missing_hparams.items()) + list(swept_hparams.items()))
 
     # Stack by envs
     envs = []
@@ -297,13 +308,14 @@ def parse_exp_dir(study_path, study_hparam_path, discounted: bool = False):
     stacked_scores = np.stack(scores, axis=-1)
     stacked_final_scores = np.stack(final_scores, axis=-1)
 
-    dim_ref = [*swept_hparams, 'num_update', 'num_steps', 'seeds', 'env']
+    dim_ref = [*swept_hparams, 'num_update', 'num_steps', 'seeds']
 
     parsed_res = {
         'envs': envs,
         'scores': stacked_scores,
         'final_scores': stacked_final_scores,
         'dim_ref': dim_ref,
+        'swept_hparams': swept_hparams,
         'hyperparams': swept_hparams,
         'all_hyperparams': all_hparams
     }
