@@ -1,4 +1,4 @@
-RESULTS_DIR='../results/pocman'
+RESULTS_DIR='../results/ld_exploration'
 
 for item in $RESULTS_DIR/*/;
 do

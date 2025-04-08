@@ -192,7 +192,7 @@ def find_file_in_dir(file_name: str, base_dir: Path) -> Path:
 
 if __name__ == "__main__":
 
-    discounted = False
+    discounted = True
     hyperparam_type = 'per_env'  # (all_env | per_env)
 
     env_name = 'rocksample_11_11'
@@ -203,7 +203,8 @@ if __name__ == "__main__":
 
     # normal
     study_paths = [
-        ('RNN', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo'), 'purple'),
+        # ('RNN', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo'), 'purple'),
+        ('RNN', Path(ROOT_DIR, 'results', f'entropy_sweep_{env_name}'), 'purple'),
         ('RNN + LD', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_LD'), 'blue'),
         ('Memoryless', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_memoryless'), 'dark gray'),
         ('STATE', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_perfect_memory_memoryless'), 'green'),
