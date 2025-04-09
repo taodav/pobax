@@ -48,6 +48,7 @@ class PPOHyperparams(Tap):
     alpha: list[float] = [1.]  # adv = alpha * adv_lambda_0 + (1 - alpha) * adv_lambda_1
     ld_weight: list[float] = [0.0]  # how much to we weight the LD loss vs. value loss? only applies when optimize LD is True.
     vf_coeff: list[float] = [0.5]
+    rnd_lr: list[float] = [2.5e-4]
 
     hidden_size: int = 128
     total_steps: int = int(1.5e6)
@@ -69,6 +70,13 @@ class PPOHyperparams(Tap):
     debug: bool = False
     show_discounted: bool = False  # For debug plotting, do we show undisc returns or disc returns?
 
+    # RND hyperparams
+    exploration_update_epochs: int = 1
+    rnd_loss_coeff: float = 0.01
+    rnd_gae_coeff: float = 0.01
+    rnd_reward_coeff: float = 1.0
+    rnd_hidden_size: int = 512
+
     study_name: str = 'batch_ppo_test'
 
     def process_args(self) -> None:
@@ -78,6 +86,7 @@ class PPOHyperparams(Tap):
         self.lambda1 = jnp.array(self.lambda1)
         self.alpha = jnp.array(self.alpha)
         self.ld_weight = jnp.array(self.ld_weight)
+        self.rnd_lr = jnp.array(self.rnd_lr)
 
 
 class DQNHyperparams(Tap):
@@ -163,6 +172,15 @@ class TransformerHyperparams(Tap):
     window_grad: int = 64
     gating: bool = True
     gating_bias: float = 2.0
+
+    # RND hyperparams
+    exploration_update_epochs: int = 1
+    rnd_loss_coeff: float = 0.01
+    rnd_gae_coeff: float = 0.01
+    rnd_reward_coeff: float = 1.0
+    rnd_lr: list[float] = [3e-4]
+    rnd_hidden_size: int = 512
+
 
     study_name: str = 'batch_ppo_test'
 

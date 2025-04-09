@@ -57,6 +57,54 @@ env_name_to_x_upper_lim = {
     'tmaze_5': 2e6
 }
 
+def plot_rnd_loss(path, rnd_loss):
+    """
+    Plots the RND loss curves over time and saves the plot as "rnd_loss.pdf" in the specified path.
+    
+    Parameters:
+        path (str or Path): Directory where the plot will be saved.
+        rnd_loss (array-like): A loss array with shape (1,1,1,1,1,1,1,5,1953),
+                               where the 5 represents the number of seeds.
+                               
+    The function squeezes the input array to remove singleton dimensions,
+    computes the mean and standard deviation across the seed dimension,
+    and then plots the mean loss over time with an error band representing one standard deviation.
+    """
+    # Remove singleton dimensions. Expected shape becomes (num_seeds, time_steps) i.e. (5, 1953).
+    loss = np.squeeze(rnd_loss)
+    
+    if loss.ndim != 2:
+        raise ValueError("After squeezing, expected a 2D array of shape (num_seeds, time_steps)")
+    
+    num_seeds, time_steps = loss.shape
+    
+    # Compute the mean and standard deviation over the seeds dimension.
+    mean_loss = np.mean(loss, axis=0)
+    std_loss = np.std(loss, axis=0)
+    
+    plt.figure(figsize=(10, 6))
+    time_axis = np.arange(time_steps)
+    
+    # Plot the mean loss curve.
+    plt.plot(time_axis, mean_loss, label="Mean Loss", color="blue", linewidth=2)
+    
+    # Plot the error band (mean ± standard deviation).
+    plt.fill_between(time_axis, mean_loss - std_loss, mean_loss + std_loss, 
+                     color="blue", alpha=0.3, label="Std Dev")
+    
+    plt.xlabel("Update Step")
+    plt.ylabel("Loss")
+    plt.title("RND Loss over Time")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    
+    # Save the plot to the specified path as "rnd_loss.pdf"
+    path = Path(path)
+    save_path = path / "rnd_loss.pdf"
+    plt.savefig(save_path)
+    plt.close()
+
 def plot_reses(all_reses: list[tuple], env_name, n_rows: int = 2,
                individual_runs: bool = False):
     plt.rcParams.update({'font.size': 32})
@@ -82,6 +130,12 @@ def plot_reses(all_reses: list[tuple], env_name, n_rows: int = 2,
 
     for k, (study_name, res, color) in enumerate(all_reses):
         scores = res['scores']
+        if 'RND' in study_name and 'rnd_loss' in res:
+            rnd_loss = res['rnd_loss']
+            # Define an output folder for rnd_loss plots.
+            rnd_output_folder = Path(ROOT_DIR, 'results')
+            plot_rnd_loss(rnd_output_folder, rnd_loss)
+            print(f"Saved RND loss plot for {study_name} in {rnd_output_folder}")
         print(scores.shape)
         if isinstance(scores, list):
             mean_over_steps = [score.mean(axis=1)[..., 0] for score in scores]
@@ -177,20 +231,20 @@ def find_file_in_dir(file_name: str, base_dir: Path) -> Path:
             return path
 
 if __name__ == "__main__":
-    env_name = 'pocman'
+    env_name = 'rocksample_11_11'
 
     # normal
     study_paths = [
         # ('$\lambda$-discrepancy + Quantile PPO', Path(ROOT_DIR, 'results', f'{env_name}_quantile_LD_ppo'), 'green'),
         # ('$\lambda$-discrepancy + PPO', Path(ROOT_DIR, 'results', f'{env_name}_LD_ppo'), 'dark gray'),
-        # ('PPO + RNN', Path(ROOT_DIR, 'results', f'{env_name}_ppo_best'), 'purple'),
+        ('PPO + RNN', Path(ROOT_DIR, 'results', f'{env_name}_ppo'), 'purple'),
         # ('PPO + TRANSFORMER + No Frame', Path(ROOT_DIR, 'results', f'{env_name}_transformer'), 'yellow'),
         # ('PPO + TRANSFORMER', Path(ROOT_DIR, 'results', f'{env_name}_transformer_best'), 'cyan'),
-        # ('PPO + RNN + LD', Path(ROOT_DIR, 'results', f'{env_name}_ppo_LD_best'), 'blue'),
-        # ('PPO + MEMORYLESS', Path(ROOT_DIR, 'results', f'{env_name}_ppo_memoryless_best'), 'dark gray'),
-        # ('PPO + OBSERVABLE', Path(ROOT_DIR, 'results', f'{env_name}_ppo_observable_best'), 'green'),
-        # ('TEST', Path(ROOT_DIR, 'results', f'test_tmaze'), 'blue'),
-        ('Perfect Memory PPO (NN)', Path(ROOT_DIR, 'results', f'{env_name}_perfect_memory_memoryless_ppo'), 'pink'),
+        ('PPO + RND MEMORY', Path(ROOT_DIR, 'results', f'{env_name}_ppo_rnd_memory'), 'blue'),
+        ('PPO + MEMORYLESS', Path(ROOT_DIR, 'results', f'{env_name}_ppo_memoryless'), 'dark gray'),
+        ('PPO + OBSERVABLE', Path(ROOT_DIR, 'results', f'{env_name}_ppo_perfect_memory'), 'green'),
+        # ('TEST', Path(ROOT_DIR, 'results', f'test_rnd_ppo'), 'blue'),
+        # ('Perfect Memory PPO (NN)', Path(ROOT_DIR, 'results', f'{env_name}_perfect_memory_memoryless_ppo'), 'pink'),
         # ('PPO (RNN)', Path(ROOT_DIR, 'results', f'{env_name}_ppo'), 'blue'),
         # ('PPO (NN)', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_ppo'), 'dark gray'),
     ]
@@ -218,7 +272,7 @@ if __name__ == "__main__":
             if name == 'PPO Markov':
                 fname = 'best_hyperparam_res_F_split.pkl'
         elif hyperparam_type == 'per_env':
-            fname = "best_hyperparam_per_env_res_discounted.pkl"
+            fname = "best_hyperparam_per_env_res_undiscounted.pkl"
 
         with open(study_path / fname, "rb") as f:
             best_res = pickle.load(f)
@@ -237,7 +291,7 @@ if __name__ == "__main__":
 
     fig, axes = plot_reses(all_reses, env_name, individual_runs=False, n_rows=3)
 
-    save_plot_to = Path(ROOT_DIR, 'results', f'{plot_name}_discounted.pdf')
+    save_plot_to = Path(ROOT_DIR, 'results', f'{plot_name}_undiscounted.pdf')
 
     fig.savefig(save_plot_to, bbox_inches='tight')
     print(f"Saved figure to {save_plot_to}")

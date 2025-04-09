@@ -12,4 +12,4 @@ cd ..
 # Activate the virtual environment
 source ~/pobax_baseline/bin/activate
 
-python parse_single_seed.py ../results/pocman_perfect_memory_memoryless_ppo
+python parse_rnd_memory.py ../results/rocksample_11_11_ppo_rnd_memory

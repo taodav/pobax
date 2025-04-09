@@ -303,5 +303,3 @@ class RockSample(Environment):
     #
     #     viz_array[:, self.size - 1] = 4
     #     return jnp.array(viz_array)
-
-

@@ -14,24 +14,22 @@ hparams = {
     'entry': '-m pobax.algos.ppo',
     'args': [
         {
-            'env': 'pocman',
+            'env': 'rocksample_15_15',
             'double_critic': False,
             'action_concat': True,
-            'perfect_memory': True,
-            'memoryless': True,
             'lr': lrs,
             'lambda0': lambda0s,
             'lambda1': ' '.join(map(str, lambda1s)),
             'alpha': ' '.join(map(str, alphas)),
             'ld_weight': ' '.join(map(str, ld_weights)),
             'hidden_size': 512,
-            'num_envs': 32,
+            'num_envs': 16,
             'entropy_coeff': 0.2,
             'steps_log_freq': 8,
             'update_log_freq': 10,
             'total_steps': int(1e7),
-            'seed': [2024 + i for i in range(5)],
-            'n_seeds': 1,
+            'seed': 2024,
+            'n_seeds': 5,
             'platform': 'gpu',
             'study_name': exp_name
         }

@@ -2,36 +2,37 @@ from pathlib import Path
 
 exp_name = Path(__file__).stem
 
-lrs = [2.5e-3, 2.5e-4, 2.5e-5, 2.5e-6]
-lambda0s = [0.1, 0.3, 0.5, 0.7, 0.9, 0.95]
-lambda1s = [0.95]
+lrs = [2.5e-3, 2.5e-4, 2.5e-5]  # Learning rates
+lambda0s = [0.1, 0.5, 0.95]
+lambda1s = [0.5, 0.7, 0.95]
 alphas = [1]
-ld_weights = [0]
+ld_weights = [0.25, 0.5]
+vf_coeffs = [0.5] 
 
 hparams = {
     'file_name':
         f'runs_{exp_name}.txt',
-    'entry': '-m pobax.algos.ppo',
+    'entry': '-m pobax.algos.transformer_xl',
     'args': [
         {
-            'env': 'pocman',
-            'double_critic': False,
+            'env': 'battleship_10',
+            'double_critic': True,
             'action_concat': True,
-            'perfect_memory': True,
-            'memoryless': True,
             'lr': lrs,
             'lambda0': lambda0s,
-            'lambda1': ' '.join(map(str, lambda1s)),
+            'lambda1': lambda1s,
             'alpha': ' '.join(map(str, alphas)),
-            'ld_weight': ' '.join(map(str, ld_weights)),
+            'ld_weight': ld_weights,
             'hidden_size': 512,
+            'embed_size': 220,
             'num_envs': 32,
-            'entropy_coeff': 0.2,
+            'entropy_coeff': 0.05,
             'steps_log_freq': 8,
             'update_log_freq': 10,
             'total_steps': int(1e7),
-            'seed': [2024 + i for i in range(5)],
-            'n_seeds': 1,
+            'seed': 2024,
+            'n_seeds': 10,
+            'debug': True,
             'platform': 'gpu',
             'study_name': exp_name
         }

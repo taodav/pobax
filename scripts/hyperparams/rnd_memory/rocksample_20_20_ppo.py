@@ -14,11 +14,9 @@ hparams = {
     'entry': '-m pobax.algos.ppo',
     'args': [
         {
-            'env': 'pocman',
+            'env': 'rocksample_20_20',
             'double_critic': False,
             'action_concat': True,
-            'perfect_memory': True,
-            'memoryless': True,
             'lr': lrs,
             'lambda0': lambda0s,
             'lambda1': ' '.join(map(str, lambda1s)),
@@ -30,8 +28,8 @@ hparams = {
             'steps_log_freq': 8,
             'update_log_freq': 10,
             'total_steps': int(1e7),
-            'seed': [2024 + i for i in range(5)],
-            'n_seeds': 1,
+            'seed': 2024,
+            'n_seeds': 5,
             'platform': 'gpu',
             'study_name': exp_name
         }

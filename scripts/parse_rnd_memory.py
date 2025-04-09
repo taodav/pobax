@@ -79,11 +79,12 @@ def plot_rnd_loss(path, rnd_loss):
 
 def parse_exp_dir(study_path, study_hparam_path, discounted: bool = False):
     # TODO: THIS
-    train_sign_hparams = ['vf_coeff', 'lambda0', 'lr', 'lambda1', 'ld_weight', 'alpha']
+    train_sign_hparams = ['vf_coeff', 'lambda0', 'lr', 'lambda1', 'ld_weight', 'alpha', 'rnd_lr']
     study_paths = list(study_path.iterdir())
     files_to_remove = {"best_hyperparam_per_env_res_discounted.pkl", "best_hyperparam_per_env_res_undiscounted.pkl"}
     study_paths = [path for path in study_paths if path.name not in files_to_remove]
     scores, final_scores, envs, hyperparams, eval_dict, final_eval_dict = {}, {}, [], {}, {}, {}
+    rnd_loss_dict = {}
     for results_path in tqdm(study_paths):
         results_path = Path(results_path).resolve()
         if results_path.suffix == '.npy':
@@ -101,6 +102,9 @@ def parse_exp_dir(study_path, study_hparam_path, discounted: bool = False):
         else:
             online_disc_returns = online_eval['returned_episode_returns']
         online_disc_returns = np.array(online_disc_returns)
+
+        rnd_loss = online_eval['rnd_loss']
+        print('rnd_loss', rnd_loss.shape)
             
         # online disc returns has shape (num_updates // update_frequency, num_steps // step_frequency, n_envs)
 
@@ -113,8 +117,10 @@ def parse_exp_dir(study_path, study_hparam_path, discounted: bool = False):
         # final_disc_returns /= (final_n_episodes + (final_n_episodes == 0).astype(float))  # add the 0 mask to prevent division by 0.
         if args_tuple in eval_dict:
             eval_dict[args_tuple].append(online_disc_returns)
+            rnd_loss_dict[args_tuple].append(rnd_loss)
         else:
             eval_dict[args_tuple] = [online_disc_returns]
+            rnd_loss_dict[args_tuple] = [rnd_loss]
         # if args_tuple in final_eval_dict:
         #     final_eval_dict[args_tuple].append(final_disc_returns)
         # else:
@@ -126,6 +132,9 @@ def parse_exp_dir(study_path, study_hparam_path, discounted: bool = False):
     # combine the seeds
     for args_tuple, online_disc_returns in eval_dict.items():
         eval_dict[args_tuple] = np.concatenate(online_disc_returns, axis=-4)
+
+    for args_tuple, rnd_losses in rnd_loss_dict.items():
+        rnd_loss_dict[args_tuple] = np.concatenate(rnd_losses, axis=-4)
     
     # for args_tuple, final_disc_returns in final_eval_dict.items():
     #     final_eval_dict[args_tuple] = np.stack(final_disc_returns, axis=0)
@@ -145,6 +154,7 @@ def parse_exp_dir(study_path, study_hparam_path, discounted: bool = False):
     max_mean_score = -np.inf
     best_hyperparams = None
     max_score = None
+    best_rnd_loss = None
 
     for args_tuple, score in scores.items():
         mean_score = score.mean(axis=-1).mean(axis=-1).mean(axis=-1)
@@ -152,6 +162,7 @@ def parse_exp_dir(study_path, study_hparam_path, discounted: bool = False):
             max_mean_score = mean_score
             # final_max_score = final_scores[args_tuple]
             best_hyperparams = hyperparams[args_tuple]
+            best_rnd_loss = rnd_loss_dict[args_tuple]
             max_score = score
     print(max_mean_score)
     print(f"Best hyperparams: {best_hyperparams}")
@@ -164,7 +175,7 @@ def parse_exp_dir(study_path, study_hparam_path, discounted: bool = False):
     parsed_res = {
         'envs': envs,
         'scores': max_score,
-        # 'final_scores': final_max_score,
+        'rnd_loss': best_rnd_loss, 
         'hyperparams': best_hyperparams,
         'trained_hyperparams': train_sign_hparams,
     }

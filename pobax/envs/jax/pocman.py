@@ -224,17 +224,17 @@ class PocManStateWrapper(GymnaxWrapper):
         grid = state.grid * (-1)
 
         # +1 for pellets
-        grid_with_pellets = grid.at[pellet_locs[:, 1], pellet_locs[:, 0]].set(1)
+        grid_with_pellets = grid.at[pellet_locs[:, 0], pellet_locs[:, 1]].set(1)
 
         # +1 for power up available
-        grid_with_power_up = grid.at[power_up_locs[:, 1], power_up_locs[:, 0]].set(1)
+        grid_with_power_up = grid.at[power_up_locs[:, 0], power_up_locs[:, 1]].set(1)
 
         # position
         position_grid = jnp.zeros_like(grid).at[state.player_locations[0], state.player_locations[1]].set(1)
 
         # separate channel for ghost locs
-        ghost_position_grid = jnp.zeros_like(grid).at[ghost_locs[:, 1], ghost_locs[:, 0]].set(1)
-        old_ghost_position_grid = jnp.zeros_like(grid).at[old_ghost_locs[:, 1], old_ghost_locs[:, 0]].set(1)
+        ghost_position_grid = jnp.zeros_like(grid).at[ghost_locs[:, 0], ghost_locs[:, 1]].set(1)
+        old_ghost_position_grid = jnp.zeros_like(grid).at[old_ghost_locs[:, 0], old_ghost_locs[:, 1]].set(1)
 
         ghost_grid = ((state.frightened_state_time == 0) * (-1) * ghost_position_grid + \
                       (state.frightened_state_time != 0) * state.frightened_state_time * ghost_position_grid)
@@ -285,11 +285,11 @@ class PocMan(PacMan, Environment):
     """
     def __init__(self):
         generator = AsciiGenerator(SMALLER_GAME_MAP)
-        super().__init__(generator=generator, time_limit=2000)
+        super().__init__(generator=generator)
 
         # generate line-of-sight masks for each possible position.
         self.line_sight_map = generate_los_map(generator)
-        self.gamma = 0.99
+        self.gamma = 0.95
 
     @property
     def default_params(self):
