@@ -194,4 +194,3 @@ class FullImageCNN(nn.Module):
 
         final_out = nn.Dense(features=self.hidden_size)(dense_out)
         return final_out
-
