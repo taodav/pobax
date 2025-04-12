@@ -26,3 +26,18 @@ class Critic(nn.Module):
         )
         return critic
 
+
+class GVF(nn.Module):
+    hidden_size: int = 128
+    out_size: int = 1
+
+    @nn.compact
+    def __call__(self, x):
+        critic = nn.Dense(self.hidden_size, kernel_init=orthogonal(2), bias_init=constant(0.0))(
+            x
+        )
+        critic = nn.relu(critic)
+        critic = nn.Dense(self.out_size, kernel_init=orthogonal(1.0), bias_init=constant(0.0))(
+            critic
+        )
+        return critic
