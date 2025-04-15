@@ -80,6 +80,12 @@ class PPOHyperparams(Tap):
         self.ld_weight = jnp.array(self.ld_weight)
 
 
+class GVFPPOHyperparams(PPOHyperparams):
+    gvf_type: str = 'obs'
+    gamma_type: str = 'fixed'  # fixed | nn_gamma_tanh
+
+
+
 class DQNHyperparams(Tap):
     env: str = 'CartPole-v1'
     num_envs: int = 4

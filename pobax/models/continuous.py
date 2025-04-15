@@ -5,7 +5,7 @@ from jax._src.nn.initializers import orthogonal, constant
 import numpy as np
 from pobax.models.transformerXL import Transformer
 from .network import SimpleNN, ScannedRNN, SmallImageCNN, FullImageCNN
-from .value import Critic
+from .critic import Critic
 
 
 class ContinuousActor(nn.Module):
@@ -164,6 +164,15 @@ class ImageContinuousActorCriticTransformer(nn.Module):
         embedding = self.transformer.forward_train(memories,embedding,mask)
 
         pi = self.actor(embedding)
+        critic = Critic(hidden_size=self.hidden_size)
 
-        v = self.critic(embedding)
+        if self.double_critic:
+            critic = nn.vmap(Critic,
+                             variable_axes={'params': 0},
+                             split_rngs={'params': True},
+                             in_axes=None,
+                             out_axes=2,
+                             axis_size=2)(hidden_size=self.hidden_size)
+
+        v = critic(embedding)
         return pi, jnp.squeeze(v, axis=-1)

@@ -9,6 +9,7 @@ from time import time
 # os.environ["CRAFTAX_RELOAD_TEXTURES"] = "True"
 
 import chex
+import flax.linen as nn
 import flax.training.train_state
 from flax.training.train_state import TrainState
 from flax.training import orbax_utils
@@ -23,11 +24,13 @@ from pobax.config import PPOHyperparams
 from pobax.envs import get_env
 from pobax.envs.wrappers.gymnax import LogEnvState
 from pobax.models import get_gymnax_network_fn, ScannedRNN
+from pobax.models.actor_critic import GammaOffset
 from pobax.utils.file_system import get_results_path, numpyify
 
 
 class Transition(NamedTuple):
     done: jnp.ndarray
+    gamma_offset: jnp.ndarray
     action: jnp.ndarray
     value: jnp.ndarray
     cumulant_value: jnp.ndarray
@@ -37,7 +40,22 @@ class Transition(NamedTuple):
     info: jnp.ndarray = None
 
 
-class GVFPPO(PPO):
+
+class GDPPO(PPO):
+    def __init__(self, network,
+                 gamma_offset_network,
+                 double_critic: bool = False,
+                 ld_weight: float = 0.,
+                 alpha: float = 0.,
+                 vf_coeff: float = 0.,
+                 ld_exploration_bonus_scale: float = 0.,
+                 entropy_coeff: float = 0.01,
+                 clip_eps: float = 0.2):
+        super().__init__(network, double_critic, ld_weight,
+                         alpha, vf_coeff, ld_exploration_bonus_scale,
+                         entropy_coeff, clip_eps)
+        self.gamma_offset_network = gamma_offset_network
+        # TODO: GVF loss coeff? Right now we're using vf_coeff
 
     def act(self, rng: chex.PRNGKey,
             train_state: flax.training.train_state.TrainState,
@@ -47,19 +65,22 @@ class GVFPPO(PPO):
         # SELECT ACTION
         ac_in = (obs[np.newaxis, :], done[np.newaxis, :])
         hstate, pi, value, c_value = self.network.apply(train_state.params, hidden_state, ac_in)
+        gamma_offset = self.gamma_offset_network.apply(train_state.gamma_offset_params, ac_in[0])
+
         action = pi.sample(seed=rng)
         log_prob = pi.log_prob(action)
-        value, c_value, action, log_prob = (
+        value, c_value, action, log_prob, gamma_offset = (
             value.squeeze(0),
             c_value.squeeze(0),
             action.squeeze(0),
             log_prob.squeeze(0),
+            gamma_offset.squeeze(0)
         )
-        return value, c_value, action, log_prob, hstate
+        return value, c_value, action, log_prob, hstate, gamma_offset
 
-    def loss(self, params, init_hstate, traj_batch, gae, targets, next_vals):
+    def loss(self, params, init_hstate, traj_batch, gae, targets, gvf_targets, next_vals):
         # RERUN NETWORK
-        _, pi, value = self.network.apply(
+        _, pi, value, gvf_value = self.network.apply(
             params, init_hstate[0], (traj_batch.obs, traj_batch.done)
         )
         log_prob = pi.log_prob(traj_batch.action)
@@ -73,10 +94,14 @@ class GVFPPO(PPO):
         value_loss = (
             jnp.maximum(value_losses, value_losses_clipped).mean()
         )
+
+        gvf_loss = jnp.square(gvf_value - gvf_targets).mean()
+
         # Lambda discrepancy loss
         if self.double_critic:
             value_loss = self.ld_weight * (jnp.square(value[..., 0] - value[..., 1])).mean() + \
                          (1 - self.ld_weight) * value_loss
+            gvf_loss = self.ld_weight * (jnp.square(gvf_value[..., 0] - value[..., 1]).mean())
 
         # CALCULATE ACTOR LOSS
         ratio = jnp.exp(log_prob - traj_batch.log_prob)
@@ -107,6 +132,7 @@ class GVFPPO(PPO):
         total_loss = (
                 loss_actor
                 + self.vf_coeff * value_loss
+                + self.vf_coeff * gvf_loss
                 - self.entropy_coeff * entropy
         )
         return total_loss, (value_loss, loss_actor, entropy)
@@ -115,20 +141,22 @@ class GVFPPO(PPO):
 def env_step(runner_state, unused, agent: PPO, env, env_params):
     train_state, env_state, last_obs, last_done, hstate, rng = runner_state
     rng, _rng = jax.random.split(rng)
-    value, action, log_prob, hstate = agent.act(_rng, train_state, hstate, last_obs, last_done)
+
+    # gamma_offset is between -1 and 1
+    value, action, log_prob, hstate, gamma_offset = agent.act(_rng, train_state, hstate, last_obs, last_done)
 
     # STEP ENV
     rng, _rng = jax.random.split(rng)
     rng_step = jax.random.split(_rng, hstate.shape[0])
     obsv, env_state, reward, done, info = env.step(rng_step, env_state, action, env_params)
     transition = Transition(
-        last_done, action, value, reward, log_prob, last_obs, info
+        last_done, gamma_offset, action, value, reward, log_prob, last_obs, info
     )
     runner_state = (train_state, env_state, obsv, done, hstate, rng)
     return runner_state, transition
 
 
-def calculate_gae(traj_batch, last_val, last_done, gae_lambda, gamma):
+def calculate_gae(traj_batch, last_val, gae_lambda, gamma):
     def _get_advantages(carry, transition):
         gae, next_value, gae_lambda = carry
         done, value, reward = transition.done, transition.value, transition.reward
@@ -138,6 +166,29 @@ def calculate_gae(traj_batch, last_val, last_done, gae_lambda, gamma):
 
     _, advantages = jax.lax.scan(_get_advantages,
                                  (jnp.zeros_like(last_val), last_val, gae_lambda),
+                                 traj_batch, reverse=True, unroll=16)
+    target = advantages + traj_batch.value
+    return advantages, target
+
+
+def calculate_gvf_lambda(traj_batch, last_gvf_val, last_val, gae_lambda, gamma,
+                         gamma_offset_scale: float = 0.1):
+    def _get_advantages(carry, transition):
+        gae, gae_cumulant, next_value, next_cumulant_value, gae_lambda = carry
+        done, cumulant_value, value, reward, gamma_offset = transition.done, transition.cumulant_value, \
+                                                transition.value, transition.reward, transition.gamma_offset
+
+        # Do our funky gamma stuff here.
+        gammas = gamma + gamma_offset_scale * gamma_offset
+
+        delta_cumulant = reward + gammas * next_cumulant_value * (1 - done) - cumulant_value
+        delta = reward + gammas * next_value * (1 - done) - value
+        gae_cumulant = delta_cumulant + gammas * gae_lambda * (1 - done) * gae
+        gae = delta + gammas * gae_lambda * (1 - done) * gae
+        return (gae, gae_cumulant, value, cumulant_value, gae_lambda), gae
+
+    _, advantages = jax.lax.scan(_get_advantages,
+                                 (jnp.zeros_like(last_gvf_val), jnp.zeros_like(last_val), last_val, gae_lambda),
                                  traj_batch, reverse=True, unroll=16)
     target = advantages + traj_batch.value
     return advantages, target
@@ -157,10 +208,10 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
     )
     env_key, rand_key = jax.random.split(rand_key)
     env, env_params = get_env(args.env, env_key,
-                                     gamma=args.gamma,
-                                     normalize_image=False,
-                                     perfect_memory=args.perfect_memory,
-                                     action_concat=args.action_concat)
+                              gamma=args.gamma,
+                              normalize_image=False,
+                              perfect_memory=args.perfect_memory,
+                              action_concat=args.action_concat)
 
     if hasattr(env, 'gamma'):
         args.gamma = env.gamma
@@ -175,6 +226,7 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
     network = network_fn(action_size,
                          double_critic=double_critic,
                          hidden_size=args.hidden_size)
+    gamma_offset_network = GammaOffset(hidden_size=args.hidden_size)
 
     steps_filter = partial(filter_period_first_dim, n=args.steps_log_freq)
     update_filter = partial(filter_period_first_dim, n=args.update_log_freq)
@@ -192,9 +244,10 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
                                  out_axes=2)
 
     def train(vf_coeff, ld_weight, alpha, lambda1, lambda0, lr, rng):
-        agent = PPO(network, double_critic=double_critic, ld_weight=ld_weight, alpha=alpha, vf_coeff=vf_coeff,
-                    clip_eps=args.clip_eps, entropy_coeff=args.entropy_coeff,
-                    ld_exploration_bonus_scale=args.ld_exploration_bonus_scale)
+        agent = GDPPO(network, gamma_offset_network,
+                      double_critic=double_critic, ld_weight=ld_weight, alpha=alpha, vf_coeff=vf_coeff,
+                      clip_eps=args.clip_eps, entropy_coeff=args.entropy_coeff,
+                      ld_exploration_bonus_scale=args.ld_exploration_bonus_scale)
 
         # initialize functions
         _env_step = partial(env_step, agent=agent, env=env, env_params=env_params)
@@ -222,6 +275,7 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
         )
         init_hstate = ScannedRNN.initialize_carry(args.num_envs, args.hidden_size)
         network_params = agent.network.init(_rng, init_hstate, init_x)
+        gamma_offset_params = agent.gamma_offset_network.init(_rng, init_x)
 
         if args.anneal_lr:
             tx = optax.chain(
@@ -237,6 +291,7 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
             apply_fn=agent.network.apply,
             params=network_params,
             tx=tx,
+            gamma_offset_params=gamma_offset_params
         )
 
         # INIT ENV
@@ -286,11 +341,14 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
             # CALCULATE ADVANTAGE
             train_state, env_state, last_obs, last_done, hstate, rng = runner_state
             ac_in = (last_obs[np.newaxis, :], last_done[np.newaxis, :])
-            _, _, last_val = network.apply(train_state.params, hstate, ac_in)
+            _, _, last_val, last_gvf_val = network.apply(train_state.params, hstate, ac_in)
             next_vals = jnp.concatenate((traj_batch.value[1:], last_val), axis=0)
             last_val = last_val.squeeze(0)
+            last_gvf_val = last_gvf_val.squeeze(0)
 
-            advantages, targets = _calculate_gae(traj_batch, last_val, last_done, gae_lambda, args.gamma)
+            advantages, targets = _calculate_gae(traj_batch, last_val, gae_lambda, args.gamma)
+            # CALCULATE GVF ADVANTAGE
+            _, gvf_targets = _calculate_gae(traj_batch, last_gvf_val, gae_lambda, args.gamma)
 
             # UPDATE NETWORK
             def _update_epoch(update_state, unused):

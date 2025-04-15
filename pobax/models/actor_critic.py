@@ -129,3 +129,18 @@ class GVFActorCritic(nn.Module):
         return hidden, pi, v, obs_gvf
 
 
+class GammaOffset(nn.Module):
+    hidden_size: int
+
+    @nn.compact
+    def __call__(self, x):
+        if len(x.shape) > 1:
+            gamma_offset = FullImageCNN(hidden_size=self.hidden_size // 4, num_channels=4)(x)
+            gamma_offset = nn.Dense(features=1)(gamma_offset)
+            gamma_offset = nn.tanh(gamma_offset)
+        else:
+            gamma_offset = SimpleNN(hidden_size=self.hidden_size // 4)(x)
+            gamma_offset = nn.Dense(features=1)(gamma_offset)
+            gamma_offset = nn.tanh(gamma_offset)
+        return gamma_offset
+
