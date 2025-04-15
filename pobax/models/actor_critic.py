@@ -73,41 +73,18 @@ class ActorCritic(nn.Module):
         return hidden, pi, v, obs_gvf
 
 
-class GVFActorCritic(nn.Module):
-    action_space: Union[spaces.Discrete, spaces.Box]
-    hidden_size: int = 128
-    gvf_obs: bool = False
-    memoryless: bool = False
-    double_critic: bool = False
+class GammaOffset(nn.Module):
+    hidden_size: int
 
     @nn.compact
-    def __call__(self, hidden, x):
-        obs, dones = x
-        embedding = nn.Dense(
-            self.hidden_size, kernel_init=orthogonal(jnp.sqrt(2)), bias_init=constant(0.0)
-        )(obs)
-        embedding = nn.relu(embedding)
-
+    def __call__(self, x):
         if len(x.shape) > 1:
-            if self.memoryless:
-                embedding = SimpleNN(hidden_size=self.hidden_size)(embedding)
-            else:
-                rnn_in = (embedding, dones)
-                hidden, embedding = ScannedRNN(hidden_size=self.hidden_size)(hidden, rnn_in)
+            gamma_offset = FullImageCNN(hidden_size=self.hidden_size // 4, num_channels=4)(x)
+            gamma_offset = nn.Dense(features=1)(gamma_offset)
+            gamma_offset = nn.tanh(gamma_offset)
+        else:
+            gamma_offset = SimpleNN(hidden_size=self.hidden_size // 4)(x)
+            gamma_offset = nn.Dense(features=1)(gamma_offset)
+            gamma_offset = nn.tanh(gamma_offset)
+        return gamma_offset
 
-        actor = Actor(self.action_space, hidden_size=self.hidden_size)
-        pi = actor(embedding)
-
-        critic = Critic(hidden_size=self.hidden_size)
-
-        if self.double_critic:
-            critic = nn.vmap(Critic,
-                             variable_axes={'params': 0},
-                             split_rngs={'params': True},
-                             in_axes=None,
-                             out_axes=2,
-                             axis_size=2)(hidden_size=self.hidden_size)
-
-        v = critic(embedding)
-
-        return hidden, pi, jnp.squeeze(v, axis=-1)

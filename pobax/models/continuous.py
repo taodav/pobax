@@ -5,7 +5,7 @@ from jax._src.nn.initializers import orthogonal, constant
 import numpy as np
 from pobax.models.transformerXL import Transformer
 from .network import SimpleNN, ScannedRNN, SmallImageCNN, FullImageCNN
-from .value import Critic
+from .critic import Critic
 
 
 class ContinuousActor(nn.Module):
