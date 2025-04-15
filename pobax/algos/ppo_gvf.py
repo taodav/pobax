@@ -20,7 +20,7 @@ import optax
 import orbax.checkpoint
 
 from pobax.algos.ppo import PPO
-from pobax.config import PPOHyperparams
+from pobax.config import GDPPOHyperparams
 from pobax.envs import get_env
 from pobax.envs.wrappers.gymnax import LogEnvState
 from pobax.models import get_gymnax_network_fn, ScannedRNN
@@ -185,13 +185,14 @@ def calculate_gvf_lambda(traj_batch, last_gvf_val, last_val, gae_lambda, gamma,
         delta = reward + gammas * next_value * (1 - done) - value
         gae_cumulant = delta_cumulant + gammas * gae_lambda * (1 - done) * gae
         gae = delta + gammas * gae_lambda * (1 - done) * gae
-        return (gae, gae_cumulant, value, cumulant_value, gae_lambda), gae
+        return (gae, gae_cumulant, value, cumulant_value, gae_lambda), (gae, gae_cumulant)
 
-    _, advantages = jax.lax.scan(_get_advantages,
-                                 (jnp.zeros_like(last_gvf_val), jnp.zeros_like(last_val), last_val, gae_lambda),
-                                 traj_batch, reverse=True, unroll=16)
-    target = advantages + traj_batch.value
-    return advantages, target
+    _, (adv, adv_cumulant) = jax.lax.scan(_get_advantages,
+                                     (jnp.zeros_like(last_val), jnp.zeros_like(last_gvf_val), last_val, gae_lambda),
+                                         traj_batch, reverse=True, unroll=16)
+    target = adv + traj_batch.value
+    gvf_target = adv_cumulant + traj_batch.cumulant_value
+    return target, gvf_target
 
 
 def filter_period_first_dim(x, n: int):
@@ -199,7 +200,7 @@ def filter_period_first_dim(x, n: int):
         return x[::n]
 
 
-def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
+def make_train(args: GDPPOHyperparams, rand_key: jax.random.PRNGKey):
     num_updates = (
             args.total_steps // args.num_steps // args.num_envs
     )
@@ -233,15 +234,21 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
 
     # Used for vmapping over our double critic.
     transition_axes_map = Transition(
-        None, None, 2, None, None, None, None
+        None, None, None, 2, 2, None, None, None, None
     )
 
     _calculate_gae = calculate_gae
+    _calculate_gvf_lambda = partial(calculate_gvf_lambda, gamma_offset_scale=args.gamma_offset_scale)
+
     if double_critic:
         # last_val is index 1 here b/c we squeezed earlier.
         _calculate_gae = jax.vmap(calculate_gae,
                                  in_axes=[transition_axes_map, 1, None, 0, None],
                                  out_axes=2)
+
+        _calculate_gvf_lambda = jax.vmap(_calculate_gvf_lambda,
+                                         in_axes=[transition_axes_map, 1, 1, None, 0, None],
+                                         out_axes=2)
 
     def train(vf_coeff, ld_weight, alpha, lambda1, lambda0, lr, rng):
         agent = GDPPO(network, gamma_offset_network,
@@ -348,7 +355,8 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
 
             advantages, targets = _calculate_gae(traj_batch, last_val, gae_lambda, args.gamma)
             # CALCULATE GVF ADVANTAGE
-            _, gvf_targets = _calculate_gae(traj_batch, last_gvf_val, gae_lambda, args.gamma)
+            # TODO: Do we need to train separate heads if we vary gamma??
+            ld_targets, gvf_targets = _calculate_gvf_lambdas(traj_batch, last_gvf_val, gae_lambda, args.gamma)
 
             # UPDATE NETWORK
             def _update_epoch(update_state, unused):

@@ -80,9 +80,10 @@ class PPOHyperparams(Tap):
         self.ld_weight = jnp.array(self.ld_weight)
 
 
-class GVFPPOHyperparams(PPOHyperparams):
-    gvf_type: str = 'obs'
+class GDPPOHyperparams(PPOHyperparams):
+    gvf_type: str = 'obs'  # obs | tanh_hs | none
     gamma_type: str = 'fixed'  # fixed | nn_gamma_tanh
+    gamma_offset_scale: float = 0.05
 
 
 

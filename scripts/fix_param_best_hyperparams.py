@@ -42,7 +42,7 @@ if __name__ == "__main__":
 
         # Replace the slice for the desired dimension with a slice that keeps the dimension
         indexer[axis] = slice(val, val + 1)
-        single_param_scores =
+        # single_param_scores =
 
         # SELECING HYPERPARAMS
         # optimize_lambda_discrep = 1  # False
