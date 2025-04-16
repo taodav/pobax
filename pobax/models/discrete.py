@@ -6,7 +6,7 @@ import numpy as np
 
 from . import FullImageCNN
 from .network import SimpleNN, ScannedRNN, SmallImageCNN
-from .value import Critic
+from .critic import Critic
 from pobax.models.transformerXL import Transformer
 
 

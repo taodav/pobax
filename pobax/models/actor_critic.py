@@ -21,7 +21,7 @@ class ActorCritic(nn.Module):
     def __call__(self, hidden, x):
         obs, dones = x
 
-        if len(x.shape) > 1:
+        if len(obs.shape) > 1:
             embedding = FullImageCNN(hidden_size=self.hidden_size)(obs)
         else:
             embedding = nn.Dense(
@@ -41,6 +41,7 @@ class ActorCritic(nn.Module):
         critic = Critic(hidden_size=self.hidden_size)
 
         # GVF prediction
+        gvf_critic = None
         if self.cumulant_size is not None:
             gvf_critic = GVF(hidden_size=self.hidden_size, out_size=self.cumulant_size)
             if self.double_critic:
