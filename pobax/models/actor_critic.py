@@ -13,7 +13,7 @@ from pobax.models.network import SimpleNN, ScannedRNN, FullImageCNN
 class ActorCritic(nn.Module):
     action_space: Union[spaces.Discrete, spaces.Box]
     hidden_size: int = 128
-    gvf_type: str = None  # [obs, hidden_state, None]
+    cumulant_size: int = None
     memoryless: bool = False
     double_critic: bool = False
 
@@ -39,52 +39,37 @@ class ActorCritic(nn.Module):
         pi = actor(embedding)
 
         critic = Critic(hidden_size=self.hidden_size)
-        if self.gvf_type is not None:
-            if self.gvf_type == 'obs':
-                gvf_out_size = obs.shape[-1]
-            elif self.gvf_type == 'hidden_state':
-                gvf_out_size = self.hidden_size
 
-            gvf_critic = GVF(hidden_size=self.hidden_size, out_size=gvf_out_size)
-
-        if self.double_critic and self.gvf_type is not None:
-            # critic = nn.vmap(Critic,
-            #                  variable_axes={'params': 0},
-            #                  split_rngs={'params': True},
-            #                  in_axes=None,
-            #                  out_axes=2,
-            #                  axis_size=2)(hidden_size=self.hidden_size)
-            gvf_critic = nn.vmap(GVF,
-                                 variable_axes={'params': 0},
-                                 split_rngs={'params': True},
-                                 in_axes=None,
-                                 out_axes=2,
-                                 axis_size=2)(hidden_size=self.hidden_size, out_size=gvf_out_size)
+        # GVF prediction
+        if self.cumulant_size is not None:
+            gvf_critic = GVF(hidden_size=self.hidden_size, out_size=self.cumulant_size)
+            if self.double_critic:
+                gvf_critic = nn.vmap(GVF,
+                                     variable_axes={'params': 0},
+                                     split_rngs={'params': True},
+                                     in_axes=None,
+                                     out_axes=2,
+                                     axis_size=2)(hidden_size=self.hidden_size, out_size=self.cumulant_size)
 
         v = jnp.squeeze(critic(embedding), axis=-1)
 
-        obs_gvf = None
+        gvf_prediction = None
         if gvf_critic is not None:
-            if self.gvf_type == 'obs':
-                obs_gvf = gvf_critic(obs)
-            elif self.gvf_type == 'hidden_state':
-                obs_gvf = gvf_critic(embedding)
+            gvf_prediction = gvf_critic(embedding)
 
-        return hidden, pi, v, obs_gvf
+        return hidden, pi, v, gvf_prediction
 
 
-class GammaOffset(nn.Module):
-    hidden_size: int
+class CumulantGammaNetwork(nn.Module):
+    cumulant_size: int
 
     @nn.compact
     def __call__(self, x):
-        if len(x.shape) > 1:
-            gamma_offset = FullImageCNN(hidden_size=self.hidden_size // 4, num_channels=4)(x)
-            gamma_offset = nn.Dense(features=1)(gamma_offset)
-            gamma_offset = nn.tanh(gamma_offset)
-        else:
-            gamma_offset = SimpleNN(hidden_size=self.hidden_size // 4)(x)
-            gamma_offset = nn.Dense(features=1)(gamma_offset)
-            gamma_offset = nn.tanh(gamma_offset)
-        return gamma_offset
+        cumulant_mapped = nn.Dense(features=self.cumulant_size)(x)
+        cumulant_mapped = nn.sigmoid(cumulant_mapped)
+
+        gamma_offset = nn.Dense(features=1)(x)
+        gamma_offset = nn.sigmoid(gamma_offset)
+
+        return cumulant_mapped, gamma_offset
 

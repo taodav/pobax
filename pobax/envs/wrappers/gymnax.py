@@ -535,6 +535,73 @@ class ActionConcatWrapper(GymnaxWrapper):
         return obs, state, reward, done, info
 
 
+class RewardConcatWrapper(GymnaxWrapper):
+
+    def observation_space(self, params) -> spaces.Box:
+        og_obs_space_shape = self._env.observation_space(params).shape
+
+        if len(og_obs_space_shape) == 1:
+            shape = (og_obs_space_shape[0] + 1,)
+        elif len(og_obs_space_shape) == 3:
+            # images
+            shape = (og_obs_space_shape[0], og_obs_space_shape[1], og_obs_space_shape[2] + 1)
+        else:
+            raise NotImplementedError
+
+        return spaces.Box(
+            low=self._env.observation_space(params).low,
+            high=self._env.observation_space(params).high,
+            shape=shape,
+            dtype=self._env.observation_space(params).dtype,
+        )
+
+    @partial(jax.jit, static_argnums=(0,-1))
+    def reset(
+            self, key: chex.PRNGKey, params: Optional[environment.EnvParams] = None
+    ) -> Tuple[chex.Array, environment.EnvState]:
+        reward_vec = jnp.zeros(1)
+        obs, state = self._env.reset(key, params)
+        obs_shape = self.observation_space(params).shape
+        if len(obs_shape) == 1:
+            obs = jnp.concatenate([obs, reward_vec])
+
+        elif len(obs_shape) == 3:
+            reward_vec = reward_vec[None, None, ...]
+            h, w, c = obs_shape
+            reward_img = reward_vec.repeat(h, axis=0).repeat(w, axis=1)
+            obs = jnp.concatenate([obs, reward_img], axis=-1)
+        else:
+            raise NotImplementedError
+
+        return obs, state
+
+    @partial(jax.jit, static_argnums=(0,-1))
+    def step(
+            self,
+            key: chex.PRNGKey,
+            state: environment.EnvState,
+            action: Union[int, float, jnp.ndarray],
+            params: Optional[environment.EnvParams] = None,
+    ) -> Tuple[chex.Array, environment.EnvState, float, bool, dict]:
+        obs, state, reward, done, info = self._env.step(
+            key, state, action, params
+        )
+        reward_vec = jnp.array([reward])
+
+        obs_shape = self.observation_space(params).shape
+        if len(obs_shape) == 1:
+            obs = jnp.concatenate([obs, reward_vec])
+
+        elif len(obs_shape) == 3:
+            reward_vec = reward_vec[None, None, ...]
+            h, w, c = obs_shape
+            reward_img = reward_vec.repeat(h, axis=0).repeat(w, axis=1)
+            obs = jnp.concatenate([obs, reward_img], axis=-1)
+        else:
+            raise NotImplementedError
+        return obs, state, reward, done, info
+
+
 class OptimisticResetVecEnvWrapper(GymnaxWrapper):
     """
     Provides efficient 'optimistic' resets.

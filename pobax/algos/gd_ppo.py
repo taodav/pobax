@@ -24,7 +24,7 @@ from pobax.config import GDPPOHyperparams
 from pobax.envs import get_env
 from pobax.envs.wrappers.gymnax import LogEnvState
 from pobax.models import get_gymnax_network_fn, ScannedRNN
-from pobax.models.actor_critic import GammaOffset
+from pobax.models.actor_critic import CumulantGammaNetwork, ActorCritic
 from pobax.utils.file_system import get_results_path, numpyify
 
 
@@ -35,8 +35,8 @@ class Transition(NamedTuple):
     value: jnp.ndarray
     cumulant_value: jnp.ndarray
     reward: jnp.ndarray
-    # TODO: add prev_reward here (?)
     log_prob: jnp.ndarray
+    hstate_cumulant: jnp.ndarray
     obs: jnp.ndarray
     info: jnp.ndarray = None
 
@@ -44,7 +44,7 @@ class Transition(NamedTuple):
 
 class GDPPO(PPO):
     def __init__(self, network,
-                 gamma_offset_network,
+                 cumulant_gamma_network,
                  double_critic: bool = False,
                  ld_weight: float = 0.,
                  alpha: float = 0.,
@@ -55,8 +55,9 @@ class GDPPO(PPO):
         super().__init__(network, double_critic, ld_weight,
                          alpha, vf_coeff, ld_exploration_bonus_scale,
                          entropy_coeff, clip_eps)
-        self.gamma_offset_network = gamma_offset_network
         # TODO: GVF loss coeff? Right now we're using vf_coeff
+
+        self.cumulant_gamma_network = cumulant_gamma_network
 
     def act(self, rng: chex.PRNGKey,
             train_state: flax.training.train_state.TrainState,
@@ -66,22 +67,23 @@ class GDPPO(PPO):
         # SELECT ACTION
         ac_in = (obs[np.newaxis, :], done[np.newaxis, :])
         hstate, pi, value, c_value = self.network.apply(train_state.params, hidden_state, ac_in)
-        gamma_offset = self.gamma_offset_network.apply(train_state.gamma_offset_params, ac_in[0])
+        hstate_cumulant, gamma_offset = self.cumulant_gamma_network.apply(train_state.cumulant_gamma_params, hstate)
 
         action = pi.sample(seed=rng)
         log_prob = pi.log_prob(action)
-        value, c_value, action, log_prob, gamma_offset = (
+        value, c_value, action, log_prob, hstate_cumulant, gamma_offset = (
             value.squeeze(0),
             c_value.squeeze(0),
             action.squeeze(0),
             log_prob.squeeze(0),
+            hstate_cumulant.squeeze(0),
             gamma_offset.squeeze(0)
         )
-        return value, c_value, action, log_prob, hstate, gamma_offset
+        return value, c_value, action, log_prob, hstate, hstate_cumulant, gamma_offset
 
-    def loss(self, params, init_hstate, traj_batch, gae, targets, gvf_targets, next_vals):
+    def loss(self, params, init_hstate, traj_batch, gae, targets, cumulant_targets, next_vals):
         # RERUN NETWORK
-        _, pi, value, gvf_value = self.network.apply(
+        _, pi, value, cumulant_value = self.network.apply(
             params, init_hstate[0], (traj_batch.obs, traj_batch.done)
         )
         log_prob = pi.log_prob(traj_batch.action)
@@ -96,13 +98,14 @@ class GDPPO(PPO):
             jnp.maximum(value_losses, value_losses_clipped).mean()
         )
 
-        gvf_loss = jnp.square(gvf_value - gvf_targets).mean()
+        if cumulant_targets is not None:
+            value_loss += jnp.square(cumulant_value - cumulant_targets).mean()
 
-        # Lambda discrepancy loss
-        if self.double_critic:
-            # value_loss = self.ld_weight * (jnp.square(value[..., 0] - value[..., 1])).mean() + \
-            #              (1 - self.ld_weight) * value_loss
-            gvf_loss = self.ld_weight * (jnp.square(gvf_value[..., 0] - value[..., 1]).mean())
+            # Lambda discrepancy loss
+            if self.double_critic:
+                # value_loss = self.ld_weight * (jnp.square(value[..., 0] - value[..., 1])).mean() + \
+                #              (1 - self.ld_weight) * value_loss
+                general_discrep_loss = (jnp.square(cumulant_value[..., 0] - cumulant_value[..., 1]).mean())
 
         # CALCULATE ACTOR LOSS
         ratio = jnp.exp(log_prob - traj_batch.log_prob)
@@ -133,26 +136,29 @@ class GDPPO(PPO):
         total_loss = (
                 loss_actor
                 + self.vf_coeff * value_loss
-                + self.vf_coeff * gvf_loss
+                + self.ld_weight * general_discrep_loss
                 - self.entropy_coeff * entropy
         )
         return total_loss, (value_loss, loss_actor, entropy)
 
 
-def env_step(runner_state, unused, agent: PPO, env, env_params):
+def env_step(runner_state, unused, agent: GDPPO, env, env_params):
     train_state, env_state, last_obs, last_done, hstate, rng = runner_state
     rng, _rng = jax.random.split(rng)
 
     # gamma_offset is between -1 and 1
-    value, action, log_prob, hstate, gamma_offset = agent.act(_rng, train_state, hstate, last_obs, last_done)
+    value, action, log_prob, hstate, hstate_cumulant, gamma_offset = agent.act(_rng, train_state, hstate, last_obs, last_done)
 
     # STEP ENV
     rng, _rng = jax.random.split(rng)
     rng_step = jax.random.split(_rng, hstate.shape[0])
     obsv, env_state, reward, done, info = env.step(rng_step, env_state, action, env_params)
+
+
     transition = Transition(
-        last_done, gamma_offset, action, value, reward, log_prob, last_obs, info
+        last_done, gamma_offset, action, value, reward, log_prob, hstate_cumulant, last_obs, info
     )
+
     runner_state = (train_state, env_state, obsv, done, hstate, rng)
     return runner_state, transition
 
@@ -172,28 +178,34 @@ def calculate_gae(traj_batch, last_val, gae_lambda, gamma):
     return advantages, target
 
 
-def calculate_gvf_lambda(traj_batch, last_gvf_val, last_val, gae_lambda, gamma,
-                         gamma_offset_scale: float = 0.1):
+def calculate_gvf_lambda(traj_batch, last_cumulant_val, gae_lambda, gamma,
+                         gamma_offset_scale: float = 0.1, cumulant_type: str = 'rew'):
     def _get_advantages(carry, transition):
-        gae, gae_cumulant, next_value, next_cumulant_value, gae_lambda = carry
-        done, cumulant_value, value, reward, gamma_offset = transition.done, transition.cumulant_value, \
-                                                transition.value, transition.reward, transition.gamma_offset
+        gae_cumulant, next_cumulant_value, gae_lambda = carry
+        done, cumulant_value, reward, hstate_cumulant, gamma_offset = (transition.done, transition.cumulant_value, transition.reward,
+                                                                       transition.hstate_cumulant, transition.gamma_offset)
+
+        # hstate_cumulant is a random fixed linear layer applied to hstate,
+        # with a sigmoid over the output.
+        if cumulant_type == 'hs':
+            cumulant = hstate_cumulant
+        elif cumulant_type == 'rew':
+            cumulant = reward
+        elif cumulant_type == 'hs_rew':
+            cumulant = jnp.concatenate((hstate_cumulant, reward[..., None]), axis=-1)
 
         # Do our funky gamma stuff here.
         gammas = gamma + gamma_offset_scale * gamma_offset
 
-        delta_cumulant = reward + gammas * next_cumulant_value * (1 - done) - cumulant_value
-        delta = reward + gammas * next_value * (1 - done) - value
-        gae_cumulant = delta_cumulant + gammas * gae_lambda * (1 - done) * gae
-        gae = delta + gammas * gae_lambda * (1 - done) * gae
-        return (gae, gae_cumulant, value, cumulant_value, gae_lambda), (gae, gae_cumulant)
+        delta_cumulant = cumulant + gammas * next_cumulant_value * (1 - done) - cumulant_value
+        gae_cumulant = delta_cumulant + gammas * gae_lambda * (1 - done) * gae_cumulant
+        return (gae_cumulant, cumulant_value, gae_lambda), gae_cumulant
 
-    _, (adv, adv_cumulant) = jax.lax.scan(_get_advantages,
-                                     (jnp.zeros_like(last_val), jnp.zeros_like(last_gvf_val), last_val, gae_lambda),
-                                         traj_batch, reverse=True, unroll=16)
-    target = adv + traj_batch.value
+    _, adv_cumulant = jax.lax.scan(_get_advantages,
+                                   (jnp.zeros_like(last_cumulant_val), last_cumulant_val, gae_lambda),
+                                   traj_batch, reverse=True, unroll=16)
     gvf_target = adv_cumulant + traj_batch.cumulant_value
-    return target, gvf_target
+    return gvf_target
 
 
 def filter_period_first_dim(x, n: int):
@@ -213,47 +225,55 @@ def make_train(args: GDPPOHyperparams, rand_key: jax.random.PRNGKey):
                               gamma=args.gamma,
                               normalize_image=False,
                               perfect_memory=args.perfect_memory,
-                              action_concat=args.action_concat)
+                              action_concat=args.action_concat,
+                              reward_concat=args.reward_concat)
 
     if hasattr(env, 'gamma'):
         args.gamma = env.gamma
 
     assert hasattr(env_params, 'max_steps_in_episode')
 
-    double_critic = args.double_critic
-    memoryless = args.memoryless
+    cumulant_size = None
+    if args.cumulant_type == 'hs':
+        cumulant_size = args.cumulant_map_size
+    elif args.cumulant_type == 'rew':
+        cumulant_size = 1
+    elif args.cumulant_type == 'hs_rew':
+        cumulant_size = args.cumulant_map_size + 1
 
-    network_fn, action_size = get_gymnax_network_fn(env, env_params, memoryless=memoryless)
+    network = ActorCritic(env.action_space(env_params),
+                          memoryless=args.memoryless,
+                          double_critic=args.double_critic,
+                          hidden_size=args.hidden_size,
+                          cumulant_size=cumulant_size)
 
-    network = network_fn(action_size,
-                         double_critic=double_critic,
-                         hidden_size=args.hidden_size)
-    gamma_offset_network = GammaOffset(hidden_size=args.hidden_size)
+    cumulant_gamma_network = CumulantGammaNetwork(cumulant_size=cumulant_size)
 
     steps_filter = partial(filter_period_first_dim, n=args.steps_log_freq)
     update_filter = partial(filter_period_first_dim, n=args.update_log_freq)
 
     # Used for vmapping over our double critic.
     transition_axes_map = Transition(
-        None, None, None, 2, 2, None, None, None, None
+        None, None, None, 2, 2, None, None, None, None, None
     )
 
     _calculate_gae = calculate_gae
-    _calculate_gvf_lambda = partial(calculate_gvf_lambda, gamma_offset_scale=args.gamma_offset_scale)
+    _calculate_gvf_lambda = partial(calculate_gvf_lambda, gamma_offset_scale=args.gamma_offset_scale,
+                                    cumulant_type=args.cumulant_type)
 
-    if double_critic:
+    if args.double_critic:
         # last_val is index 1 here b/c we squeezed earlier.
         # _calculate_gae = jax.vmap(calculate_gae,
         #                          in_axes=[transition_axes_map, 1, None, 0, None],
         #                          out_axes=2)
 
         _calculate_gvf_lambda = jax.vmap(_calculate_gvf_lambda,
-                                         in_axes=[transition_axes_map, 1, 1, None, 0, None],
+                                         in_axes=[transition_axes_map, 1, None, 0, None],
                                          out_axes=2)
 
     def train(vf_coeff, ld_weight, alpha, lambda1, lambda0, lr, rng):
-        agent = GDPPO(network, gamma_offset_network,
-                      double_critic=double_critic, ld_weight=ld_weight, alpha=alpha, vf_coeff=vf_coeff,
+        agent = GDPPO(network, cumulant_gamma_network,
+                      double_critic=args.double_critic, ld_weight=ld_weight, alpha=alpha, vf_coeff=vf_coeff,
                       clip_eps=args.clip_eps, entropy_coeff=args.entropy_coeff,
                       ld_exploration_bonus_scale=args.ld_exploration_bonus_scale)
 
@@ -261,7 +281,7 @@ def make_train(args: GDPPOHyperparams, rand_key: jax.random.PRNGKey):
         _env_step = partial(env_step, agent=agent, env=env, env_params=env_params)
 
         gae_lambda = jnp.array(lambda0)
-        if double_critic:
+        if args.double_critic:
             gae_lambda = jnp.array([lambda0, lambda1])
 
         def linear_schedule(count):
@@ -283,7 +303,7 @@ def make_train(args: GDPPOHyperparams, rand_key: jax.random.PRNGKey):
         )
         init_hstate = ScannedRNN.initialize_carry(args.num_envs, args.hidden_size)
         network_params = agent.network.init(_rng, init_hstate, init_x)
-        gamma_offset_params = agent.gamma_offset_network.init(_rng, init_x)
+        cumulant_gamma_params = agent.cumulant_gamma_network.init(_rng, init_hstate)
 
         if args.anneal_lr:
             tx = optax.chain(
@@ -299,7 +319,7 @@ def make_train(args: GDPPOHyperparams, rand_key: jax.random.PRNGKey):
             apply_fn=agent.network.apply,
             params=network_params,
             tx=tx,
-            gamma_offset_params=gamma_offset_params
+            cumulant_gamma_params=cumulant_gamma_params
         )
 
         # INIT ENV
@@ -349,24 +369,24 @@ def make_train(args: GDPPOHyperparams, rand_key: jax.random.PRNGKey):
             # CALCULATE ADVANTAGE
             train_state, env_state, last_obs, last_done, hstate, rng = runner_state
             ac_in = (last_obs[np.newaxis, :], last_done[np.newaxis, :])
-            _, _, last_val, last_gvf_val = network.apply(train_state.params, hstate, ac_in)
+            _, _, last_val, last_cumulant_val = network.apply(train_state.params, hstate, ac_in)
             next_vals = jnp.concatenate((traj_batch.value[1:], last_val), axis=0)
             last_val = last_val.squeeze(0)
-            last_gvf_val = last_gvf_val.squeeze(0)
+            last_cumulant_val = last_cumulant_val.squeeze(0)
 
             advantages, targets = _calculate_gae(traj_batch, last_val, gae_lambda, args.gamma)
-            # CALCULATE GVF ADVANTAGE
-            # TODO: Do we need to train separate heads if we vary gamma??
-            ld_targets, gvf_targets = _calculate_gvf_lambda(traj_batch, last_gvf_val, gae_lambda, args.gamma)
+            # CALCULATE LD + GVF TARGETS
+            cumulant_targets = _calculate_gvf_lambda(traj_batch, last_cumulant_val, gae_lambda, args.gamma)
 
             # UPDATE NETWORK
             def _update_epoch(update_state, unused):
                 def _update_minbatch(train_state, batch_info):
-                    init_hstate, traj_batch, advantages, targets, next_vals = batch_info
+                    init_hstate, traj_batch, advantages, targets, cumulant_targets, next_vals = batch_info
 
                     grad_fn = jax.value_and_grad(agent.loss, has_aux=True)
                     total_loss, grads = grad_fn(
-                        train_state.params, init_hstate, traj_batch, advantages, targets, next_vals
+                        train_state.params, init_hstate, traj_batch, advantages,
+                        targets, cumulant_targets, next_vals
                     )
                     train_state = train_state.apply_gradients(grads=grads)
                     return train_state, total_loss
@@ -377,6 +397,7 @@ def make_train(args: GDPPOHyperparams, rand_key: jax.random.PRNGKey):
                     traj_batch,
                     advantages,
                     targets,
+                    cumulant_targets,
                     next_vals,
                     rng,
                 ) = update_state
@@ -384,7 +405,7 @@ def make_train(args: GDPPOHyperparams, rand_key: jax.random.PRNGKey):
                 # SHUFFLE COLLECTED BATCH
                 rng, _rng = jax.random.split(rng)
                 permutation = jax.random.permutation(_rng, args.num_envs)
-                batch = (init_hstate, traj_batch, advantages, targets, next_vals)
+                batch = (init_hstate, traj_batch, advantages, targets, cumulant_targets, next_vals)
 
                 shuffled_batch = jax.tree.map(
                     lambda x: jnp.take(x, permutation, axis=1), batch
@@ -412,6 +433,7 @@ def make_train(args: GDPPOHyperparams, rand_key: jax.random.PRNGKey):
                     traj_batch,
                     advantages,
                     targets,
+                    cumulant_targets,
                     next_vals,
                     rng,
                 )
@@ -424,6 +446,7 @@ def make_train(args: GDPPOHyperparams, rand_key: jax.random.PRNGKey):
                 traj_batch,
                 advantages,
                 targets,
+                cumulant_targets,
                 next_vals,
                 rng,
             )
@@ -514,7 +537,7 @@ def make_train(args: GDPPOHyperparams, rand_key: jax.random.PRNGKey):
 if __name__ == "__main__":
     # jax.disable_jit(True)
     # okay some weirdness here. NUM_ENVS needs to match with NUM_MINIBATCHES
-    args = PPOHyperparams().parse_args()
+    args = GDPPOHyperparams().parse_args()
     jax.config.update('jax_platform_name', args.platform)
 
     rng = jax.random.PRNGKey(args.seed)

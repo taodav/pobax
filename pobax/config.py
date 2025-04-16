@@ -82,9 +82,12 @@ class PPOHyperparams(Tap):
 
 
 class GDPPOHyperparams(PPOHyperparams):
-    gvf_type: str = 'obs'  # obs | tanh_hs | none
+    cumulant_map_size: int = 32
+    cumulant_type: str = None  # hs | rew | hs_rew | None
     gamma_type: str = 'fixed'  # fixed | nn_gamma_tanh
     gamma_offset_scale: float = 0.05
+    action_concat: bool = True
+    reward_concat: bool = True
 
 
 
