@@ -31,6 +31,7 @@ from pobax.envs.wrappers.gymnax import (
     NormalizeVecReward,
     NormalizeVecObservation,
     ActionConcatWrapper,
+    RewardConcatWrapper,
     AutoResetEnvWrapper,
     OptimisticResetVecEnvWrapper,
     MadronaWrapper
@@ -128,7 +129,8 @@ def get_env(env_name: str,
             normalize_image: bool = False,
             gamma: float = 0.99,
             perfect_memory: bool = False,
-            action_concat: bool = False):
+            action_concat: bool = False,
+            reward_concat: bool = False):
 
     mask_dims = None
     if env_name in masked_gymnax_env_map:
@@ -369,6 +371,9 @@ def get_transformer_env(env_name: str,
 
     if action_concat:
         env = ActionConcatWrapper(env)
+
+    if reward_concat:
+        env = RewardConcatWrapper(env)
 
     env = LogWrapper(env, gamma=gamma)
 
