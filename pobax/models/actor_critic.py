@@ -38,32 +38,32 @@ class ActorCritic(nn.Module):
         actor = Actor(self.action_space, hidden_size=self.hidden_size)
         pi = actor(embedding)
 
-        obs_gvf = None
         critic = Critic(hidden_size=self.hidden_size)
         if self.gvf_type is not None:
             if self.gvf_type == 'obs':
-                gvf_hidden_size = obs.shape[-1]
+                gvf_out_size = obs.shape[-1]
             elif self.gvf_type == 'hidden_state':
-                gvf_hidden_size = self.hidden_size
+                gvf_out_size = self.hidden_size
 
-            gvf_critic = GVF(hidden_size=gvf_hidden_size)
+            gvf_critic = GVF(hidden_size=self.hidden_size, out_size=gvf_out_size)
 
-        if self.double_critic:
-            critic = nn.vmap(Critic,
-                             variable_axes={'params': 0},
-                             split_rngs={'params': True},
-                             in_axes=None,
-                             out_axes=2,
-                             axis_size=2)(hidden_size=self.hidden_size)
-            if self.gvf_type is not None:
-                gvf_critic = nn.vmap(GVF,
-                                     variable_axes={'params': 0},
-                                     split_rngs={'params': True},
-                                     in_axes=None,
-                                     out_axes=2,
-                                     axis_size=2)(hidden_size=self.hidden_size)
+        if self.double_critic and self.gvf_type is not None:
+            # critic = nn.vmap(Critic,
+            #                  variable_axes={'params': 0},
+            #                  split_rngs={'params': True},
+            #                  in_axes=None,
+            #                  out_axes=2,
+            #                  axis_size=2)(hidden_size=self.hidden_size)
+            gvf_critic = nn.vmap(GVF,
+                                 variable_axes={'params': 0},
+                                 split_rngs={'params': True},
+                                 in_axes=None,
+                                 out_axes=2,
+                                 axis_size=2)(hidden_size=self.hidden_size, out_size=gvf_out_size)
 
         v = jnp.squeeze(critic(embedding), axis=-1)
+
+        obs_gvf = None
         if gvf_critic is not None:
             if self.gvf_type == 'obs':
                 obs_gvf = gvf_critic(obs)

@@ -35,6 +35,7 @@ class Transition(NamedTuple):
     value: jnp.ndarray
     cumulant_value: jnp.ndarray
     reward: jnp.ndarray
+    # TODO: add prev_reward here (?)
     log_prob: jnp.ndarray
     obs: jnp.ndarray
     info: jnp.ndarray = None
@@ -99,8 +100,8 @@ class GDPPO(PPO):
 
         # Lambda discrepancy loss
         if self.double_critic:
-            value_loss = self.ld_weight * (jnp.square(value[..., 0] - value[..., 1])).mean() + \
-                         (1 - self.ld_weight) * value_loss
+            # value_loss = self.ld_weight * (jnp.square(value[..., 0] - value[..., 1])).mean() + \
+            #              (1 - self.ld_weight) * value_loss
             gvf_loss = self.ld_weight * (jnp.square(gvf_value[..., 0] - value[..., 1]).mean())
 
         # CALCULATE ACTOR LOSS
@@ -242,9 +243,9 @@ def make_train(args: GDPPOHyperparams, rand_key: jax.random.PRNGKey):
 
     if double_critic:
         # last_val is index 1 here b/c we squeezed earlier.
-        _calculate_gae = jax.vmap(calculate_gae,
-                                 in_axes=[transition_axes_map, 1, None, 0, None],
-                                 out_axes=2)
+        # _calculate_gae = jax.vmap(calculate_gae,
+        #                          in_axes=[transition_axes_map, 1, None, 0, None],
+        #                          out_axes=2)
 
         _calculate_gvf_lambda = jax.vmap(_calculate_gvf_lambda,
                                          in_axes=[transition_axes_map, 1, 1, None, 0, None],
@@ -356,7 +357,7 @@ def make_train(args: GDPPOHyperparams, rand_key: jax.random.PRNGKey):
             advantages, targets = _calculate_gae(traj_batch, last_val, gae_lambda, args.gamma)
             # CALCULATE GVF ADVANTAGE
             # TODO: Do we need to train separate heads if we vary gamma??
-            ld_targets, gvf_targets = _calculate_gvf_lambdas(traj_batch, last_gvf_val, gae_lambda, args.gamma)
+            ld_targets, gvf_targets = _calculate_gvf_lambda(traj_batch, last_gvf_val, gae_lambda, args.gamma)
 
             # UPDATE NETWORK
             def _update_epoch(update_state, unused):
