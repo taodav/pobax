@@ -41,6 +41,9 @@ class Transition(NamedTuple):
     info: jnp.ndarray = None
 
 
+class GDTrainState(TrainState):
+    cumulant_gamma_params: dict
+
 
 class GDPPO(PPO):
     def __init__(self, network,
@@ -71,13 +74,11 @@ class GDPPO(PPO):
 
         action = pi.sample(seed=rng)
         log_prob = pi.log_prob(action)
-        value, c_value, action, log_prob, hstate_cumulant, gamma_offset = (
+        value, c_value, action, log_prob = (
             value.squeeze(0),
             c_value.squeeze(0),
             action.squeeze(0),
-            log_prob.squeeze(0),
-            hstate_cumulant.squeeze(0),
-            gamma_offset.squeeze(0)
+            log_prob.squeeze(0)
         )
         return value, c_value, action, log_prob, hstate, hstate_cumulant, gamma_offset
 
@@ -147,7 +148,7 @@ def env_step(runner_state, unused, agent: GDPPO, env, env_params):
     rng, _rng = jax.random.split(rng)
 
     # gamma_offset is between -1 and 1
-    value, action, log_prob, hstate, hstate_cumulant, gamma_offset = agent.act(_rng, train_state, hstate, last_obs, last_done)
+    value, cumulant_value, action, log_prob, hstate, hstate_cumulant, gamma_offset = agent.act(_rng, train_state, hstate, last_obs, last_done)
 
     # STEP ENV
     rng, _rng = jax.random.split(rng)
@@ -156,7 +157,7 @@ def env_step(runner_state, unused, agent: GDPPO, env, env_params):
 
 
     transition = Transition(
-        last_done, gamma_offset, action, value, reward, log_prob, hstate_cumulant, last_obs, info
+        last_done, gamma_offset, action, value, cumulant_value, reward, log_prob, hstate_cumulant, last_obs, info
     )
 
     runner_state = (train_state, env_state, obsv, done, hstate, rng)
@@ -184,13 +185,13 @@ def calculate_gvf_lambda(traj_batch, last_cumulant_val, gae_lambda, gamma,
         gae_cumulant, next_cumulant_value, gae_lambda = carry
         done, cumulant_value, reward, hstate_cumulant, gamma_offset = (transition.done, transition.cumulant_value, transition.reward,
                                                                        transition.hstate_cumulant, transition.gamma_offset)
-
+        done = done[..., None]
         # hstate_cumulant is a random fixed linear layer applied to hstate,
         # with a sigmoid over the output.
         if cumulant_type == 'hs':
             cumulant = hstate_cumulant
         elif cumulant_type == 'rew':
-            cumulant = reward
+            cumulant = reward[..., None]
         elif cumulant_type == 'hs_rew':
             cumulant = jnp.concatenate((hstate_cumulant, reward[..., None]), axis=-1)
 
@@ -315,7 +316,7 @@ def make_train(args: GDPPOHyperparams, rand_key: jax.random.PRNGKey):
                 optax.clip_by_global_norm(args.max_grad_norm),
                 optax.adam(lr, eps=1e-5),
             )
-        train_state = TrainState.create(
+        train_state = GDTrainState.create(
             apply_fn=agent.network.apply,
             params=network_params,
             tx=tx,
