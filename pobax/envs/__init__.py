@@ -4,6 +4,7 @@ from pathlib import Path
 import gymnax
 from jax import random
 import navix as nx
+from jax import numpy as jnp
 
 from definitions import ROOT_DIR
 
@@ -37,6 +38,7 @@ from pobax.envs.wrappers.gymnax import (
 from pobax.envs.wrappers.pixel import PixelBraxVecEnvWrapper, PixelTMazeVecEnvWrapper, PixelSimpleChainVecEnvWrapper, PixelCraftaxVecEnvWrapper
 from pobax.envs.wrappers.gymnasium import GymnaxToGymWrapper
 from pobax.envs.wrappers.nx import NavixGymnaxWrapper, MazeFoVWrapper
+from pobax.envs.wrappers.trace import TraceFeaturesWrapper
 
 masked_gymnax_env_map = {
     'Pendulum-F-v0': {'env_str': 'Pendulum-v1', 'mask_dims': [0, 1, 2]},
@@ -127,7 +129,9 @@ def get_env(env_name: str,
             normalize_image: bool = True,
             gamma: float = 0.99,
             perfect_memory: bool = False,
-            action_concat: bool = False):
+            action_concat: bool = False,
+            trace_features: bool = False, 
+            trace_lambdas: jnp.ndarray = jnp.array([0.1, 0.5, 0.9, 0.95, 0.99])):
 
     mask_dims = None
     if env_name in masked_gymnax_env_map:
@@ -229,6 +233,9 @@ def get_env(env_name: str,
 
     if mask_dims is not None:
         env = MaskObservationWrapper(env, mask_dims=mask_dims)
+    
+    if trace_features:
+        env = TraceFeaturesWrapper(env, lambdas=trace_lambdas)
 
     # Vectorize our environment
     env = VecEnv(env)

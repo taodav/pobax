@@ -69,6 +69,7 @@ class PPOHyperparams(Tap):
     platform: Literal['cpu', 'gpu'] = 'cpu'
     debug: bool = False
     show_discounted: bool = False  # For debug plotting, do we show undisc returns or disc returns?
+    normalize_env: bool = False  # Normalize the env observations?
 
     # RND hyperparams
     exploration_update_epochs: int = 1
@@ -76,6 +77,8 @@ class PPOHyperparams(Tap):
     rnd_gae_coeff: float = 0.01
     rnd_reward_coeff: float = 1.0
     rnd_hidden_size: int = 512
+    trace_features: bool = False
+    trace_features_lambdas: list[float] = [0., 0.5, 0.7, 0.9, 0.95]
 
     study_name: str = 'batch_ppo_test'
 
@@ -87,6 +90,7 @@ class PPOHyperparams(Tap):
         self.alpha = jnp.array(self.alpha)
         self.ld_weight = jnp.array(self.ld_weight)
         self.rnd_lr = jnp.array(self.rnd_lr)
+        self.trace_features_lambdas = jnp.array(self.trace_features_lambdas)
 
 
 class DQNHyperparams(Tap):
