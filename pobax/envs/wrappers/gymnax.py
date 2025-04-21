@@ -599,7 +599,7 @@ class ActionConcatWrapper(GymnaxWrapper):
 
         elif len(og_obs_space.shape) == 3:
             action_vec = action_vec[None, None, ...]
-            h, w, c = obs_shape
+            h, w, c = og_obs_space.shape
             action_img = action_vec.repeat(h, axis=0).repeat(w, axis=1)
             obs = jnp.concatenate([obs, action_img], axis=-1)
         else:
@@ -779,7 +779,7 @@ class MadronaWrapper(GymnaxWrapper):
     super().__init__(env)
     self.num_worlds = num_worlds
     if not randomization_fn:
-      randomization_fn = functools.partial(
+      randomization_fn = partial(
           _identity_randomization_fn, num_worlds=num_worlds
       )
     self.sys = self._unwrapped._env.sys
