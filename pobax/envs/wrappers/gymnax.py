@@ -521,6 +521,10 @@ class ActionConcatWrapper(GymnaxWrapper):
         if isinstance(action_space, spaces.Discrete):
             action_vec = jnp.eye(action_space.n)[action]
 
+        # Here we need to zero out our action_vec if we are done,
+        # since our next obs should be after reset.
+        action_vec *= (1 - done)
+
         obs_shape = self.observation_space(params).shape
         if len(obs_shape) == 1:
             obs = jnp.concatenate([obs, action_vec])

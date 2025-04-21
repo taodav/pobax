@@ -82,4 +82,22 @@ class FullyObservableSimpleChain(SimpleChain):
         return spaces.Box(0, 1, (n_obs, ))
 
     def get_obs(self, state: np.ndarray) -> np.ndarray:
-        return self.state.copy()
+        obs = jnp.zeros(self.n).at[state.pos_idx].set(1)
+        return obs
+
+
+class FullyObservableImageSimpleChain(SimpleChain):
+    def __init__(self, n: int = 10, reward_in_obs: bool = False):
+        super().__init__(n=n, reward_in_obs=reward_in_obs)
+
+    def observation_space(self, params: EnvParams):
+        n_obs = self.n
+        if self.reward_in_obs:
+            n_obs += 1
+
+        return spaces.Box(0, 1, (n_obs, n_obs, 1))
+
+    def get_obs(self, state: np.ndarray) -> np.ndarray:
+        obs = jnp.zeros(self.n).at[state.pos_idx].set(1)
+        obs = obs[..., None].repeat(self.n, axis=-1)[..., None]
+        return obs
