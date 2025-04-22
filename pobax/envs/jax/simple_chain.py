@@ -99,5 +99,5 @@ class FullyObservableImageSimpleChain(SimpleChain):
 
     def get_obs(self, state: np.ndarray) -> np.ndarray:
         obs = jnp.zeros(self.n).at[state.pos_idx].set(1)
-        obs = obs[..., None].repeat(self.n, axis=-1)[..., None]
+        obs = obs[None, ...].repeat(self.n, axis=0)[..., None]
         return obs
