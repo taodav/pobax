@@ -172,10 +172,11 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
     )
     env_key, rand_key = jax.random.split(rand_key)
     env, env_params = get_env(args.env, env_key,
-                                     gamma=args.gamma,
-                                     normalize_image=False,
-                                     perfect_memory=args.perfect_memory,
-                                     action_concat=args.action_concat)
+                              gamma=args.gamma,
+                              normalize_image=False,
+                              perfect_memory=args.perfect_memory,
+                              action_concat=args.action_concat,
+                              trace_lambdas=args.trace_lambdas)
 
     if hasattr(env, 'gamma'):
         args.gamma = env.gamma
@@ -461,7 +462,6 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
 
 if __name__ == "__main__":
     # jax.disable_jit(True)
-    # okay some weirdness here. NUM_ENVS needs to match with NUM_MINIBATCHES
     args = PPOHyperparams().parse_args()
     jax.config.update('jax_platform_name', args.platform)
 

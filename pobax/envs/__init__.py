@@ -3,6 +3,7 @@ from pathlib import Path
 
 import gymnax
 from jax import random
+import jax.numpy as jnp
 import navix as nx
 
 from definitions import ROOT_DIR
@@ -38,6 +39,7 @@ from pobax.envs.wrappers.gymnax import (
 from pobax.envs.wrappers.pixel import PixelBraxVecEnvWrapper, PixelTMazeVecEnvWrapper, PixelSimpleChainVecEnvWrapper, PixelCraftaxVecEnvWrapper
 from pobax.envs.wrappers.gymnasium import GymnaxToGymWrapper
 from pobax.envs.wrappers.nx import NavixGymnaxWrapper, MazeFoVWrapper
+from pobax.envs.wrappers.trace import TraceFeaturesWrapper
 
 masked_gymnax_env_map = {
     'Pendulum-F-v0': {'env_str': 'Pendulum-v1', 'mask_dims': [0, 1, 2]},
@@ -128,7 +130,9 @@ def get_env(env_name: str,
             gamma: float = 0.99,
             perfect_memory: bool = False,
             action_concat: bool = False,
-            reward_concat: bool = False):
+            reward_concat: bool = False,
+            trace_lambdas: jnp.ndarray = None
+            ):
 
     mask_dims = None
     if env_name in masked_gymnax_env_map:
@@ -228,6 +232,9 @@ def get_env(env_name: str,
 
     if reward_concat:
         env = RewardConcatWrapper(env)
+
+    if trace_lambdas is not None:
+        env = TraceFeaturesWrapper(env, lambdas=trace_lambdas, trace_in_obs=True)
 
     env = LogWrapper(env, gamma=gamma)
 

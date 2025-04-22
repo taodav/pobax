@@ -49,6 +49,8 @@ class PPOHyperparams(Tap):
     ld_weight: list[float] = [0.0]  # how much to we weight the LD loss vs. value loss? only applies when optimize LD is True.
     vf_coeff: list[float] = [0.5]
 
+    use_trace_features: bool = False
+    trace_lambdas: str = '0. 0.5 0.7 0.9 0.95'
     hidden_size: int = 128
     total_steps: int = int(1.5e6)
     entropy_coeff: float = 0.01
@@ -79,6 +81,11 @@ class PPOHyperparams(Tap):
         self.lambda1 = jnp.array(self.lambda1)
         self.alpha = jnp.array(self.alpha)
         self.ld_weight = jnp.array(self.ld_weight)
+
+        if self.use_trace_features:
+            self.trace_lambdas = jnp.array([float(t) for t in self.trace_lambdas.split(' ')])
+        else:
+            self.trace_lambdas = None
 
 
 class GDPPOHyperparams(PPOHyperparams):
