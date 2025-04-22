@@ -21,7 +21,7 @@ class ActorCritic(nn.Module):
     def __call__(self, hidden, x):
         obs, dones = x
 
-        if len(obs.shape) > 1:
+        if len(obs.shape) > 3:
             embedding = FullImageCNN(hidden_size=self.hidden_size)(obs)
         else:
             embedding = nn.Dense(
@@ -63,14 +63,18 @@ class ActorCritic(nn.Module):
 
 class CumulantGammaNetwork(nn.Module):
     cumulant_size: int
+    gamma_type: str = 'nn_gamma_tanh'
 
     @nn.compact
     def __call__(self, x):
         cumulant_mapped = nn.Dense(features=self.cumulant_size)(x)
         cumulant_mapped = nn.sigmoid(cumulant_mapped)
 
-        gamma_offset = nn.Dense(features=1)(x)
-        gamma_offset = nn.sigmoid(gamma_offset)
+        if self.gamma_type == 'nn_gamma_tanh':
+            gamma_offset = nn.Dense(features=1)(x)
+            gamma_offset = nn.tanh(gamma_offset)
+        elif self.gamma_type == 'fixed':
+            gamma_offset = jnp.zeros((x.shape[0], 1))
 
         return cumulant_mapped, gamma_offset
 

@@ -99,6 +99,7 @@ class GDPPO(PPO):
             jnp.maximum(value_losses, value_losses_clipped).mean()
         )
 
+        general_discrep_loss = 0
         if cumulant_targets is not None:
             value_loss += jnp.square(cumulant_value - cumulant_targets).mean()
 
@@ -248,7 +249,8 @@ def make_train(args: GDPPOHyperparams, rand_key: jax.random.PRNGKey):
                           hidden_size=args.hidden_size,
                           cumulant_size=cumulant_size)
 
-    cumulant_gamma_network = CumulantGammaNetwork(cumulant_size=cumulant_size)
+    cumulant_gamma_network = CumulantGammaNetwork(cumulant_size=cumulant_size,
+                                                  gamma_type=args.gamma_type)
 
     steps_filter = partial(filter_period_first_dim, n=args.steps_log_freq)
     update_filter = partial(filter_period_first_dim, n=args.update_log_freq)
@@ -536,7 +538,7 @@ def make_train(args: GDPPOHyperparams, rand_key: jax.random.PRNGKey):
 
 
 if __name__ == "__main__":
-    # jax.disable_jit(True)
+    jax.disable_jit(True)
     # okay some weirdness here. NUM_ENVS needs to match with NUM_MINIBATCHES
     args = GDPPOHyperparams().parse_args()
     jax.config.update('jax_platform_name', args.platform)
