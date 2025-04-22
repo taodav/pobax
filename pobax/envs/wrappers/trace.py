@@ -42,7 +42,7 @@ class TraceFeaturesWrapper(GymnaxWrapper):
 
             if len(og_obs_space_shape) == 1:
                 obs_length = og_obs_space_shape[0]
-                shape = obs_length * n_lambdas
+                shape = (obs_length * n_lambdas,)
             elif len(og_obs_space_shape) == 3:
                 # images
                 shape = (og_obs_space_shape[0], og_obs_space_shape[1], og_obs_space_shape[2] * n_lambdas)
