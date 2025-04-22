@@ -67,7 +67,7 @@ def test_image_simple_chain():
     obs_for_lambda = obses[..., lambda_idx_to_test::n_lambdas]
     obs_for_lambda_without_action = obs_for_lambda[..., :-1]
 
-    assert np.allclose(obs_for_lambda_without_action.sum(axis=-1), 1.)
+    assert np.allclose(np.squeeze(obs_for_lambda_without_action).sum(axis=-1), 1.)
 
     assert done.item()
 
