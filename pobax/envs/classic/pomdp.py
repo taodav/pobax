@@ -48,13 +48,13 @@ class POMDP(environment.Environment):
         obs = obs.at[observed_idx].set(1)
         return obs
 
-    @partial(jit, static_argnums=(0, ))
+    @partial(jit, static_argnums=(0,))
     def reset_env(self, key: chex.PRNGKey, params: environment.EnvParams):
         obs_key, init_key = random.split(key)
         state = random.choice(init_key, self.p0.shape[0], p=self.p0)
         return self.get_obs(obs_key, state), state
 
-    @partial(jit, static_argnums=(0, -2))
+    @partial(jit, static_argnums=(0,))
     def step_env(self,
                  key: chex.PRNGKey,
                  state: jnp.ndarray,
