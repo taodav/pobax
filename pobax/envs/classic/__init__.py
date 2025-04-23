@@ -5,6 +5,7 @@ import gymnasium as gym
 from gymnasium import spaces
 from jax.tree_util import register_pytree_node_class
 import numpy as np
+from pobax.envs.classic.pomdp import POMDP
 
 from definitions import ROOT_DIR
 
@@ -553,111 +554,111 @@ class POMDPFile:
         print("R:", self.R)
 
 
-@register_pytree_node_class
-class POMDP(gym.Env):
-    def __init__(self,
-                 T: np.ndarray,
-                 R: np.ndarray,
-                 p0: np.ndarray,
-                 gamma: float,
-                 phi: np.ndarray = None,
-                 rand_key: np.random.RandomState = None):
-        self.gamma = gamma
-        self.T = T
-        self.R = R
-        self.phi = phi
-
-        self.R_min = np.min(self.R)
-        self.R_max = np.max(self.R)
-        self.p0 = p0
-        self.current_state = None
-        self.rand_key = rand_key
-
-    def tree_flatten(self):
-        children = (self.T, self.R, self.p0, self.gamma, self.phi)
-        aux_data = None
-        return (children, aux_data)
-
-    @classmethod
-    def tree_unflatten(cls, aux_data, children):
-        return cls(*children)
-
-    def __repr__(self):
-        return repr(self.T) + '\n' + repr(self.R)
-
-    def stationary_distribution(self, pi=None, p0=None, max_steps=200):
-        if p0 is None:
-            state_distr = np.ones(self.state_space.n) / self.state_space.n
-        else:
-            state_distr = p0
-        old_distr = state_distr
-
-        if pi is None:
-            T_pi = np.mean(self.T, axis=0)
-        else:
-            T_pi = self.T[pi, np.arange(self.state_space.n), :]
-
-        for t in range(max_steps):
-            state_distr = state_distr @ T_pi
-            if np.allclose(state_distr, old_distr):
-                break
-            old_distr = state_distr
-        return state_distr
-
-    def reset(self, state=None, **kwargs):
-        if state is None:
-            if self.rand_key is not None:
-                state = self.rand_key.choice(self.state_space.n, p=self.p0)
-            else:
-                state = np.random.choice(self.state_space.n, p=self.p0)
-        self.current_state = state
-        info = {'state': self.current_state}
-        return self.observe(self.current_state), info
-
-    def step(self, action: int, gamma_terminal: bool = True):
-        pr_next_s = self.T[action, self.current_state, :]
-        if self.rand_key is not None:
-            next_state = self.rand_key.choice(self.state_space.n, p=pr_next_s)
-        else:
-            next_state = np.random.choice(self.state_space.n, p=pr_next_s)
-        reward = self.R[action][self.current_state][next_state]
-        # Check if next_state is absorbing state
-        is_absorbing = (self.T[:, next_state, next_state] == 1)
-        terminal = is_absorbing.all() # absorbing for all actions
-        truncated = False
-        observation = self.observe(next_state)
-        info = {'state': next_state}
-        self.current_state = next_state
-        # Conform to new-style Gym API
-        return observation, reward, terminal, truncated, info
-
-    def observe(self, s):
-        if self.phi is None:
-            obs = np.zeros(self.state_space.n)
-            obs[s] = 1
-        else:
-            if self.rand_key is not None:
-                observed_idx = self.rand_key.choice(self.observation_space.n, p=self.phi[s])
-
-            observed_idx = np.random.choice(self.observation_space.n, p=self.phi[s])
-            obs = np.zeros(self.observation_space.n)
-            obs[observed_idx] = 1
-        return obs
-
-    @property
-    def state_space(self) -> spaces.Space:
-        return spaces.Discrete(self.T.shape[-1])
-
-    @property
-    def observation_space(self) -> spaces.Discrete:
-        if self.phi is None:
-            return spaces.MultiBinary(self.T.shape[-1])
-        else:
-            return spaces.MultiBinary(self.phi.shape[-1])
-
-    @property
-    def action_space(self) -> spaces.Discrete:
-        return spaces.Discrete(self.T.shape[0])
+# @register_pytree_node_class
+# class POMDP(gym.Env):
+#     def __init__(self,
+#                  T: np.ndarray,
+#                  R: np.ndarray,
+#                  p0: np.ndarray,
+#                  gamma: float,
+#                  phi: np.ndarray = None,
+#                  rand_key: np.random.RandomState = None):
+#         self.gamma = gamma
+#         self.T = T
+#         self.R = R
+#         self.phi = phi
+#
+#         self.R_min = np.min(self.R)
+#         self.R_max = np.max(self.R)
+#         self.p0 = p0
+#         self.current_state = None
+#         self.rand_key = rand_key
+#
+#     def tree_flatten(self):
+#         children = (self.T, self.R, self.p0, self.gamma, self.phi)
+#         aux_data = None
+#         return (children, aux_data)
+#
+#     @classmethod
+#     def tree_unflatten(cls, aux_data, children):
+#         return cls(*children)
+#
+#     def __repr__(self):
+#         return repr(self.T) + '\n' + repr(self.R)
+#
+#     def stationary_distribution(self, pi=None, p0=None, max_steps=200):
+#         if p0 is None:
+#             state_distr = np.ones(self.state_space.n) / self.state_space.n
+#         else:
+#             state_distr = p0
+#         old_distr = state_distr
+#
+#         if pi is None:
+#             T_pi = np.mean(self.T, axis=0)
+#         else:
+#             T_pi = self.T[pi, np.arange(self.state_space.n), :]
+#
+#         for t in range(max_steps):
+#             state_distr = state_distr @ T_pi
+#             if np.allclose(state_distr, old_distr):
+#                 break
+#             old_distr = state_distr
+#         return state_distr
+#
+#     def reset(self, state=None, **kwargs):
+#         if state is None:
+#             if self.rand_key is not None:
+#                 state = self.rand_key.choice(self.state_space.n, p=self.p0)
+#             else:
+#                 state = np.random.choice(self.state_space.n, p=self.p0)
+#         self.current_state = state
+#         info = {'state': self.current_state}
+#         return self.observe(self.current_state), info
+#
+#     def step(self, action: int, gamma_terminal: bool = True):
+#         pr_next_s = self.T[action, self.current_state, :]
+#         if self.rand_key is not None:
+#             next_state = self.rand_key.choice(self.state_space.n, p=pr_next_s)
+#         else:
+#             next_state = np.random.choice(self.state_space.n, p=pr_next_s)
+#         reward = self.R[action][self.current_state][next_state]
+#         # Check if next_state is absorbing state
+#         is_absorbing = (self.T[:, next_state, next_state] == 1)
+#         terminal = is_absorbing.all() # absorbing for all actions
+#         truncated = False
+#         observation = self.observe(next_state)
+#         info = {'state': next_state}
+#         self.current_state = next_state
+#         # Conform to new-style Gym API
+#         return observation, reward, terminal, truncated, info
+#
+#     def observe(self, s):
+#         if self.phi is None:
+#             obs = np.zeros(self.state_space.n)
+#             obs[s] = 1
+#         else:
+#             if self.rand_key is not None:
+#                 observed_idx = self.rand_key.choice(self.observation_space.n, p=self.phi[s])
+#
+#             observed_idx = np.random.choice(self.observation_space.n, p=self.phi[s])
+#             obs = np.zeros(self.observation_space.n)
+#             obs[observed_idx] = 1
+#         return obs
+#
+#     @property
+#     def state_space(self) -> spaces.Space:
+#         return spaces.Discrete(self.T.shape[-1])
+#
+#     @property
+#     def observation_space(self) -> spaces.Discrete:
+#         if self.phi is None:
+#             return spaces.MultiBinary(self.T.shape[-1])
+#         else:
+#             return spaces.MultiBinary(self.phi.shape[-1])
+#
+#     @property
+#     def action_space(self) -> spaces.Discrete:
+#         return spaces.Discrete(self.T.shape[0])
 
 
 def is_numeric(lst):
@@ -734,5 +735,5 @@ def load_spec(name: str, **kwargs):
 def load_pomdp(name: str, fully_observable: bool = False):
     spec = load_spec(name)
     pomdp = POMDP(spec['T'], spec['R'], spec['p0'], spec['gamma'], spec['phi'],
-                     fully_observable=fully_observable)
+                  fully_observable=fully_observable)
     return pomdp
