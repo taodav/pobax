@@ -63,18 +63,22 @@ class ActorCritic(nn.Module):
 
 class CumulantGammaNetwork(nn.Module):
     cumulant_size: int
-    gamma_type: str = 'nn_gamma_tanh'
+    gamma: float = 0.9
+    gamma_type: str = 'nn_gamma_sigmoid'
+    gamma_max: float = 1.
+    gamma_min: float = 0.75
 
     @nn.compact
     def __call__(self, x):
         cumulant_mapped = nn.Dense(features=self.cumulant_size)(x)
         cumulant_mapped = nn.sigmoid(cumulant_mapped)
 
-        if self.gamma_type == 'nn_gamma_tanh':
-            gamma_offset = nn.Dense(features=1)(x)
-            gamma_offset = nn.tanh(gamma_offset)
+        if self.gamma_type == 'nn_gamma_sigmoid':
+            hangman = nn.Dense(features=1)(x)
+            hangman = nn.sigmoid(hangman)
+            hangman = (self.gamma_max - self.gamma_min) * hangman + self.gamma_min
         elif self.gamma_type == 'fixed':
-            gamma_offset = jnp.zeros((x.shape[0], 1))
+            hangman = jnp.zeros((x.shape[0], 1)) + self.gamma
 
-        return cumulant_mapped, gamma_offset
+        return cumulant_mapped, hangman
 

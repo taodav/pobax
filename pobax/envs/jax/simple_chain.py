@@ -34,6 +34,10 @@ class SimpleChain(Environment):
 
         return spaces.Box(0, 1, (n_obs, ))
 
+    @property
+    def default_params(self) -> EnvParams:
+        return EnvParams(max_steps_in_episode=self.n)
+
     def action_space(self, params: EnvParams):
         return spaces.Discrete(1)
 
