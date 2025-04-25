@@ -306,7 +306,7 @@ def get_transformer_env(env_name: str,
         if hasattr(env, 'gamma'):
             gamma = env.gamma
         env_params = env.default_params
-    elif env_name == 'simple_chain':
+    elif env_name == 'simplechain':
         n = 10
         if fo_pomdp:
             env = FullyObservableSimpleChain(n=n)

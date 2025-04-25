@@ -90,10 +90,11 @@ class PPOHyperparams(Tap):
 class GDPPOHyperparams(PPOHyperparams):
     cumulant_map_size: int = 32
     cumulant_type: str = None  # hs | rew | hs_rew | None
-    gamma_type: str = 'fixed'  # fixed | nn_gamma_tanh
-    gamma_offset_scale: float = 0.05
+    gamma_type: str = 'fixed'  # fixed | nn_gamma_sigmoid
+    gamma_max: float = 1.
+    gamma_min: float = 0.75
     action_concat: bool = True
-    reward_concat: bool = True
+    reward_concat: bool = True  # TODO: Fix this? Gym does rewards weirdly
 
 
 

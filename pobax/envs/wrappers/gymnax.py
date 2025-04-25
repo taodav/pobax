@@ -666,7 +666,9 @@ class RewardConcatWrapper(GymnaxWrapper):
         obs, state, reward, done, info = self._env.step(
             key, state, action, params
         )
-        reward_vec = jnp.array([reward])
+        # Here we need to zero out our action_vec if we are done,
+        # since our next obs should be after reset.
+        reward_vec = jnp.array([reward]) * (1 - done)
 
         obs_shape = self.observation_space(params).shape
         if len(obs_shape) == 1:
