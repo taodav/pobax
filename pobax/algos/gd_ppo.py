@@ -113,13 +113,13 @@ class GDPPO(PPO):
         ratio = jnp.exp(log_prob - traj_batch.log_prob)
 
         # which advantage do we use to update our policy?
-        if self.double_critic:
-            gae = (self.alpha * gae[..., 0] +
-                   (1 - self.alpha) * gae[..., 1])
-
-            ld_exploration_bonus = jnp.abs(next_vals[..., 0] - next_vals[..., 1])
-
-            gae += self.ld_exploration_bonus_scale * ld_exploration_bonus
+        # if self.double_critic:
+        #     gae = (self.alpha * gae[..., 0] +
+        #            (1 - self.alpha) * gae[..., 1])
+        #
+        #     ld_exploration_bonus = jnp.abs(next_vals[..., 0] - next_vals[..., 1])
+        #
+        #     gae += self.ld_exploration_bonus_scale * ld_exploration_bonus
 
         gae = (gae - gae.mean()) / (gae.std() + 1e-8)
         loss_actor1 = ratio * gae
