@@ -54,6 +54,7 @@ class PPOHyperparams(Tap):
     total_steps: int = int(1.5e6)
     entropy_coeff: float = 0.01
     ld_exploration_bonus_scale: float = 0.
+    cumulant_loss_weight: float = 0.5
     clip_eps: float = 0.2
     max_grad_norm: float = 0.5
     anneal_lr: bool = True
