@@ -71,7 +71,7 @@ class CumulantGammaNetwork(nn.Module):
     @nn.compact
     def __call__(self, x):
         cumulant_mapped = nn.Dense(features=self.cumulant_size)(x)
-        cumulant_mapped = nn.sigmoid(cumulant_mapped)
+        cumulant_mapped = nn.LayerNorm()(cumulant_mapped)
 
         if self.gamma_type == 'nn_gamma_sigmoid':
             hangman = nn.Dense(features=1)(x)

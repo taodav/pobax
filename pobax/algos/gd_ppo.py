@@ -53,7 +53,7 @@ class GDPPO(PPO):
                  alpha: float = 0.,
                  vf_coeff: float = 0.,
                  ld_exploration_bonus_scale: float = 0.,
-                 cumulant_weight: float = 0.5,
+                 cumulant_loss_weight: float = 0.5,
                  entropy_coeff: float = 0.01,
                  clip_eps: float = 0.2):
         super().__init__(network, double_critic, ld_weight,
@@ -62,7 +62,7 @@ class GDPPO(PPO):
         # TODO: GVF loss coeff? Right now we're using vf_coeff
 
         self.cumulant_gamma_network = cumulant_gamma_network
-        self.cumulant_weight = cumulant_weight
+        self.cumulant_loss_weight = cumulant_loss_weight
 
     def act(self, rng: chex.PRNGKey,
             train_state: flax.training.train_state.TrainState,
@@ -103,8 +103,7 @@ class GDPPO(PPO):
 
         general_discrep_loss = 0
         if cumulant_targets is not None:
-            # TODO: weight this!
-            value_loss += self.cumulant_weight * jnp.square(cumulant_value - cumulant_targets).mean()
+            value_loss += self.cumulant_loss_weight * jnp.square(cumulant_value - cumulant_targets).mean()
 
             # Lambda discrepancy loss
             if self.double_critic:
@@ -288,7 +287,8 @@ def make_train(args: GDPPOHyperparams, rand_key: jax.random.PRNGKey):
         agent = GDPPO(network, cumulant_gamma_network,
                       double_critic=args.double_critic, ld_weight=ld_weight, alpha=alpha, vf_coeff=vf_coeff,
                       clip_eps=args.clip_eps, entropy_coeff=args.entropy_coeff,
-                      ld_exploration_bonus_scale=args.ld_exploration_bonus_scale)
+                      ld_exploration_bonus_scale=args.ld_exploration_bonus_scale,
+                      cumulant_loss_weight=args.cumulant_loss_weight)
 
         # initialize functions
         _env_step = partial(env_step, agent=agent, env=env, env_params=env_params)
@@ -551,7 +551,7 @@ def make_train(args: GDPPOHyperparams, rand_key: jax.random.PRNGKey):
 
 
 if __name__ == "__main__":
-    # jax.disable_jit(True)
+    jax.disable_jit(True)
     # okay some weirdness here. NUM_ENVS needs to match with NUM_MINIBATCHES
     args = GDPPOHyperparams().parse_args()
     jax.config.update('jax_platform_name', args.platform)
