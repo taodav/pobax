@@ -195,8 +195,8 @@ if __name__ == "__main__":
     discounted = False
     hyperparam_type = 'per_env'  # (all_env | per_env)
 
-    env_name = 'battleship_10'
-    super_dir = 'battleship'
+    env_name = 'rocksample_11_11'
+    super_dir = 'rocksample_11_11'
 
     ylims = None
     # ylims = (0, 40)  # for rocksample_11_11 hsize
@@ -206,7 +206,9 @@ if __name__ == "__main__":
     # normal
     study_paths = [
         ('RNN', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo'), 'purple'),
-        ('Trace', Path(ROOT_DIR, 'results', 'trace_experiments', f'{env_name}_ppo_trace_memoryless'), 'blue'),
+        # ('Trace', Path(ROOT_DIR, 'results', 'trace_experiments', f'{env_name}_ppo_trace_memoryless'), 'blue'),
+        # ('SF', Path(ROOT_DIR, 'results', 'gd_sf', f'{env_name}_ppo_gd_sf'), 'blue'),
+        ('Hangman', Path(ROOT_DIR, 'results', 'gd_hangman', f'{env_name}_ppo_gd_hangman'), 'blue'),
         # ('RNN + LD', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_LD'), 'blue'),
         ('Memoryless', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_memoryless'), 'dark gray'),
         ('STATE', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_perfect_memory_memoryless'), 'green'),

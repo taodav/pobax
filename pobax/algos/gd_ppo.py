@@ -53,6 +53,7 @@ class GDPPO(PPO):
                  alpha: float = 0.,
                  vf_coeff: float = 0.,
                  ld_exploration_bonus_scale: float = 0.,
+                 cumulant_weight: float = 0.5,
                  entropy_coeff: float = 0.01,
                  clip_eps: float = 0.2):
         super().__init__(network, double_critic, ld_weight,
@@ -61,6 +62,7 @@ class GDPPO(PPO):
         # TODO: GVF loss coeff? Right now we're using vf_coeff
 
         self.cumulant_gamma_network = cumulant_gamma_network
+        self.cumulant_weight = cumulant_weight
 
     def act(self, rng: chex.PRNGKey,
             train_state: flax.training.train_state.TrainState,
@@ -101,7 +103,8 @@ class GDPPO(PPO):
 
         general_discrep_loss = 0
         if cumulant_targets is not None:
-            value_loss += jnp.square(cumulant_value - cumulant_targets).mean()
+            # TODO: weight this!
+            value_loss += self.cumulant_weight * jnp.square(cumulant_value - cumulant_targets).mean()
 
             # Lambda discrepancy loss
             if self.double_critic:
