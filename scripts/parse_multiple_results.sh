@@ -1,4 +1,4 @@
-RESULTS_DIR='../results/gd_hangman'
+RESULTS_DIR='../results/gd_sf'
 
 for item in $RESULTS_DIR/*/;
 do
