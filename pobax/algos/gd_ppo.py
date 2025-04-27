@@ -109,7 +109,7 @@ class GDPPO(PPO):
             if self.double_critic:
                 # value_loss = self.ld_weight * (jnp.square(value[..., 0] - value[..., 1])).mean() + \
                 #              (1 - self.ld_weight) * value_loss
-                general_discrep_loss = (jnp.square(cumulant_value[..., 0] - cumulant_value[..., 1]).mean())
+                general_discrep_loss = (jnp.square(cumulant_value[..., 0, :] - cumulant_value[..., 1, :]).mean())
 
         # CALCULATE ACTOR LOSS
         ratio = jnp.exp(log_prob - traj_batch.log_prob)
