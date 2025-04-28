@@ -36,6 +36,13 @@ def load_train_state(fpath: Path, key: chex.PRNGKey):
         cumulant_size = 1
     elif args.cumulant_type == 'hs_rew':
         cumulant_size = args.cumulant_map_size + 1
+    elif args.cumulant_type == 'obs':
+        obs_shape = env.observation_space(env_params).shape
+        assert len(obs_shape) <= 1, 'no support for images for obs cumulant'
+        cumulant_size = obs_shape[0]
+    elif args.cumulant_type == 'enc_obs':
+        cumulant_size = args.hidden_size
+
 
     network = ActorCritic(env.action_space(env_params),
                           memoryless=args.memoryless,
@@ -43,8 +50,11 @@ def load_train_state(fpath: Path, key: chex.PRNGKey):
                           hidden_size=args.hidden_size,
                           cumulant_size=cumulant_size)
 
-    cumulant_gamma_network = CumulantGammaNetwork(cumulant_size=cumulant_size,
-                                                  gamma_type=args.gamma_type)
+    cumulant_gamma_network = CumulantGammaNetwork(cumulant_size=args.cumulant_map_size,
+                                                  gamma=args.gamma,
+                                                  gamma_type=args.gamma_type,
+                                                  gamma_max=args.gamma_max,
+                                                  gamma_min=args.gamma_min)
 
     agent = GDPPO(network, cumulant_gamma_network,
                   double_critic=args.double_critic,
@@ -53,7 +63,8 @@ def load_train_state(fpath: Path, key: chex.PRNGKey):
                   vf_coeff=args.vf_coeff.item(),
                   clip_eps=args.clip_eps,
                   entropy_coeff=args.entropy_coeff,
-                  ld_exploration_bonus_scale=args.ld_exploration_bonus_scale)
+                  ld_exploration_bonus_scale=args.ld_exploration_bonus_scale,
+                  cumulant_loss_weight=args.cumulant_loss_weight)
 
     ts_dict = jax.tree.map(lambda x: x[0, 0, 0, 0, 0, 0, 0], restored['final_train_state'])
     tx = optax.adam(args.lr)
@@ -76,7 +87,7 @@ if __name__ == "__main__":
     n_steps = int(1e3)
     rng, load_key = jax.random.split(rng)
 
-    ckpt_path = Path('/Users/ruoyutao/Documents/pobax/results/test_gd_ppo/tmaze_5_seed(2024)_time(20250423-150113)_e3dba12c8888a375fe47a98f570c4b43')
+    ckpt_path = Path('/Users/ruoyutao/Documents/pobax/results/test_gd_ppo/parity_check_seed(2024)_time(20250428-193800)_929b0aa56496f3e8314f64202e942d19')
 
     env, env_params, args, agent, ts = load_train_state(ckpt_path, load_key)
 
