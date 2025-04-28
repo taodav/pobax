@@ -76,11 +76,12 @@ class GDPPO(PPO):
 
         action = pi.sample(seed=rng)
         log_prob = pi.log_prob(action)
-        value, c_value, action, log_prob = (
+        value, c_value, action, log_prob, obs_encoding = (
             value.squeeze(0),
             c_value.squeeze(0),
             action.squeeze(0),
-            log_prob.squeeze(0)
+            log_prob.squeeze(0),
+            obs_encoding.squeeze(0)
         )
         return value, c_value, action, log_prob, hstate, hstate_cumulant, hangman, obs_encoding
 
