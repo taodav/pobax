@@ -38,6 +38,7 @@ class Transition(NamedTuple):
     log_prob: jnp.ndarray
     hstate_cumulant: jnp.ndarray
     obs: jnp.ndarray
+    obs_encoding: jnp.ndarray
     info: jnp.ndarray = None
 
 
@@ -59,7 +60,6 @@ class GDPPO(PPO):
         super().__init__(network, double_critic, ld_weight,
                          alpha, vf_coeff, ld_exploration_bonus_scale,
                          entropy_coeff, clip_eps)
-        # TODO: GVF loss coeff? Right now we're using vf_coeff
 
         self.cumulant_gamma_network = cumulant_gamma_network
         self.cumulant_loss_weight = cumulant_loss_weight
@@ -71,7 +71,7 @@ class GDPPO(PPO):
 
         # SELECT ACTION
         ac_in = (obs[np.newaxis, :], done[np.newaxis, :])
-        hstate, pi, value, c_value = self.network.apply(train_state.params, hidden_state, ac_in)
+        hstate, pi, value, c_value, obs_encoding = self.network.apply(train_state.params, hidden_state, ac_in)
         hstate_cumulant, hangman = self.cumulant_gamma_network.apply(train_state.cumulant_gamma_params, hstate)
 
         action = pi.sample(seed=rng)
@@ -82,11 +82,12 @@ class GDPPO(PPO):
             action.squeeze(0),
             log_prob.squeeze(0)
         )
-        return value, c_value, action, log_prob, hstate, hstate_cumulant, hangman
+        return value, c_value, action, log_prob, hstate, hstate_cumulant, hangman, obs_encoding
 
     def loss(self, params, init_hstate, traj_batch, gae, targets, cumulant_targets, next_vals):
         # RERUN NETWORK
-        _, pi, value, cumulant_value = self.network.apply(
+        # TODO: BPTT for obs_encoding w/ trace?
+        _, pi, value, cumulant_value, obs_encoding = self.network.apply(
             params, init_hstate[0], (traj_batch.obs, traj_batch.done)
         )
         log_prob = pi.log_prob(traj_batch.action)
@@ -151,7 +152,7 @@ def env_step(runner_state, unused, agent: GDPPO, env, env_params):
     rng, _rng = jax.random.split(rng)
 
     # gamma_offset is between -1 and 1
-    value, cumulant_value, action, log_prob, hstate, hstate_cumulant, hangman = agent.act(_rng, train_state, hstate, last_obs, last_done)
+    value, cumulant_value, action, log_prob, hstate, hstate_cumulant, hangman, last_obs_encoding = agent.act(_rng, train_state, hstate, last_obs, last_done)
 
     # STEP ENV
     rng, _rng = jax.random.split(rng)
@@ -159,7 +160,7 @@ def env_step(runner_state, unused, agent: GDPPO, env, env_params):
     obsv, env_state, reward, done, info = env.step(rng_step, env_state, action, env_params)
 
     transition = Transition(
-        last_done, hangman, action, value, cumulant_value, reward, log_prob, hstate_cumulant, last_obs, info
+        last_done, hangman, action, value, cumulant_value, reward, log_prob, hstate_cumulant, last_obs, last_obs_encoding, info
     )
 
     runner_state = (train_state, env_state, obsv, done, hstate, rng)
@@ -185,10 +186,10 @@ def calculate_gvf_lambda(traj_batch, last_cumulant_val, last_done, gae_lambda,
                          cumulant_type: str = 'rew'):
     def _get_advantages(carry, transition):
         gae_cumulant, next_cumulant_value, gae_lambda, next_done = carry
-        done, cumulant_value, reward, hstate_cumulant, hangman, obs\
+        done, cumulant_value, reward, hstate_cumulant, hangman, obs, obs_encoding\
             = (transition.done, transition.cumulant_value, transition.reward,
                transition.hstate_cumulant, transition.hangman,
-               transition.obs)
+               transition.obs, transition.obs_encoding)
         next_done = next_done[..., None]
         # hstate_cumulant is a random fixed linear layer applied to hstate,
         # with a sigmoid over the output.
@@ -200,6 +201,8 @@ def calculate_gvf_lambda(traj_batch, last_cumulant_val, last_done, gae_lambda,
             cumulant = jnp.concatenate((hstate_cumulant, reward[..., None]), axis=-1)
         elif cumulant_type == 'obs':
             cumulant = obs
+        elif cumulant_type == 'enc_obs':
+            cumulant = obs_encoding
 
         delta_cumulant = cumulant + hangman * next_cumulant_value * (1 - next_done) - cumulant_value
         gae_cumulant = delta_cumulant + hangman * gae_lambda * (1 - next_done) * gae_cumulant
@@ -248,6 +251,8 @@ def make_train(args: GDPPOHyperparams, rand_key: jax.random.PRNGKey):
         obs_shape = env.observation_space(env_params).shape
         assert len(obs_shape) <= 1, 'no support for images for obs cumulant'
         cumulant_size = obs_shape[0]
+    elif args.cumulant_type == 'enc_obs':
+        cumulant_size = args.hidden_size
 
 
     network = ActorCritic(env.action_space(env_params),
@@ -382,7 +387,7 @@ def make_train(args: GDPPOHyperparams, rand_key: jax.random.PRNGKey):
             # CALCULATE ADVANTAGE
             train_state, env_state, last_obs, last_done, hstate, rng = runner_state
             ac_in = (last_obs[np.newaxis, :], last_done[np.newaxis, :])
-            _, _, last_val, last_cumulant_val = network.apply(train_state.params, hstate, ac_in)
+            _, _, last_val, last_cumulant_val, _ = network.apply(train_state.params, hstate, ac_in)
             next_vals = jnp.concatenate((traj_batch.value[1:], last_val), axis=0)
             last_val = last_val.squeeze(0)
             last_cumulant_val = last_cumulant_val.squeeze(0)
