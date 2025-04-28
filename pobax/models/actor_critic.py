@@ -22,12 +22,19 @@ class ActorCritic(nn.Module):
         obs, dones = x
 
         if len(obs.shape) > 3:
-            embedding = FullImageCNN(hidden_size=self.hidden_size)(obs)
+            obs_encoding = FullImageCNN(hidden_size=self.hidden_size)(obs)
+            obs_encoding = nn.LayerNorm()(obs_encoding)
+            embedding = nn.relu(obs_encoding)
         else:
-            embedding = nn.Dense(
+            obs_encoding = nn.Dense(
                 self.hidden_size, kernel_init=orthogonal(jnp.sqrt(2)), bias_init=constant(0.0)
             )(obs)
-            embedding = nn.relu(embedding)
+            obs_encoding = nn.relu(obs_encoding)
+            obs_encoding = nn.Dense(
+                self.hidden_size, kernel_init=orthogonal(jnp.sqrt(2)), bias_init=constant(0.0)
+            )(obs_encoding)
+            obs_encoding = nn.LayerNorm()(obs_encoding)
+            embedding = nn.relu(obs_encoding)
 
         if self.memoryless:
             embedding = SimpleNN(hidden_size=self.hidden_size)(embedding)
@@ -58,7 +65,7 @@ class ActorCritic(nn.Module):
         if gvf_critic is not None:
             gvf_prediction = gvf_critic(embedding)
 
-        return hidden, pi, v, gvf_prediction
+        return hidden, pi, v, gvf_prediction, obs_encoding
 
 
 class CumulantGammaNetwork(nn.Module):

@@ -3,9 +3,27 @@ import functools
 import flax.linen as nn
 import jax
 import jax.numpy as jnp
+from flax.linen.recurrent import Carry
+from flax.typing import PRNGKey
 from jax._src.nn.initializers import orthogonal, constant
 import numpy as np
 
+
+class TraceRNN(nn.RNNCellBase):
+    lambdas_: jnp.ndarray
+
+    def initialize_carry(
+        self, rng: PRNGKey, input_shape: tuple[int, ...]
+    ) -> Carry:
+        return jnp.zeros(input_shape + (len(self.lambdas_)), )
+
+    @property
+    def num_feature_axes(self) -> int:
+        return 1
+
+    @nn.compact
+    def __call__(self, carry, inputs):
+        pass
 
 class ScannedRNN(nn.Module):
     hidden_size: int
