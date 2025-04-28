@@ -366,7 +366,7 @@ def env_step(runner_state, unused, agent: PPORND, env, env_params, rnd_reward_co
 
 def calculate_gae(traj_batch, last_val, last_done, gae_lambda, gamma, is_extrinsic):
     def _get_advantages(carry, transition):
-        gae, next_value, gae_lambda, is_extrinsic = carry
+        gae, next_value, gae_lambda, next_done, is_extrinsic = carry
         done, value, reward = (
             transition.done,
             jax.lax.select(
@@ -376,12 +376,12 @@ def calculate_gae(traj_batch, last_val, last_done, gae_lambda, gamma, is_extrins
                 is_extrinsic, transition.reward_e, transition.reward_i
             ),
         )
-        delta = reward + gamma * next_value * (1 - done) - value
-        gae = delta + gamma * gae_lambda * (1 - done) * gae
-        return (gae, value, gae_lambda, is_extrinsic), gae
+        delta = reward + gamma * next_value * (1 - next_done) - value
+        gae = delta + gamma * gae_lambda * (1 - next_done) * gae
+        return (gae, value, gae_lambda, done, is_extrinsic), gae
 
     _, advantages = jax.lax.scan(_get_advantages,
-                                 (jnp.zeros_like(last_val), last_val, gae_lambda, is_extrinsic),
+                                 (jnp.zeros_like(last_val), last_val, gae_lambda, last_done, is_extrinsic),
                                  traj_batch, reverse=True, unroll=16)
     target = advantages +  jax.lax.select(
                     is_extrinsic, traj_batch.value_e, traj_batch.value_i
