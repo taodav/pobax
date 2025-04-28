@@ -138,14 +138,14 @@ def env_step(runner_state, unused, agent: PPO, env, env_params):
 
 def calculate_gae(traj_batch, last_val, last_done, gae_lambda, gamma):
     def _get_advantages(carry, transition):
-        gae, next_value, next_done, gae_lambda = carry
+        gae, next_value, gae_lambda = carry
         done, value, reward = transition.done, transition.value, transition.reward
         delta = reward + gamma * next_value * (1 - done) - value
         gae = delta + gamma * gae_lambda * (1 - done) * gae
-        return (gae, value, done, gae_lambda), gae
+        return (gae, value, gae_lambda), gae
 
     _, advantages = jax.lax.scan(_get_advantages,
-                                 (jnp.zeros_like(last_val), last_val, last_done, gae_lambda),
+                                 (jnp.zeros_like(last_val), last_val, gae_lambda),
                                  traj_batch, reverse=True, unroll=16)
     target = advantages + traj_batch.value
     return advantages, target
@@ -165,10 +165,12 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
     )
     env_key, rand_key = jax.random.split(rand_key)
     env, env_params = get_env(args.env, env_key, args.num_envs,
-                                     gamma=args.gamma,
-                                     normalize_image=False,
-                                     perfect_memory=args.perfect_memory,
-                                     action_concat=args.action_concat)
+                                    gamma=args.gamma,
+                                    normalize_image=False,
+                                    perfect_memory=args.perfect_memory,
+                                    action_concat=args.action_concat,
+                                    trace_in_obs=args.trace_in_obs,
+                                    trace_lambdas=args.trace_lambdas)
 
     if hasattr(env, 'gamma'):
         args.gamma = env.gamma

@@ -75,10 +75,13 @@ class PPOHyperparams(Tap):
     exploration_update_epochs: int = 1
     rnd_loss_coeff: float = 0.01
     rnd_gae_coeff: float = 0.01
-    rnd_reward_coeff: float = 1.0
+    rnd_reward_coeff: list[float] = [1.0]
     rnd_hidden_size: int = 512
-    trace_features: bool = False
-    trace_features_lambdas: list[float] = [0., 0.5, 0.7, 0.9, 0.95]
+
+    # Trace features
+    use_trace_features: bool = False
+    trace_in_obs: bool = False
+    trace_lambdas: str = '0. 0.5 0.7 0.9 0.95'
 
     study_name: str = 'batch_ppo_test'
 
@@ -90,7 +93,11 @@ class PPOHyperparams(Tap):
         self.alpha = jnp.array(self.alpha)
         self.ld_weight = jnp.array(self.ld_weight)
         self.rnd_lr = jnp.array(self.rnd_lr)
-        self.trace_features_lambdas = jnp.array(self.trace_features_lambdas)
+        self.rnd_reward_coeff = jnp.array(self.rnd_reward_coeff)
+        if self.use_trace_features:
+             self.trace_lambdas = jnp.array([float(t) for t in self.trace_lambdas.split(' ')])
+        else:
+             self.trace_lambdas = None
 
 
 class DQNHyperparams(Tap):

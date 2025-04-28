@@ -52,7 +52,7 @@ class RNDNetwork(nn.Module):
         # Traces have shape (batch_size, num_envs, num_features, num_trace_lambdas)
         traces = traces.reshape(*traces.shape[:2], -1)
         # Reshape to (batch_size, num_envs, num_features * num_trace_lambdas)
-        embedding = SimpleNN(hidden_size=self.hidden_size)(traces)
+        embedding = RNDNN(hidden_size=self.hidden_size)(traces)
 
         return hidden, embedding
 
@@ -69,13 +69,28 @@ class RNDCNNNetwork(nn.Module):
         else:
             embedding = SmallImageCNN(hidden_size=self.hidden_size)(traces)
         embedding = nn.relu(embedding)
-        embedding = SimpleNN(hidden_size=self.hidden_size)(embedding)
+        embedding = RNDNN(hidden_size=self.hidden_size)(embedding)
 
         return hidden, embedding
+
+class RNDNN(nn.Module):
+    hidden_size: int
+
+    @nn.compact
+    def __call__(self, x):
+        out = nn.Dense(self.hidden_size)(x)
+        out = nn.relu(out)
+        out = nn.Dense(self.hidden_size)(out)
+        out = nn.relu(out)
+        out = nn.Dense(self.hidden_size)(out)
+        out = nn.relu(out)
+        out = nn.Dense(self.hidden_size)(out)
+        return out
 
 class ActorCriticCNNRND(nn.Module):
     action_dim: int
     hidden_size: int = 128
+    memoryless: bool = False
 
     @nn.compact
     def __call__(self, hidden, x):
@@ -85,13 +100,12 @@ class ActorCriticCNNRND(nn.Module):
         else:
             embedding = SmallImageCNN(hidden_size=self.hidden_size)(obs)
         embedding = nn.relu(embedding)
-        embedding = nn.Dense(
-            self.hidden_size, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
-        )(embedding)
-        embedding = nn.relu(embedding)
 
-        rnn_in = (embedding, dones)
-        hidden, embedding = ScannedRNN(hidden_size=self.hidden_size)(hidden, rnn_in)
+        if self.memoryless:
+            embedding = SimpleNN(hidden_size=self.hidden_size)(embedding)
+        else:
+            rnn_in = (embedding, dones)
+            hidden, embedding = ScannedRNN(hidden_size=self.hidden_size)(hidden, rnn_in)
 
         actor = DiscreteActor(self.action_dim, hidden_size=self.hidden_size)
         pi = actor(embedding)
@@ -107,17 +121,19 @@ class ActorCriticCNNRND(nn.Module):
 class ActorCriticRND(nn.Module):
     action_dim: int
     hidden_size: int = 128
+    memoryless: bool = False
 
     @nn.compact
     def __call__(self, hidden, x):
         obs, dones = x
-        embedding = nn.Dense(
-            self.hidden_size, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
-        )(obs)
-        embedding = nn.relu(embedding)
 
-        rnn_in = (embedding, dones)
-        hidden, embedding = ScannedRNN(hidden_size=self.hidden_size)(hidden, rnn_in)
+        if self.memoryless:
+            embedding = SimpleNN(hidden_size=self.hidden_size)(obs)
+        else:
+            embedding = nn.Dense(self.hidden_size, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(obs)
+            embedding = nn.relu(embedding)
+            rnn_in = (embedding, dones)
+            hidden, embedding = ScannedRNN(hidden_size=self.hidden_size)(hidden, rnn_in)
 
         actor = DiscreteActor(self.action_dim, hidden_size=self.hidden_size)
         pi = actor(embedding)
@@ -184,6 +200,7 @@ class PPORND:
         mse = jnp.square(error).mean(axis=-1)
         reward_i = mse * rnd_reward_coeff
         reward_i = reward_i.squeeze(0)
+        # jax.debug.print("reward_i={t}", t=reward_i)
         return rnd_random_hstate, rnd_distillation_hstate, random_pred, distill_pred, error, reward_i
 
     def loss(self, params, init_hstate, traj_batch, gae_e, targets_e, gae_i, targets_i):
@@ -282,6 +299,7 @@ def env_step(runner_state, unused, agent: PPORND, env, env_params, rnd_reward_co
     value_e, value_i, action, log_prob, hstate = agent.act(_rng, train_state, hstate, last_obs, last_done)
 
     last_traces = get_traces(env_state)
+    # jax.debug.print("trace_max={t}", t=last_traces)
     rnd_random_hstate, rnd_distillation_hstate, random_pred, distill_pred, error, reward_i = agent.rnd_act(rnd_state, rnd_random_hstate, rnd_distillation_hstate, last_traces, last_done, rnd_reward_coeff)
     
     # STEP ENV
@@ -299,7 +317,7 @@ def env_step(runner_state, unused, agent: PPORND, env, env_params, rnd_reward_co
 
 def calculate_gae(traj_batch, last_val, last_done, gae_lambda, gamma, is_extrinsic):
     def _get_advantages(carry, transition):
-        gae, next_value, next_done, gae_lambda, is_extrinsic = carry
+        gae, next_value, gae_lambda, is_extrinsic = carry
         done, value, reward = (
             transition.done,
             jax.lax.select(
@@ -311,10 +329,10 @@ def calculate_gae(traj_batch, last_val, last_done, gae_lambda, gamma, is_extrins
         )
         delta = reward + gamma * next_value * (1 - done) - value
         gae = delta + gamma * gae_lambda * (1 - done) * gae
-        return (gae, value, done, gae_lambda, is_extrinsic), gae
+        return (gae, value, gae_lambda, is_extrinsic), gae
 
     _, advantages = jax.lax.scan(_get_advantages,
-                                 (jnp.zeros_like(last_val), last_val, last_done, gae_lambda, is_extrinsic),
+                                 (jnp.zeros_like(last_val), last_val, gae_lambda, is_extrinsic),
                                  traj_batch, reverse=True, unroll=16)
     target = advantages +  jax.lax.select(
                     is_extrinsic, traj_batch.value_e, traj_batch.value_i
@@ -340,13 +358,14 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
                                      normalize_env=args.normalize_env,
                                      perfect_memory=args.perfect_memory,
                                      action_concat=args.action_concat,
-                                     trace_features=args.trace_features,
-                                     trace_lambdas=args.trace_features_lambdas)
+                                     trace_in_obs=args.trace_in_obs,
+                                     trace_lambdas=args.trace_lambdas)
 
     if hasattr(env, 'gamma'):
         args.gamma = env.gamma
     
     double_critic = args.double_critic
+    memoryless = args.memoryless
 
     assert hasattr(env_params, 'max_steps_in_episode')
 
@@ -359,7 +378,8 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
     # initialize network
     ac_network_fn = get_network_fn(env, env_params)
     network = ac_network_fn(action_size,
-                         hidden_size=args.hidden_size)
+                         hidden_size=args.hidden_size,
+                         memoryless=memoryless)
     
     rnd_network_fn = get_rnd_network_fn(env, env_params)
     rnd_random_network = rnd_network_fn(args.rnd_hidden_size)
@@ -371,13 +391,11 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
 
     _calculate_gae = calculate_gae
 
-    def train(vf_coeff, ld_weight, alpha, lambda1, lambda0, lr, rnd_lr, rng):
+    def train(vf_coeff, ld_weight, alpha, lambda1, lambda0, lr, rnd_lr, rnd_reward_coeff, rng):
         agent = PPORND(network, rnd_random_network, rnd_distillation_network, args.rnd_gae_coeff, args.rnd_loss_coeff, double_critic=double_critic, ld_weight=ld_weight, alpha=alpha, vf_coeff=vf_coeff,
                     clip_eps=args.clip_eps, entropy_coeff=args.entropy_coeff)
 
         gae_lambda = jnp.array(lambda0)
-        # if double_critic:
-        #     gae_lambda = jnp.array([lambda0, lambda1])
 
         def linear_schedule(count):
             frac = (
@@ -400,7 +418,7 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
         network_params = agent.network.init(_rng, init_hstate, init_x)
 
         # initialize rnd network
-        init_traces = jnp.zeros((1, args.num_envs, *env.observation_space(env_params).shape, args.trace_features_lambdas.shape[0]))
+        init_traces = jnp.ones((1, args.num_envs, *env.observation_space(env_params).shape, args.trace_lambdas.shape[0]))
         init_rnd_random_hstate = ScannedRNN.initialize_carry(args.num_envs, args.rnd_hidden_size)
         rng, _rng = jax.random.split(rng)
         rnd_random_network_params = agent.rnd_random_network.init(_rng, init_rnd_random_hstate, init_traces)
@@ -410,7 +428,7 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
         rnd_distillation_network_params = agent.rnd_distillation_network.init(_rng, init_rnd_distillation_hstate, init_traces)
 
         # initialize functions
-        _env_step = partial(env_step, agent=agent, env=env, env_params=env_params, rnd_reward_coeff=args.rnd_reward_coeff)
+        _env_step = partial(env_step, agent=agent, env=env, env_params=env_params, rnd_reward_coeff=rnd_reward_coeff)
         # Number of parameters
         param_count = sum(x.size for x in jax.tree_leaves(network_params))
         print('Network params number:', param_count)
@@ -425,7 +443,6 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
                 optax.clip_by_global_norm(args.max_grad_norm),
                 optax.adam(lr, eps=1e-5),
             )
-        print('lr', type(lr))
         train_state = TrainState.create(
             apply_fn=agent.network.apply,
             params=network_params,
@@ -660,7 +677,7 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
                 None,
                 args.exploration_update_epochs,
             )
-            metric["rnd_loss"] = ex_loss[0].mean()
+            metric["rnd_loss"] = ex_loss[0].mean() # This might be wrong
 
             rnd_state = ex_update_state[0]
             rng = ex_update_state[-1]

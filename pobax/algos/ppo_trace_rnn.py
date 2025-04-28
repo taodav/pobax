@@ -24,7 +24,8 @@ from jax._src.nn.initializers import orthogonal, constant
 from pobax.config import PPOHyperparams
 from pobax.envs import get_env
 from pobax.envs.wrappers.gymnax import LogEnvState
-from pobax.models import get_gymnax_network_fn, ScannedRNN, FullImageCNN, SmallImageCNN
+from pobax.envs.wrappers.trace import TraceFeatureState
+from pobax.models import get_gymnax_network_fn, SimpleNN, ScannedRNN, FullImageCNN, SmallImageCNN
 from pobax.models.value import Critic
 from pobax.models.discrete import DiscreteActor
 from pobax.utils.file_system import get_results_path, numpyify
@@ -40,25 +41,100 @@ class Transition(NamedTuple):
     log_prob: jnp.ndarray
     obs: jnp.ndarray
     next_obs: jnp.ndarray
+    traces: jnp.ndarray
     info: jnp.ndarray
 
 class RNDNetwork(nn.Module):
     hidden_size: int
-
+    
     @nn.compact
-    def __call__(self, hidden, x):
-        obs, dones = x
-        embedding = nn.Dense(self.hidden_size)(obs)
-        embedding = nn.relu(embedding)
-
-        rnn_in = (embedding, dones)
-        hidden, embedding = ScannedRNN(hidden_size=self.hidden_size)(hidden, rnn_in)
+    def __call__(self, hidden, traces):
+        # Traces have shape (batch_size, num_envs, num_features, num_trace_lambdas)
+        traces = traces.reshape(*traces.shape[:2], -1)
+        # Reshape to (batch_size, num_envs, num_features * num_trace_lambdas)
+        embedding = RNDNN(hidden_size=self.hidden_size)(traces)
 
         return hidden, embedding
 
 class RNDCNNNetwork(nn.Module):
     hidden_size: int
     
+    @nn.compact
+    def __call__(self, hidden, traces):
+        # Traces have shape (batch_size, num_envs, H, W, C, num_trace_lambdas)
+        traces = traces.reshape(*traces.shape[:-2], -1)
+        # Reshape to (batch_size, num_envs, H, W, C * num_trace_lambdas)
+        if traces.shape[-2] >= 20:
+            embedding = FullImageCNN(hidden_size=self.hidden_size)(traces)
+        else:
+            embedding = SmallImageCNN(hidden_size=self.hidden_size)(traces)
+        embedding = nn.relu(embedding)
+        embedding = RNDNN(hidden_size=self.hidden_size)(embedding)
+
+        return hidden, embedding
+
+class RNDNN(nn.Module):
+    hidden_size: int
+
+    @nn.compact
+    def __call__(self, x):
+        out = nn.Dense(self.hidden_size)(x)
+        out = nn.relu(out)
+        out = nn.Dense(self.hidden_size)(out)
+        out = nn.relu(out)
+        out = nn.Dense(self.hidden_size)(out)
+        out = nn.relu(out)
+        out = nn.Dense(self.hidden_size)(out)
+        return out
+
+class TraceRNN(nn.Module):
+    lambdas: jnp.ndarray
+
+    @staticmethod
+    def initialize_carry(features: jnp.ndarray,
+                         n_lambda:   int,
+                         dtype=jnp.float32):
+        return features[..., None].repeat(n_lambda, axis=-1)
+
+    @functools.partial(
+        nn.scan,
+        variable_broadcast="params",
+        in_axes=0, 
+        out_axes=0,
+        split_rngs={"params": False},
+    )
+    @nn.compact
+    def __call__(self,
+                 carry: jnp.ndarray,
+                 x: Tuple[jnp.ndarray, jnp.ndarray]
+                 ) -> Tuple[jnp.ndarray, jnp.ndarray]:
+        trace = carry
+        features, resets = x
+
+        trace = jnp.where(
+            resets[:, np.newaxis],
+            self.initialize_carry(features, len(self.lambdas)),
+            trace,
+        )
+
+        leading_dims = (1,) * len(features.shape)
+        lambdas = jnp.broadcast_to(self.lambdas, leading_dims + self.lambdas.shape)
+
+        curr_feature_lambda = (1 - resets) * (1 - lambdas) + resets
+
+        next_trace = (1 - resets) * lambdas * trace + curr_feature_lambda * features[..., None]
+
+        unflatten_dims = next_trace.shape[:-2]
+        flatten_next_trace = next_trace.reshape((*unflatten_dims, -1))
+        return next_trace, flatten_next_trace
+
+class ActorCriticCNNRND(nn.Module):
+    action_dim: int
+    hidden_size: int = 128
+    memoryless: bool = False
+    lambdas: jnp.ndarray = None
+    traces_in_obs: bool = False
+
     @nn.compact
     def __call__(self, hidden, x):
         obs, dones = x
@@ -68,25 +144,17 @@ class RNDCNNNetwork(nn.Module):
             embedding = SmallImageCNN(hidden_size=self.hidden_size)(obs)
         embedding = nn.relu(embedding)
 
-        rnn_in = (embedding, dones)
-        hidden, embedding = ScannedRNN(hidden_size=self.hidden_size)(hidden, rnn_in)
-
-        return hidden, embedding
-
-class ActorCriticMemoryRND(nn.Module):
-    action_dim: int
-    hidden_size: int = 128
-
-    @nn.compact
-    def __call__(self, hidden, x):
-        obs, dones = x
-        embedding = nn.Dense(
-            self.hidden_size, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
-        )(obs)
-        embedding = nn.relu(embedding)
-
-        rnn_in = (embedding, dones)
-        hidden, embedding = ScannedRNN(hidden_size=self.hidden_size)(hidden, rnn_in)
+        if self.memoryless:
+            embedding = SimpleNN(hidden_size=self.hidden_size)(embedding)
+        else:
+            rnn_in = (embedding, dones)
+            hidden, embedding = ScannedRNN(hidden_size=self.hidden_size)(hidden, rnn_in)
+        
+        if lambdas is not None:
+            trace_in = (embedding, dones)
+            next_trace, flatten_next_trace = TraceRNN(self.lambdas)(trace, trace_in)
+            if self.traces_in_obs:
+                embedding = flatten_next_trace
 
         actor = DiscreteActor(self.action_dim, hidden_size=self.hidden_size)
         pi = actor(embedding)
@@ -99,21 +167,22 @@ class ActorCriticMemoryRND(nn.Module):
 
         return hidden, pi, jnp.squeeze(v_e, axis=-1), jnp.squeeze(v_i, axis=-1)
 
-class ActorCriticMemoryCNNRND(nn.Module):
+class ActorCriticRND(nn.Module):
     action_dim: int
     hidden_size: int = 128
+    memoryless: bool = False
 
     @nn.compact
     def __call__(self, hidden, x):
         obs, dones = x
-        if obs.shape[-2] >= 20:
-            embedding = FullImageCNN(hidden_size=self.hidden_size)(obs)
-        else:
-            embedding = SmallImageCNN(hidden_size=self.hidden_size)(obs)
-        embedding = nn.relu(embedding)
 
-        rnn_in = (embedding, dones)
-        hidden, embedding = ScannedRNN(hidden_size=self.hidden_size)(hidden, rnn_in)
+        if self.memoryless:
+            embedding = SimpleNN(hidden_size=self.hidden_size)(obs)
+        else:
+            embedding = nn.Dense(self.hidden_size, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(obs)
+            embedding = nn.relu(embedding)
+            rnn_in = (embedding, dones)
+            hidden, embedding = ScannedRNN(hidden_size=self.hidden_size)(hidden, rnn_in)
 
         actor = DiscreteActor(self.action_dim, hidden_size=self.hidden_size)
         pi = actor(embedding)
@@ -172,16 +241,15 @@ class PPORND:
         return value_e, value_i, action, log_prob, hstate
     
     def rnd_act(self, rnd_state: flax.training.train_state.TrainState, rnd_random_hstate: chex.Array, rnd_distillation_hstate: chex.Array,
-                obs: chex.Array, done: chex.Array, rnd_reward_coeff):
-        ac_in = (obs[np.newaxis, :], done[np.newaxis, :])
-        rnd_random_hstate, random_pred = self.rnd_random_network.apply(self.rnd_random_network_params, rnd_random_hstate, ac_in)
-        rnd_distillation_hstate, distill_pred = self.rnd_distillation_network.apply(rnd_state.params, rnd_distillation_hstate, ac_in)
+                traces: chex.Array, done: chex.Array, rnd_reward_coeff):
+        traces = traces[np.newaxis, :]
+        rnd_random_hstate, random_pred = self.rnd_random_network.apply(self.rnd_random_network_params, rnd_random_hstate, traces)
+        rnd_distillation_hstate, distill_pred = self.rnd_distillation_network.apply(rnd_state.params, rnd_distillation_hstate, traces)
         error = (random_pred - distill_pred) * (1 - done[np.newaxis, :, None])
-        # error = (rnd_random_hstate - rnd_distillation_hstate) * (1 - done[np.newaxis, :, None])
         mse = jnp.square(error).mean(axis=-1)
         reward_i = mse * rnd_reward_coeff
         reward_i = reward_i.squeeze(0)
-        print('reward_i', reward_i.shape)
+        # jax.debug.print("reward_i={t}", t=reward_i)
         return rnd_random_hstate, rnd_distillation_hstate, random_pred, distill_pred, error, reward_i
 
     def loss(self, params, init_hstate, traj_batch, gae_e, targets_e, gae_i, targets_i):
@@ -200,12 +268,8 @@ class PPORND:
         value_loss_e = (
             jnp.maximum(value_losses_e, value_losses_clipped_e).mean()
         )
-        # Lambda discrepancy loss
-        # if self.double_critic:
-        #     value_loss_e = self.ld_weight * (jnp.square(value_e[..., 0] - value_e[..., 1])).mean() + \
-        #                  (1 - self.ld_weight) * value_loss_e
 
-        # CALCULATE EXTRINSIC VALUE LOSS
+        # CALCULATE INTRINSIC VALUE LOSS
         value_pred_clipped_i = traj_batch.value_i + (
                 value_i - traj_batch.value_i
         ).clip(-self.clip_eps, self.clip_eps)
@@ -214,20 +278,12 @@ class PPORND:
         value_loss_i = (
             jnp.maximum(value_losses_i, value_losses_clipped_i).mean()
         )
-        # Lambda discrepancy loss
-        # if self.double_critic:
-        #     value_loss_i = self.ld_weight * (jnp.square(value_i[..., 0] - value_i[..., 1])).mean() + \
-        #                  (1 - self.ld_weight) * value_loss_i
 
         # CALCULATE ACTOR LOSS
         ratio = jnp.exp(log_prob - traj_batch.log_prob)
 
         # which advantage do we use to update our policy?
-        gae = gae_e
-        gae += gae_i * self.rnd_gae_coeff
-        # if self.double_critic:
-        #     gae = (self.alpha * gae[..., 0] +
-        #            (1 - self.alpha) * gae[..., 1])
+        gae = gae_e + self.rnd_gae_coeff * gae_i
         gae = (gae - gae.mean()) / (gae.std() + 1e-8)
         loss_actor1 = ratio * gae
         loss_actor2 = (
@@ -251,18 +307,20 @@ class PPORND:
         return total_loss, (value_loss_e, value_loss_i, loss_actor, entropy)
     
     def rnd_loss(self, rnd_distillation_params, init_rnd_random_hstate, init_rnd_distillation_hstate, traj_batch):
-        ac_in = (traj_batch.obs, traj_batch.done)
-        random_network_hstate, random_network_out = self.rnd_random_network.apply(self.rnd_random_network_params, init_rnd_random_hstate[0], ac_in)
+        random_network_hstate, random_network_out = self.rnd_random_network.apply(self.rnd_random_network_params, init_rnd_random_hstate[0], traj_batch.traces)
 
-        distillation_network_hstate, distillation_network_out = self.rnd_distillation_network.apply(rnd_distillation_params, init_rnd_distillation_hstate[0], ac_in)
+        distillation_network_hstate, distillation_network_out = self.rnd_distillation_network.apply(rnd_distillation_params, init_rnd_distillation_hstate[0], traj_batch.traces)
 
         error = (random_network_out - distillation_network_out) * (
                                 1 - traj_batch.done[:, :, None]
                             )
-        # error = (random_network_hstate - distillation_network_hstate) * (
-        #                         1 - traj_batch.done[:, :, None]
-        #                     )
         return jnp.square(error).mean() * self.rnd_loss_coeff
+
+def get_traces(env_state):
+    if isinstance(env_state, TraceFeatureState):
+        return env_state.trace_features
+    else:
+        return get_traces(env_state.env_state)
 
 def get_rnd_network_fn(env: environment.Environment, env_params: environment.EnvParams):
     obs_space_shape = env.observation_space(env_params).shape
@@ -278,9 +336,9 @@ def get_network_fn(env: environment.Environment, env_params: environment.EnvPara
 
     if len(obs_space_shape) > 1:
         # assert jnp.all(jnp.array(obs_space_shape[:-1]) == 5)
-        network_fn = ActorCriticMemoryCNNRND
+        network_fn = ActorCriticCNNRND
     else:
-        network_fn = ActorCriticMemoryRND
+        network_fn = ActorCriticRND
 
     return network_fn
 
@@ -288,15 +346,18 @@ def env_step(runner_state, unused, agent: PPORND, env, env_params, rnd_reward_co
     train_state, rnd_state, env_state, last_obs, last_done, hstate, rnd_random_hstate, rnd_distillation_hstate, rng = runner_state
     rng, _rng = jax.random.split(rng)
     value_e, value_i, action, log_prob, hstate = agent.act(_rng, train_state, hstate, last_obs, last_done)
-    rnd_random_hstate, rnd_distillation_hstate, random_pred, distill_pred, error, reward_i = agent.rnd_act(rnd_state, rnd_random_hstate, rnd_distillation_hstate, last_obs, last_done, rnd_reward_coeff)
 
+    last_traces = get_traces(env_state)
+    # jax.debug.print("trace_max={t}", t=last_traces)
+    rnd_random_hstate, rnd_distillation_hstate, random_pred, distill_pred, error, reward_i = agent.rnd_act(rnd_state, rnd_random_hstate, rnd_distillation_hstate, last_traces, last_done, rnd_reward_coeff)
+    
     # STEP ENV
     rng, _rng = jax.random.split(rng)
     rng_step = jax.random.split(_rng, hstate.shape[0])
     obsv, env_state, reward_e, done, info = env.step(rng_step, env_state, action, env_params)
     reward = reward_i + reward_e
     transition = Transition(
-        last_done, action, value_e, value_i, reward_e, reward_i, reward, log_prob, last_obs, obsv, info
+        last_done, action, value_e, value_i, reward_e, reward_i, reward, log_prob, last_obs, obsv, last_traces, info
     )
 
     runner_state = (train_state, rnd_state, env_state, obsv, done, hstate, rnd_random_hstate, rnd_distillation_hstate, rng)
@@ -343,14 +404,17 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
     env_key, rand_key = jax.random.split(rand_key)
     env, env_params = get_env(args.env, env_key, args.num_envs,
                                      gamma=args.gamma,
-                                     normalize_image=False,
+                                     normalize_env=args.normalize_env,
                                      perfect_memory=args.perfect_memory,
-                                     action_concat=args.action_concat)
+                                     action_concat=args.action_concat,
+                                     trace_in_obs=args.trace_in_obs,
+                                     trace_lambdas=args.trace_lambdas)
 
     if hasattr(env, 'gamma'):
         args.gamma = env.gamma
     
     double_critic = args.double_critic
+    memoryless = args.memoryless
 
     assert hasattr(env_params, 'max_steps_in_episode')
 
@@ -361,11 +425,12 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
         action_size = env.action_space(env_params).shape[0]
     
     # initialize network
-    rnd_network_fn = get_rnd_network_fn(env, env_params)
-    network_fn = get_network_fn(env, env_params)
-    network = network_fn(action_size,
-                         hidden_size=args.hidden_size)
+    ac_network_fn = get_network_fn(env, env_params)
+    network = ac_network_fn(action_size,
+                         hidden_size=args.hidden_size,
+                         memoryless=memoryless)
     
+    rnd_network_fn = get_rnd_network_fn(env, env_params)
     rnd_random_network = rnd_network_fn(args.rnd_hidden_size)
 
     rnd_distillation_network = rnd_network_fn(args.rnd_hidden_size)
@@ -373,25 +438,13 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
     steps_filter = partial(filter_period_first_dim, n=args.steps_log_freq)
     update_filter = partial(filter_period_first_dim, n=args.update_log_freq)
 
-    # Used for vmapping over our double critic.
-    # transition_axes_map = Transition(
-    #     None, None, 2, None, None, None, None
-    # )
-
     _calculate_gae = calculate_gae
-    # if double_critic:
-    #     # last_val is index 1 here b/c we squeezed earlier.
-    #     _calculate_gae = jax.vmap(calculate_gae,
-    #                              in_axes=[transition_axes_map, 1, None, 0, None],
-    #                              out_axes=2)
 
     def train(vf_coeff, ld_weight, alpha, lambda1, lambda0, lr, rnd_lr, rnd_reward_coeff, rng):
         agent = PPORND(network, rnd_random_network, rnd_distillation_network, args.rnd_gae_coeff, args.rnd_loss_coeff, double_critic=double_critic, ld_weight=ld_weight, alpha=alpha, vf_coeff=vf_coeff,
                     clip_eps=args.clip_eps, entropy_coeff=args.entropy_coeff)
 
         gae_lambda = jnp.array(lambda0)
-        # if double_critic:
-        #     gae_lambda = jnp.array([lambda0, lambda1])
 
         def linear_schedule(count):
             frac = (
@@ -414,13 +467,14 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
         network_params = agent.network.init(_rng, init_hstate, init_x)
 
         # initialize rnd network
+        init_traces = jnp.ones((1, args.num_envs, *env.observation_space(env_params).shape, args.trace_lambdas.shape[0]))
         init_rnd_random_hstate = ScannedRNN.initialize_carry(args.num_envs, args.rnd_hidden_size)
         rng, _rng = jax.random.split(rng)
-        rnd_random_network_params = agent.rnd_random_network.init(_rng, init_rnd_random_hstate, init_x)
+        rnd_random_network_params = agent.rnd_random_network.init(_rng, init_rnd_random_hstate, init_traces)
         agent.rnd_random_network_params = rnd_random_network_params
         init_rnd_distillation_hstate = ScannedRNN.initialize_carry(args.num_envs, args.rnd_hidden_size)
         rng, _rng = jax.random.split(rng)
-        rnd_distillation_network_params = agent.rnd_distillation_network.init(_rng, init_rnd_distillation_hstate, init_x)
+        rnd_distillation_network_params = agent.rnd_distillation_network.init(_rng, init_rnd_distillation_hstate, init_traces)
 
         # initialize functions
         _env_step = partial(env_step, agent=agent, env=env, env_params=env_params, rnd_reward_coeff=rnd_reward_coeff)
@@ -438,7 +492,6 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
                 optax.clip_by_global_norm(args.max_grad_norm),
                 optax.adam(lr, eps=1e-5),
             )
-        print('lr', type(lr))
         train_state = TrainState.create(
             apply_fn=agent.network.apply,
             params=network_params,
@@ -673,7 +726,7 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
                 None,
                 args.exploration_update_epochs,
             )
-            metric["rnd_loss"] = ex_loss[0].mean()
+            metric["rnd_loss"] = ex_loss[0].mean() # This might be wrong
 
             rnd_state = ex_update_state[0]
             rng = ex_update_state[-1]

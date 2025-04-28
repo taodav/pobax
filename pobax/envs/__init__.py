@@ -32,6 +32,7 @@ from pobax.envs.wrappers.gymnax import (
     NormalizeVecReward,
     NormalizeVecObservation,
     ActionConcatWrapper,
+    RewardConcatWrapper,
     AutoResetEnvWrapper,
     OptimisticResetVecEnvWrapper
 )
@@ -130,8 +131,9 @@ def get_env(env_name: str,
             gamma: float = 0.99,
             perfect_memory: bool = False,
             action_concat: bool = False,
-            trace_features: bool = False, 
-            trace_lambdas: jnp.ndarray = jnp.array([0.1, 0.5, 0.9, 0.95, 0.99])):
+            reward_concat: bool = False,
+            trace_in_obs: bool = False,
+            trace_lambdas: jnp.ndarray = None):
 
     mask_dims = None
     if env_name in masked_gymnax_env_map:
@@ -228,13 +230,19 @@ def get_env(env_name: str,
 
     if action_concat and not env_name.startswith('craftax'):
         env = ActionConcatWrapper(env)
+    
+    if reward_concat:
+        env = RewardConcatWrapper(env)
+
+    if trace_lambdas is not None:
+        env = TraceFeaturesWrapper(env, lambdas=trace_lambdas, trace_in_obs=trace_in_obs)
 
     env = LogWrapper(env, gamma=gamma)
 
     if mask_dims is not None:
         env = MaskObservationWrapper(env, mask_dims=mask_dims)
     
-    if trace_features:
+    if trace_lambdas is not None:
         env = TraceFeaturesWrapper(env, lambdas=trace_lambdas)
 
     # Vectorize our environment
