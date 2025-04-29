@@ -15,7 +15,7 @@ hparams = {
     'entry': '-m pobax.algos.gd_ppo',
     'args': [
         {
-            'env': 'rocksample11_11',
+            'env': 'rocksample_11_11',
             'double_critic': False,
             'action_concat': True,
             'reward_concat': False,
