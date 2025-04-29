@@ -198,8 +198,8 @@ if __name__ == "__main__":
     env_name = 'rocksample_11_11'
     super_dir = 'rocksample_11_11'
 
-    ylims = None
-    # ylims = (0, 40)  # for rocksample_11_11 hsize
+    # ylims = None
+    ylims = (0, 40)  # for rocksample_11_11 hsize
 
     plot_name = f'{env_name}_{hyperparam_type}'
 
