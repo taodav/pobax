@@ -146,7 +146,7 @@ def plot_reses(all_reses: list[tuple], n_rows: int = 2,
             ax.spines[['right', 'top']].set_visible(False)
 
     # Customize legend to use square markers
-    legend = plt.legend(loc='lower right')
+    legend = plt.legend(loc='upper left')
 
     # # Change line in legend to square
     # for line in legend.get_lines():
@@ -207,10 +207,11 @@ if __name__ == "__main__":
     study_paths = [
         ('RNN', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo'), 'purple'),
         # ('Trace', Path(ROOT_DIR, 'results', 'trace_experiments', f'{env_name}_ppo_trace_memoryless'), 'blue'),
-        ('SF obs', Path(ROOT_DIR, 'results', f'{env_name}_ppo_gd_sf_obs'), 'blue'),
+        # ('SF obs', Path(ROOT_DIR, 'results', f'{env_name}_ppo_gd_sf_obs'), 'blue'),
+        ('SF obs discrep', Path(ROOT_DIR, 'results', 'gd_sf_obs_discrep', f'{env_name}_ppo_gd_sf_obs_discrep'), 'cyan'),
         # ('Hangman', Path(ROOT_DIR, 'results', 'gd_hangman', f'{env_name}_ppo_gd_hangman'), 'blue'),
         # ('Hangman Discrep', Path(ROOT_DIR, 'results', 'gd_hangman_discrep', f'{env_name}_ppo_gd_hangman_discrep'), 'blue'),
-        # ('RNN + LD', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_LD'), 'blue'),
+        ('LD', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_LD'), 'blue'),
         ('Memoryless', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_memoryless'), 'dark gray'),
         ('STATE', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_perfect_memory_memoryless'), 'green'),
         # ('TRANFORMER', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_transformer'), 'cyan'),
