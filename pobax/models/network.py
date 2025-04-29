@@ -23,7 +23,8 @@ class TraceRNN(nn.RNNCellBase):
 
     @nn.compact
     def __call__(self, carry, inputs):
-        pass
+        next_carry = self.lambdas_ * carry + (1 - self.lambdas_) * inputs[..., None]
+        return next_carry
 
 class ScannedRNN(nn.Module):
     hidden_size: int
