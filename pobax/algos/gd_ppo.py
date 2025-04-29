@@ -72,7 +72,7 @@ class GDPPO(PPO):
         # SELECT ACTION
         ac_in = (obs[np.newaxis, :], done[np.newaxis, :])
         hstate, pi, value, c_value, obs_encoding = self.network.apply(train_state.params, hidden_state, ac_in)
-        hstate_cumulant, hangman = self.cumulant_gamma_network.apply(train_state.cumulant_gamma_params, hstate)
+        hstate_cumulant, hangman = self.cumulant_gamma_network.apply(train_state.cumulant_gamma_params, obs)
 
         action = pi.sample(seed=rng)
         log_prob = pi.log_prob(action)
