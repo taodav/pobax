@@ -77,8 +77,20 @@ class CumulantGammaNetwork(nn.Module):
 
     @nn.compact
     def __call__(self, x):
-        cumulant_mapped = nn.Dense(features=self.cumulant_size)(x)
-        cumulant_mapped = nn.LayerNorm()(cumulant_mapped)
+        if len(x.shape) > 3:
+            obs_encoding = FullImageCNN(hidden_size=self.cumulant_size)(x)
+            cumulant_mapped = nn.LayerNorm()(obs_encoding)
+        else:
+            obs_encoding = nn.Dense(
+                self.cumulant_size, kernel_init=orthogonal(jnp.sqrt(2)), bias_init=constant(0.0)
+            )(x)
+            obs_encoding = nn.relu(obs_encoding)
+            obs_encoding = nn.Dense(
+                self.cumulant_size, kernel_init=orthogonal(jnp.sqrt(2)), bias_init=constant(0.0)
+            )(obs_encoding)
+            cumulant_mapped = nn.LayerNorm()(obs_encoding)
+        # cumulant_mapped = nn.Dense(features=self.cumulant_size)(x)
+        # cumulant_mapped = nn.LayerNorm()(cumulant_mapped)
 
         if self.gamma_type == 'nn_gamma_sigmoid':
             hangman = nn.Dense(features=1)(x)
