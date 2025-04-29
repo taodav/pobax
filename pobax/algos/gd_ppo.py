@@ -322,7 +322,8 @@ def make_train(args: GDPPOHyperparams, rand_key: jax.random.PRNGKey):
         )
         init_hstate = ScannedRNN.initialize_carry(args.num_envs, args.hidden_size)
         network_params = agent.network.init(_rng, init_hstate, init_x)
-        cumulant_gamma_params = agent.cumulant_gamma_network.init(_rng, init_hstate)
+        # cumulant_gamma_params = agent.cumulant_gamma_network.init(_rng, init_hstate)
+        cumulant_gamma_params = agent.cumulant_gamma_network.init(_rng, init_x[0])
 
         if args.anneal_lr:
             tx = optax.chain(
