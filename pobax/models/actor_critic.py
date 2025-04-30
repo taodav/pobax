@@ -1,5 +1,7 @@
 from typing import Union
-from flax import linen as nn
+
+import flax.linen as nn
+import jax.lax
 from jax import numpy as jnp
 from jax._src.nn.initializers import orthogonal, constant
 from gymnax.environments import spaces
@@ -10,6 +12,90 @@ from pobax.models.continuous import ContinuousActor
 from pobax.models.critic import Critic, GVF
 from pobax.models.network import SimpleNN, ScannedRNN, FullImageCNN
 from pobax.models.embedding import CNN
+
+
+class Encoder(nn.Module):
+    hidden_size: int = 128
+
+    @nn.compact
+    def __call__(self, x):
+        if len(obs.shape) > 3:
+            obs_encoding = FullImageCNN(hidden_size=self.hidden_size)(obs)
+        else:
+            obs_encoding = nn.Dense(
+                self.hidden_size, kernel_init=orthogonal(jnp.sqrt(2)), bias_init=constant(0.0)
+            )(obs)
+            obs_encoding = nn.relu(obs_encoding)
+            obs_encoding = nn.Dense(
+                self.hidden_size, kernel_init=orthogonal(jnp.sqrt(2)), bias_init=constant(0.0)
+            )(obs_encoding)
+
+        return embedding
+
+
+class SFNetwork(nn.Module):
+    hidden_size: int = 128
+
+    @nn.compact
+    def __call__(self, x):
+        # Now we do our SF critic
+        critic_embedding = nn.Dense(self.hidden_size, kernel_init=orthogonal(2), bias_init=constant(0.0))(
+            embedding
+        )
+        critic_embedding = nn.relu(critic_embedding)
+        critic_embedding = nn.Dense(self.hidden_size, kernel_init=orthogonal(2), bias_init=constant(0.0))(
+            critic_embedding
+        )
+        critic_embedding = nn.relu(critic_embedding)
+        critic_embedding = nn.Dense(self.hidden_size, kernel_init=orthogonal(2), bias_init=constant(0.0))(
+            critic_embedding
+        )
+        return critic_embedding
+
+
+class SFActorCritic(nn.Module):
+    action_space: Union[spaces.Discrete, spaces.Box]
+    hidden_size: int = 128
+    memoryless: bool = False
+    double_critic: bool = False
+
+    def setup(self) -> None:
+        self.encoder = Encoder(hidden_size)
+        if self.memoryless:
+            self.rnn = SimpleNN(hidden_size=self.hidden_size)
+        else:
+            self.rnn = ScannedRNN(hidden_size=self.hidden_size)
+        self.actor = Actor(self.action_space, hidden_size=self.hidden_size)
+        self.sf = SFNetwork(hidden_size=self.hidden_size)
+        self.reward_weights = nn.Dense(1, name='r', kernel_init=orthogonal(2), bias_init=constant(0.0))
+
+    def __call__(self, hidden, x):
+        """
+        Does a forward pass, with a stop gradient through
+        :param hidden:
+        :param x:
+        :return:
+        """
+        obs, dones = x
+
+        encoded_obs = self.encoder(obs)
+
+        if self.memoryless:
+            hs = self.rnn(encoded_obs)
+        else:
+            hidden, hs = self.rnn(hidden, rnn_in)
+
+        pi = self.actor(hs)
+
+        sf_embedding = self.sf(hs)
+        frozen_reward_weights = jax.lax.stop_gradient(self.reward_weights)
+
+        v = jnp.squeeze(frozen_reward_weights(sf_embedding), axis=-1)
+
+        return hidden, pi, v
+
+    def reward(self, basis_embedding):
+        return jnp.squeeze(self.reward_weights(basis_embedding), axis=-1)
 
 
 class ActorCritic(nn.Module):
