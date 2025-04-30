@@ -230,6 +230,8 @@ if __name__ == "__main__":
         # ('SF random proj obs diff discrep', Path(ROOT_DIR, 'results', 'gd_sf_random_proj_obs', env_name, f'{env_name}_ppo_gd_sf_random_proj_obs_diff_discrep'), 'yellow'),
 
         # ('SF obs', Path(ROOT_DIR, 'results', f'{env_name}_ppo_gd_sf_obs'), 'blue'),
+        # ('SF random proj. obs', Path(ROOT_DIR, 'results', 'gd_sf_hs', f'{env_name}_ppo_gd_sf_hs'), 'cyan'),
+        # ('SF random proj. obs discrep', Path(ROOT_DIR, 'results', 'gd_sf_hs', f'{env_name}_ppo_gd_sf_hs_discrep'), 'cyan'),
         # ('SF obs discrep', Path(ROOT_DIR, 'results', 'gd_sf_obs_discrep', f'{env_name}_ppo_gd_sf_obs_discrep'), 'cyan'),
         # ('SF obs diff', Path(ROOT_DIR, 'results', 'gd_sf_obs_diff', env_name, f'{env_name}_ppo_gd_sf_obs_diff'), 'cyan'),
         # ('SF obs diff discrep', Path(ROOT_DIR, 'results', 'gd_sf_obs_diff', env_name, f'{env_name}_ppo_gd_sf_obs_diff_discrep'), 'yellow'),

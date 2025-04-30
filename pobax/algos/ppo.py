@@ -41,7 +41,6 @@ class PPO:
                  double_critic: bool = False,
                  ld_weight: float = 0.,
                  vf_coeff: float = 0.,
-                 ld_exploration_bonus_scale: float = 0.,
                  entropy_coeff: float = 0.01,
                  clip_eps: float = 0.2):
         self.network = network
@@ -49,7 +48,6 @@ class PPO:
         self.ld_weight = ld_weight
         self.vf_coeff = vf_coeff
         self.entropy_coeff = entropy_coeff
-        self.ld_exploration_bonus_scale = ld_exploration_bonus_scale
         self.clip_eps = clip_eps
         self.act = jax.jit(self.act)
         self.loss = jax.jit(self.loss)
@@ -71,7 +69,7 @@ class PPO:
         )
         return value, action, log_prob, hstate
 
-    def loss(self, params, init_hstate, traj_batch, gae, targets, next_vals):
+    def loss(self, params, init_hstate, traj_batch, gae, targets):
         # RERUN NETWORK
         _, pi, value = self.network.apply(
             params, init_hstate[0], (traj_batch.obs, traj_batch.done)
@@ -98,10 +96,6 @@ class PPO:
         # which advantage do we use to update our policy?
         if self.double_critic:
             gae = gae[..., 0]
-
-            ld_exploration_bonus = jnp.abs(next_vals[..., 0] - next_vals[..., 1])
-
-            gae += self.ld_exploration_bonus_scale * ld_exploration_bonus
 
         gae = (gae - gae.mean()) / (gae.std() + 1e-8)
         loss_actor1 = ratio * gae
@@ -145,6 +139,8 @@ def calculate_gae(traj_batch, last_val, last_done, gae_lambda, gamma):
     def _get_advantages(carry, transition):
         gae, next_value, gae_lambda, next_done = carry
         done, value, reward = transition.done, transition.value, transition.reward
+        if len(next_value.shape) > 1:
+            reward, next_done = reward[..., None], next_done[..., None]
         delta = reward + gamma * next_value * (1 - next_done) - value
         gae = delta + gamma * gae_lambda * (1 - next_done) * gae
         return (gae, value, gae_lambda, done), gae
@@ -308,7 +304,6 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
             train_state, env_state, last_obs, last_done, hstate, rng = runner_state
             ac_in = (jax.tree.map(lambda x: x[jnp.newaxis, ...], last_obs), last_done[np.newaxis, :])
             _, _, last_val = network.apply(train_state.params, hstate, ac_in)
-            next_vals = jnp.concatenate((traj_batch.value[1:], last_val), axis=0)
             last_val = last_val.squeeze(0)
 
             advantages, targets = _calculate_gae(traj_batch, last_val, last_done, gae_lambda, args.gamma)
@@ -316,11 +311,11 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
             # UPDATE NETWORK
             def _update_epoch(update_state, unused):
                 def _update_minbatch(train_state, batch_info):
-                    init_hstate, traj_batch, advantages, targets, next_vals = batch_info
+                    init_hstate, traj_batch, advantages, targets = batch_info
 
                     grad_fn = jax.value_and_grad(agent.loss, has_aux=True)
                     total_loss, grads = grad_fn(
-                        train_state.params, init_hstate, traj_batch, advantages, targets, next_vals
+                        train_state.params, init_hstate, traj_batch, advantages, targets
                     )
                     train_state = train_state.apply_gradients(grads=grads)
                     return train_state, total_loss
@@ -331,14 +326,13 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
                     traj_batch,
                     advantages,
                     targets,
-                    next_vals,
                     rng,
                 ) = update_state
 
                 # SHUFFLE COLLECTED BATCH
                 rng, _rng = jax.random.split(rng)
                 permutation = jax.random.permutation(_rng, args.num_envs)
-                batch = (init_hstate, traj_batch, advantages, targets, next_vals)
+                batch = (init_hstate, traj_batch, advantages, targets)
 
                 shuffled_batch = jax.tree.map(
                     lambda x: jnp.take(x, permutation, axis=1), batch
@@ -366,7 +360,6 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
                     traj_batch,
                     advantages,
                     targets,
-                    next_vals,
                     rng,
                 )
                 return update_state, total_loss
@@ -378,7 +371,6 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
                 traj_batch,
                 advantages,
                 targets,
-                next_vals,
                 rng,
             )
             update_state, loss_info = jax.lax.scan(

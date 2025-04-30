@@ -100,6 +100,7 @@ class SFPPOHyperparams(PPOHyperparams):
 
 class QRPPOHyperparams(PPOHyperparams):
     n_atoms: int = 51
+    kappa: float = 1.
 
 
 class DQNHyperparams(Tap):
