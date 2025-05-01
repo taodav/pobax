@@ -22,7 +22,8 @@ class Encoder(nn.Module):
             obs_encoding = nn.Dense(
                 self.hidden_size, kernel_init=orthogonal(jnp.sqrt(2)), bias_init=constant(0.0)
             )(obs)
-            obs_encoding = nn.relu(obs_encoding)
+            obs_encoding = nn.LayerNorm()(obs_encoding)
+            obs_encoding = nn.tanh(obs_encoding)
             obs_encoding = nn.Dense(
                 self.hidden_size, kernel_init=orthogonal(jnp.sqrt(2)), bias_init=constant(0.0)
             )(obs_encoding)
@@ -48,6 +49,11 @@ class SFNetwork(nn.Module):
             critic_embedding
         )
         return critic_embedding
+
+def normalize(arr: jnp.ndarray, p: int = 2, axis: int = 0, eps: float = 1e-12):
+    denom = jnp.linalg.norm(arr, ord=p, axis=axis, keepdims=True)
+    denom = jnp.clip(denom, min=eps)
+    return arr / denom
 
 
 class SFActorCritic(nn.Module):
@@ -92,7 +98,7 @@ class SFActorCritic(nn.Module):
         return hidden, pi, v
 
     def get_reward(self, encoding):
-        return self.reward_fn(encoding)
+        return jnp.squeeze(self.reward_fn(normalize(encoding, p=2, axis=-1)), axis=-1)
 
     def get_encoding(self, obs):
         return self.encoder(obs)
@@ -116,7 +122,7 @@ class SFActorCritic(nn.Module):
         v = sf_embedding @ rew_w + rew_b
         v = jnp.squeeze(v, axis=-1)
 
-        return hidden, pi, v, encoded_obs
+        return hidden, pi, v
 
 
 class ActorCritic(nn.Module):

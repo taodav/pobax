@@ -21,6 +21,7 @@ import orbax.checkpoint
 from pobax.config import PPOHyperparams
 from pobax.envs import get_env
 from pobax.envs.wrappers.gymnax import LogEnvState
+from pobax.models.actor_critic import SFActorCritic
 from pobax.models import get_gymnax_network_fn, ScannedRNN
 from pobax.utils.file_system import get_results_path, numpyify
 
@@ -32,11 +33,12 @@ class Transition(NamedTuple):
     reward: jnp.ndarray
     log_prob: jnp.ndarray
     obs: jnp.ndarray
+    next_obs: jnp.ndarray
     info: jnp.ndarray = None
 
 
 class SFPPO:
-    def __init__(self, network,
+    def __init__(self, network: SFActorCritic,
                  double_critic: bool = False,
                  ld_weight: float = 0.,
                  alpha: float = 0.,
@@ -51,7 +53,8 @@ class SFPPO:
         self.entropy_coeff = entropy_coeff
         self.clip_eps = clip_eps
         self.act = jax.jit(self.act)
-        self.loss = jax.jit(self.loss)
+        self.actor_sf_loss = jax.jit(self.actor_sf_loss)
+        self.reward_loss = jax.jit(self.reward_loss)
 
     def act(self, rng: chex.PRNGKey,
             train_state: flax.training.train_state.TrainState,
@@ -70,11 +73,12 @@ class SFPPO:
         )
         return value, action, log_prob, hstate
 
-    def loss(self, params, init_hstate, traj_batch, gae, targets):
-        # RERUN NETWORK
-        _, pi, value = self.network.apply(
-            params, init_hstate[0], (traj_batch.obs, traj_batch.done)
-        )
+    def actor_sf_loss(self, params, init_hstate, traj_batch, gae, targets):
+        rew_params = params['params']['r']
+        rew_params = (rew_params['kernel'], rew_params['bias'])
+        _, pi, value = self.network.apply(params, init_hstate[0], (traj_batch.obs, traj_batch.done), rew_params,
+                                               method=SFActorCritic.get_sf)
+
         log_prob = pi.log_prob(traj_batch.action)
 
         # CALCULATE VALUE LOSS
@@ -120,8 +124,13 @@ class SFPPO:
         )
         return total_loss, (value_loss, loss_actor, entropy)
 
+    def reward_loss(self, params, encoding, traj_batch):
+        reward_prediction = self.network.apply(params, encoding, method=SFActorCritic.get_reward)
+        loss = (reward_prediction - traj_batch.reward) ** 2
+        return loss.sum()
 
-def env_step(runner_state, unused, agent: PPO, env, env_params):
+
+def env_step(runner_state, unused, agent: SFPPO, env, env_params):
     train_state, env_state, last_obs, last_done, hstate, rng = runner_state
     rng, _rng = jax.random.split(rng)
     value, action, log_prob, hstate = agent.act(_rng, train_state, hstate, last_obs, last_done)
@@ -130,8 +139,11 @@ def env_step(runner_state, unused, agent: PPO, env, env_params):
     rng, _rng = jax.random.split(rng)
     rng_step = jax.random.split(_rng, hstate.shape[0])
     obsv, env_state, reward, done, info = env.step(rng_step, env_state, action, env_params)
+
+    # we set next_obs to all 0s if done.
+    next_obs = obsv * (1 - done[..., None])
     transition = Transition(
-        last_done, action, value, reward, log_prob, last_obs, info
+        last_done, action, value, reward, log_prob, last_obs, next_obs, info
     )
     runner_state = (train_state, env_state, obsv, done, hstate, rng)
     return runner_state, transition
@@ -172,46 +184,42 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
                               normalize_image=False,
                               perfect_memory=args.perfect_memory,
                               action_concat=args.action_concat,
-                              trace_lambdas=args.trace_lambdas)
+                              trace_lambdas=args.trace_lambdas if args.use_trace_features else None)
 
     if hasattr(env, 'gamma'):
         args.gamma = env.gamma
 
     assert hasattr(env_params, 'max_steps_in_episode')
 
-    double_critic = args.double_critic
-    memoryless = args.memoryless
-
     network = SFActorCritic(env.action_space(env_params),
                             memoryless=args.memoryless,
                             double_critic=args.double_critic,
-                            hidden_size=args.hidden_size,
-                            cumulant_size=cumulant_size)
+                            hidden_size=args.hidden_size)
 
     steps_filter = partial(filter_period_first_dim, n=args.steps_log_freq)
     update_filter = partial(filter_period_first_dim, n=args.update_log_freq)
 
     # Used for vmapping over our double critic.
     transition_axes_map = Transition(
-        None, None, 2, None, None, None, None
+        None, None, 2, None, None, None, None, None
     )
 
     _calculate_gae = calculate_gae
-    if double_critic:
+    if args.double_critic:
         # last_val is index 1 here b/c we squeezed earlier.
         _calculate_gae = jax.vmap(calculate_gae,
                                  in_axes=[transition_axes_map, 1, None, 0, None],
                                  out_axes=2)
 
     def train(vf_coeff, ld_weight, alpha, lambda1, lambda0, lr, rng):
-        agent = SFPPO(network, double_critic=double_critic, ld_weight=ld_weight, alpha=alpha, vf_coeff=vf_coeff,
+        agent = SFPPO(network, double_critic=args.double_critic, ld_weight=ld_weight, alpha=alpha, vf_coeff=vf_coeff,
                       clip_eps=args.clip_eps, entropy_coeff=args.entropy_coeff)
 
         # initialize functions
         _env_step = partial(env_step, agent=agent, env=env, env_params=env_params)
 
         gae_lambda = jnp.array(lambda0)
-        if double_critic:
+        if args.double_critic:
             gae_lambda = jnp.array([lambda0, lambda1])
 
         def linear_schedule(count):
@@ -307,12 +315,25 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
                 def _update_minbatch(train_state, batch_info):
                     init_hstate, traj_batch, advantages, targets = batch_info
 
-                    grad_fn = jax.value_and_grad(agent.loss, has_aux=True)
-                    total_loss, grads = grad_fn(
+                    # SF loss, freeze reward params
+                    actor_sf_grad_fn = jax.value_and_grad(agent.actor_sf_loss, has_aux=True)
+                    actor_sf_out, actor_sf_grads = actor_sf_grad_fn(
                         train_state.params, init_hstate, traj_batch, advantages, targets
                     )
-                    train_state = train_state.apply_gradients(grads=grads)
-                    return train_state, total_loss
+
+                    next_encoded_obs = agent.network.apply(train_state.params, traj_batch.next_obs,
+                                                           method=agent.network.get_encoding)
+
+                    # Reward loss, freeze other params
+                    reward_grad_fn = jax.value_and_grad(agent.reward_loss)
+                    reward_loss, reward_grads = reward_grad_fn(
+                        train_state.params, next_encoded_obs, traj_batch
+                    )
+
+                    summed_grads = jax.tree.map(lambda x, y: x + y, actor_sf_grads, reward_grads)
+
+                    train_state = train_state.apply_gradients(grads=summed_grads)
+                    return train_state, (actor_sf_out, reward_loss)
 
                 (
                     train_state,
