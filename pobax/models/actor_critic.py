@@ -69,7 +69,15 @@ class SFActorCritic(nn.Module):
         else:
             self.rnn = ScannedRNN(hidden_size=self.hidden_size)
         self.actor = Actor(self.action_space, hidden_size=self.hidden_size)
-        self.sf = SFNetwork(hidden_size=self.hidden_size)
+        if self.double_critic:
+            self.sf = nn.vmap(SFNetwork,
+                              variable_axes={'params': 0},
+                              split_rngs={'params': True},
+                              in_axes=None,
+                              out_axes=2,
+                              axis_size=2)(hidden_size=self.hidden_size)
+        else:
+            self.sf = SFNetwork(hidden_size=self.hidden_size)
         self.reward_fn = nn.Dense(1, name='r', kernel_init=orthogonal(2), bias_init=constant(0.0))
 
     def __call__(self, hidden, x):
@@ -122,7 +130,7 @@ class SFActorCritic(nn.Module):
         v = sf_embedding @ rew_w + rew_b
         v = jnp.squeeze(v, axis=-1)
 
-        return hidden, pi, v
+        return hidden, pi, v, sf_embedding
 
 
 class ActorCritic(nn.Module):
