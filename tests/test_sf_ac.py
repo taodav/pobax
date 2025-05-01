@@ -8,13 +8,13 @@ import optax
 import numpy as np
 
 from pobax.algos.sf_ppo import SFPPO, env_step, calculate_gae, make_train
-from pobax.config import PPOHyperparams
+from pobax.config import SFPPOHyperparams
 from pobax.envs import get_env
 from pobax.models.network import ScannedRNN
 from pobax.models.actor_critic import SFActorCritic
 
 
-def load_vars(args: PPOHyperparams, rng: jax.random.PRNGKey):
+def load_vars(args: SFPPOHyperparams, rng: jax.random.PRNGKey):
     rng, env_rng = jax.random.split(rng)
     env, env_params = get_env(args.env, env_rng,
                               gamma=args.gamma,
@@ -33,11 +33,12 @@ def load_vars(args: PPOHyperparams, rng: jax.random.PRNGKey):
                   ld_weight=args.ld_weight[0],
                   alpha=args.alpha[0],
                   vf_coeff=args.vf_coeff[0],
-                  clip_eps=args.clip_eps, entropy_coeff=args.entropy_coeff)
+                  clip_eps=args.clip_eps, entropy_coeff=args.entropy_coeff,
+                  discrep_over=args.discrep_over)
 
     return env, env_params, agent
 
-def run_n_steps_with_args(args: PPOHyperparams, n: int = 10):
+def run_n_steps_with_args(args: SFPPOHyperparams, n: int = 10):
     rng = jax.random.PRNGKey(args.seed)
     make_rng, train_rng, env_rng, rng = jax.random.split(rng, 4)
     train_fn = jax.jit(make_train(args, rng))
@@ -74,7 +75,7 @@ def run_n_steps_with_args(args: PPOHyperparams, n: int = 10):
     return res, runner_state, agent, traj_batch
 
 def test_predictions():
-    args = PPOHyperparams().from_dict({
+    args = SFPPOHyperparams().from_dict({
         'env': 'fully_observable_simplechain',
         'gamma': 0.9,
         'hidden_size': 16,
@@ -99,7 +100,7 @@ def test_predictions():
     assert np.allclose(rewards[:, 0], traj_batch.reward[:, 0], atol=1e-6)
 
 def test_discrep_predictions():
-    args = PPOHyperparams().from_dict({
+    args = SFPPOHyperparams().from_dict({
         'env': 'fully_observable_simplechain',
         'gamma': 0.9,
         'hidden_size': 16,
@@ -108,7 +109,7 @@ def test_discrep_predictions():
         'double_critic': True,
         'ld_weight': [0.5],
         # 'discrep_type': 'rew',
-        'discrep_type': 'sf',
+        'discrep_over': 'sf',
         'debug': True
     })
     res, runner_state, agent, traj_batch = run_n_steps_with_args(args, n=10)
@@ -119,7 +120,7 @@ def test_discrep_predictions():
 
 
 def test_env_grads():
-    args = PPOHyperparams().from_dict({'env': 'tmaze_5',
+    args = SFPPOHyperparams().from_dict({'env': 'tmaze_5',
                                        'memoryless': False,
                                        'hidden_size': 32})
     rand_key = jax.random.PRNGKey(2025)

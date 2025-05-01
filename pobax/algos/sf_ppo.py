@@ -18,7 +18,7 @@ import numpy as np
 import optax
 import orbax.checkpoint
 
-from pobax.config import PPOHyperparams
+from pobax.config import SFPPOHyperparams
 from pobax.envs import get_env
 from pobax.envs.wrappers.gymnax import LogEnvState
 from pobax.models.actor_critic import SFActorCritic
@@ -179,7 +179,7 @@ def filter_period_first_dim(x, n: int):
         return x[::n]
 
 
-def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
+def make_train(args: SFPPOHyperparams, rand_key: jax.random.PRNGKey):
     num_updates = (
             args.total_steps // args.num_steps // args.num_envs
     )
@@ -221,7 +221,8 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
 
     def train(vf_coeff, ld_weight, alpha, lambda1, lambda0, lr, rng):
         agent = SFPPO(network, double_critic=args.double_critic, ld_weight=ld_weight, alpha=alpha, vf_coeff=vf_coeff,
-                      clip_eps=args.clip_eps, entropy_coeff=args.entropy_coeff)
+                      clip_eps=args.clip_eps, entropy_coeff=args.entropy_coeff,
+                      discrep_over=args.discrep_over)
 
         # initialize functions
         _env_step = partial(env_step, agent=agent, env=env, env_params=env_params)
@@ -482,7 +483,7 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
 
 if __name__ == "__main__":
     # jax.disable_jit(True)
-    args = PPOHyperparams().parse_args()
+    args = SFPPOHyperparams().parse_args()
     jax.config.update('jax_platform_name', args.platform)
 
     rng = jax.random.PRNGKey(args.seed)
