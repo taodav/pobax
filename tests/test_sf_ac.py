@@ -98,6 +98,25 @@ def test_predictions():
     rewards = np.array(rewards)
     assert np.allclose(rewards[:, 0], traj_batch.reward[:, 0], atol=1e-6)
 
+def test_discrep_predictions():
+    args = PPOHyperparams().from_dict({
+        'env': 'fully_observable_simplechain',
+        'gamma': 0.9,
+        'hidden_size': 16,
+        'total_steps': int(1e6),
+        'seed': 2025,
+        'double_critic': True,
+        'ld_weight': [0.5],
+        # 'discrep_type': 'rew',
+        'discrep_type': 'sf',
+        'debug': True
+    })
+    res, runner_state, agent, traj_batch = run_n_steps_with_args(args, n=10)
+    traj_batch = jax.tree.map(lambda x: np.array(x), traj_batch)
+
+    ground_truth_values = ((0.9 ** np.arange(10))[::-1])[..., None]
+    assert np.allclose(traj_batch.value[:, 0] - ground_truth_values, 0, atol=1e-5)
+
 
 def test_env_grads():
     args = PPOHyperparams().from_dict({'env': 'tmaze_5',
@@ -254,4 +273,5 @@ if __name__ == "__main__":
     # jax.disable_jit(True)
     # test_simple_grads()
     # test_env_grads()
-    test_predictions()
+    # test_predictions()
+    test_discrep_predictions()

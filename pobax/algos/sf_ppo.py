@@ -44,7 +44,8 @@ class SFPPO:
                  alpha: float = 0.,
                  vf_coeff: float = 0.,
                  entropy_coeff: float = 0.01,
-                 clip_eps: float = 0.2):
+                 clip_eps: float = 0.2,
+                 discrep_over: str = 'sf'):
         self.network = network
         self.double_critic = double_critic
         self.ld_weight = ld_weight
@@ -52,6 +53,7 @@ class SFPPO:
         self.vf_coeff = vf_coeff
         self.entropy_coeff = entropy_coeff
         self.clip_eps = clip_eps
+        self.discrep_over = discrep_over
         self.act = jax.jit(self.act)
         self.actor_sf_loss = jax.jit(self.actor_sf_loss)
         self.reward_loss = jax.jit(self.reward_loss)
@@ -76,8 +78,8 @@ class SFPPO:
     def actor_sf_loss(self, params, init_hstate, traj_batch, gae, targets):
         rew_params = params['params']['r']
         rew_params = (rew_params['kernel'], rew_params['bias'])
-        _, pi, value = self.network.apply(params, init_hstate[0], (traj_batch.obs, traj_batch.done), rew_params,
-                                               method=SFActorCritic.get_sf)
+        _, pi, value, sf_embeddings = self.network.apply(params, init_hstate[0], (traj_batch.obs, traj_batch.done), rew_params,
+                                                         method=SFActorCritic.get_sf)
 
         log_prob = pi.log_prob(traj_batch.action)
 
@@ -91,9 +93,14 @@ class SFPPO:
             jnp.maximum(value_losses, value_losses_clipped).mean()
         )
         # Lambda discrepancy loss
+        discrep_loss = 0
         if self.double_critic:
-            value_loss = self.ld_weight * (jnp.square(value[..., 0] - value[..., 1])).mean() + \
-                         (1 - self.ld_weight) * value_loss
+            if self.discrep_over == 'val':
+                discrep_loss = (jnp.square(value[..., 0] - value[..., 1])).mean()
+                # value_loss = self.ld_weight *  + \
+                #              (1 - self.ld_weight) * value_loss
+            elif self.discrep_over == 'sf':
+                discrep_loss = (jnp.square(sf_embeddings[..., 0] - sf_embeddings[..., 1])).mean()
 
         # CALCULATE ACTOR LOSS
         ratio = jnp.exp(log_prob - traj_batch.log_prob)
@@ -120,6 +127,7 @@ class SFPPO:
         total_loss = (
                 loss_actor
                 + self.vf_coeff * value_loss
+                + self.ld_weight * discrep_loss
                 - self.entropy_coeff * entropy
         )
         return total_loss, (value_loss, loss_actor, entropy)

@@ -98,6 +98,9 @@ class GDPPOHyperparams(PPOHyperparams):
     reward_concat: bool = True  # TODO: Fix this? Gym does rewards weirdly
 
 
+class SFPPOHyperparams(PPOHyperparams):
+    discrep_over: str = 'sf'  # (sf | val) what do we take our discrepancy over?
+
 
 class DQNHyperparams(Tap):
     env: str = 'CartPole-v1'
