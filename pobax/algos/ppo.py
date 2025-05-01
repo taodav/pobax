@@ -176,7 +176,7 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
                               gamma=args.gamma,
                               perfect_memory=args.perfect_memory,
                               action_concat=args.action_concat,
-                              trace_lambdas=args.trace_lambdas)
+                              trace_lambdas=args.trace_lambdas if args.use_trace_features else None)
 
     if hasattr(env, 'gamma'):
         args.gamma = env.gamma
