@@ -18,7 +18,7 @@ class Encoder(nn.Module):
     hidden_size: int = 128
 
     @nn.compact
-    def __call__(self, x):
+    def __call__(self, obs):
         if len(obs.shape) > 3:
             obs_encoding = FullImageCNN(hidden_size=self.hidden_size)(obs)
         else:
@@ -30,7 +30,7 @@ class Encoder(nn.Module):
                 self.hidden_size, kernel_init=orthogonal(jnp.sqrt(2)), bias_init=constant(0.0)
             )(obs_encoding)
 
-        return embedding
+        return obs_encoding
 
 
 class SFNetwork(nn.Module):
@@ -40,7 +40,7 @@ class SFNetwork(nn.Module):
     def __call__(self, x):
         # Now we do our SF critic
         critic_embedding = nn.Dense(self.hidden_size, kernel_init=orthogonal(2), bias_init=constant(0.0))(
-            embedding
+            x
         )
         critic_embedding = nn.relu(critic_embedding)
         critic_embedding = nn.Dense(self.hidden_size, kernel_init=orthogonal(2), bias_init=constant(0.0))(
@@ -60,14 +60,14 @@ class SFActorCritic(nn.Module):
     double_critic: bool = False
 
     def setup(self) -> None:
-        self.encoder = Encoder(hidden_size)
+        self.encoder = Encoder(self.hidden_size)
         if self.memoryless:
             self.rnn = SimpleNN(hidden_size=self.hidden_size)
         else:
             self.rnn = ScannedRNN(hidden_size=self.hidden_size)
         self.actor = Actor(self.action_space, hidden_size=self.hidden_size)
         self.sf = SFNetwork(hidden_size=self.hidden_size)
-        self.reward_weights = nn.Dense(1, name='r', kernel_init=orthogonal(2), bias_init=constant(0.0))
+        self.reward_fn = nn.Dense(1, name='r', kernel_init=orthogonal(2), bias_init=constant(0.0))
 
     def __call__(self, hidden, x):
         """
@@ -83,19 +83,43 @@ class SFActorCritic(nn.Module):
         if self.memoryless:
             hs = self.rnn(encoded_obs)
         else:
+            rnn_in = (encoded_obs, dones)
             hidden, hs = self.rnn(hidden, rnn_in)
 
         pi = self.actor(hs)
 
         sf_embedding = self.sf(hs)
-        frozen_reward_weights = jax.lax.stop_gradient(self.reward_weights)
 
-        v = jnp.squeeze(frozen_reward_weights(sf_embedding), axis=-1)
+        v = jnp.squeeze(self.reward_fn(sf_embedding), axis=-1)
 
         return hidden, pi, v
 
-    def reward(self, basis_embedding):
-        return jnp.squeeze(self.reward_weights(basis_embedding), axis=-1)
+    def get_reward(self, encoding):
+        return self.reward_fn(encoding)
+
+    def get_encoding(self, obs):
+        return self.encoder(obs)
+
+    def get_sf(self, hidden, x, rew_params):
+        obs, dones = x
+
+        encoded_obs = self.encoder(obs)
+
+        if self.memoryless:
+            hs = self.rnn(encoded_obs)
+        else:
+            rnn_in = (encoded_obs, dones)
+            hidden, hs = self.rnn(hidden, rnn_in)
+
+        pi = self.actor(hs)
+
+        sf_embedding = self.sf(hs)
+
+        rew_w, rew_b = rew_params
+        v = sf_embedding @ rew_w + rew_b
+        v = jnp.squeeze(v, axis=-1)
+
+        return hidden, pi, v, encoded_obs
 
 
 class ActorCritic(nn.Module):
