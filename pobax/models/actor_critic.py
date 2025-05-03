@@ -1,4 +1,5 @@
-from typing import Union
+import math
+from typing import Union, Any
 
 import flax.linen as nn
 import jax.lax
@@ -248,6 +249,28 @@ class GVFActorCritic(nn.Module):
         return hidden, pi, v, gvf_prediction, obs_encoding
 
 
+def orthogonal_random_projection() -> jax.nn.initializers.Initializer:
+    """
+    Builds an initializer that returns random projections of a vector.
+
+    Implemented as per https://en.wikipedia.org/wiki/Random_projection#Orthogonal_random_projection
+
+    Returns:
+    An orthogonal initializer.
+    """
+    def init(key: jnp.ndarray,
+           shape: tuple,
+           dtype: Any = float) -> jnp.ndarray:
+        dtype = jax._src.dtypes.canonicalize_dtype(dtype)
+        if len(shape) < 2:
+          raise ValueError("orthogonal initializer requires at least a 2D shape")
+        bern = jax.random.bernoulli(key, shape=shape).astype(float)
+        shifted_bern = bern - (bern == 0).astype(float)
+        scaled_shifted_bern = jnp.sqrt(shape[0]) * shifted_bern.astype(dtype)
+        return scaled_shifted_bern
+    return init
+
+
 class CumulantGammaNetwork(nn.Module):
     cumulant_size: int
     gamma: float = 0.9
@@ -258,17 +281,12 @@ class CumulantGammaNetwork(nn.Module):
     @nn.compact
     def __call__(self, x):
         if len(x.shape) > 3:
-            obs_encoding = FullImageCNN(hidden_size=self.cumulant_size)(x)
-            cumulant_mapped = nn.LayerNorm()(obs_encoding)
-        else:
-            obs_encoding = nn.Dense(
-                self.cumulant_size, kernel_init=orthogonal(jnp.sqrt(2)), bias_init=constant(0.0)
-            )(x)
-            obs_encoding = nn.relu(obs_encoding)
-            obs_encoding = nn.Dense(
-                self.cumulant_size, kernel_init=orthogonal(jnp.sqrt(2)), bias_init=constant(0.0)
-            )(obs_encoding)
-            cumulant_mapped = nn.LayerNorm()(obs_encoding)
+            # If x is an image, flatten it
+            x = x.reshape((x.shape[:-3], -1))
+
+        cumulant_mapped = nn.Dense(
+            self.cumulant_size, kernel_init=orthogonal_random_projection(), use_bias=False
+        )(x)
         # cumulant_mapped = nn.Dense(features=self.cumulant_size)(x)
         # cumulant_mapped = nn.LayerNorm()(cumulant_mapped)
 
