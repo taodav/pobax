@@ -21,7 +21,7 @@ import orbax.checkpoint
 from pobax.config import SFPPOHyperparams
 from pobax.envs import get_env
 from pobax.envs.wrappers.gymnax import LogEnvState
-from pobax.models.actor_critic import SFActorCritic
+from pobax.models.actor_critic import SFActorCritic, RandomRewardNetwork
 from pobax.models import get_gymnax_network_fn, ScannedRNN
 from pobax.utils.file_system import get_results_path, numpyify
 
@@ -37,16 +37,24 @@ class Transition(NamedTuple):
     info: jnp.ndarray = None
 
 
+class RRTrainState(TrainState):
+    random_rewards_params: dict
+
+
 class SFPPO:
-    def __init__(self, network: SFActorCritic,
+    def __init__(self,
+                 network: SFActorCritic,
+                 random_reward_network: RandomRewardNetwork = None,
                  double_critic: bool = False,
                  ld_weight: float = 0.,
                  alpha: float = 0.,
                  vf_coeff: float = 0.,
                  entropy_coeff: float = 0.01,
                  clip_eps: float = 0.2,
-                 discrep_over: str = 'sf'):
+                 discrep_over: str = 'sf',
+                 random_reward_loss_coeff: float = 0.5):
         self.network = network
+        self.random_reward_network = random_reward_network
         self.double_critic = double_critic
         self.ld_weight = ld_weight
         self.alpha = alpha
@@ -54,6 +62,7 @@ class SFPPO:
         self.entropy_coeff = entropy_coeff
         self.clip_eps = clip_eps
         self.discrep_over = discrep_over
+        self.rr_loss_coeff = random_reward_loss_coeff
         self.act = jax.jit(self.act)
         self.actor_sf_loss = jax.jit(self.actor_sf_loss)
         self.reward_loss = jax.jit(self.reward_loss)
@@ -66,6 +75,12 @@ class SFPPO:
         # SELECT ACTION
         ac_in = (obs[np.newaxis, :], done[np.newaxis, :])
         hstate, pi, value = self.network.apply(train_state.params, hidden_state, ac_in)
+
+        random_rewards = None
+        if self.random_reward_network is not None:
+            random_rewards = self.random_reward_network.apply(train_state.random_rewards_params, ac_in[0])
+            random_rewards = random_rewards.squeeze(0)
+
         action = pi.sample(seed=rng)
         log_prob = pi.log_prob(action)
         value, action, log_prob = (
@@ -73,25 +88,40 @@ class SFPPO:
             action.squeeze(0),
             log_prob.squeeze(0),
         )
-        return value, action, log_prob, hstate
+        return value, action, log_prob, hstate, random_rewards
 
-    def actor_sf_loss(self, params, init_hstate, traj_batch, gae, targets):
+    def actor_sf_loss(self, params, init_hstate, traj_batch, gae, all_targets):
         rew_params = params['params']['r']
         rew_params = (rew_params['kernel'], rew_params['bias'])
-        _, pi, value, sf_embeddings = self.network.apply(params, init_hstate[0], (traj_batch.obs, traj_batch.done), rew_params,
-                                                         method=SFActorCritic.get_sf)
+
+        _, pi, all_values, sf_embeddings = self.network.apply(params, init_hstate[0], (traj_batch.obs, traj_batch.done), rew_params,
+                                                              method=SFActorCritic.get_sf)
+
+        all_traj_values = traj_batch.value
+
+        # Value to optimize policy
+        # We assume that index 0 is true reward function.
+        value, targets, traj_values = all_values[..., 0], all_targets[..., 0], all_traj_values[..., 0]
 
         log_prob = pi.log_prob(traj_batch.action)
 
         # CALCULATE VALUE LOSS
-        value_pred_clipped = traj_batch.value + (
-                value - traj_batch.value
+        value_pred_clipped = traj_values + (
+                value - traj_values
         ).clip(-self.clip_eps, self.clip_eps)
         value_losses = jnp.square(value - targets)
         value_losses_clipped = jnp.square(value_pred_clipped - targets)
         value_loss = (
             jnp.maximum(value_losses, value_losses_clipped).mean()
         )
+
+        # Values of random reward functions
+        # We assume that index 1: is random reward function.
+        rr_value, rr_targets = all_values[..., 1:], all_targets[..., 1:]
+        rr_value_losses = jnp.square(rr_value - rr_targets).mean()
+
+        value_loss += self.rr_loss_coeff * rr_value_losses
+
         # Lambda discrepancy loss
         discrep_loss = 0
         if self.double_critic:
@@ -141,12 +171,16 @@ class SFPPO:
 def env_step(runner_state, unused, agent: SFPPO, env, env_params):
     train_state, env_state, last_obs, last_done, hstate, rng = runner_state
     rng, _rng = jax.random.split(rng)
-    value, action, log_prob, hstate = agent.act(_rng, train_state, hstate, last_obs, last_done)
+    value, action, log_prob, hstate, random_rewards = agent.act(_rng, train_state, hstate, last_obs, last_done)
 
     # STEP ENV
     rng, _rng = jax.random.split(rng)
     rng_step = jax.random.split(_rng, hstate.shape[0])
     obsv, env_state, reward, done, info = env.step(rng_step, env_state, action, env_params)
+
+    reward = reward[..., None]
+    if random_rewards is not None:
+        reward = jnp.concatenate((reward, random_rewards), axis=-1)
 
     # we set next_obs to all 0s if done.
     next_obs = obsv * (1 - done[..., None])
@@ -162,7 +196,7 @@ def calculate_gae(traj_batch, last_val, last_done, gae_lambda, gamma):
         gae, next_value, gae_lambda, next_done = carry
         done, value, reward = transition.done, transition.value, transition.reward
         if len(next_value.shape) > 1:
-            reward, next_done = reward[..., None], next_done[..., None]
+            next_done = next_done[..., None]
         delta = reward + gamma * next_value * (1 - next_done) - value
         gae = delta + gamma * gae_lambda * (1 - next_done) * gae
         return (gae, value, gae_lambda, done), gae
@@ -202,7 +236,11 @@ def make_train(args: SFPPOHyperparams, rand_key: jax.random.PRNGKey):
     network = SFActorCritic(env.action_space(env_params),
                             memoryless=args.memoryless,
                             double_critic=args.double_critic,
-                            hidden_size=args.hidden_size)
+                            hidden_size=args.hidden_size,
+                            n_rewards=args.n_random_rewards + 1)
+    random_rewards_network = None
+    if args.n_random_rewards > 0:
+        random_rewards_network = RandomRewardNetwork(n_rewards=args.n_random_rewards)
 
     steps_filter = partial(filter_period_first_dim, n=args.steps_log_freq)
     update_filter = partial(filter_period_first_dim, n=args.update_log_freq)
@@ -220,7 +258,7 @@ def make_train(args: SFPPOHyperparams, rand_key: jax.random.PRNGKey):
                                  out_axes=2)
 
     def train(vf_coeff, ld_weight, alpha, lambda1, lambda0, lr, rng):
-        agent = SFPPO(network, double_critic=args.double_critic, ld_weight=ld_weight, alpha=alpha, vf_coeff=vf_coeff,
+        agent = SFPPO(network, random_rewards_network, double_critic=args.double_critic, ld_weight=ld_weight, alpha=alpha, vf_coeff=vf_coeff,
                       clip_eps=args.clip_eps, entropy_coeff=args.entropy_coeff,
                       discrep_over=args.discrep_over)
 
@@ -251,6 +289,11 @@ def make_train(args: SFPPOHyperparams, rand_key: jax.random.PRNGKey):
         init_hstate = ScannedRNN.initialize_carry(args.num_envs, args.hidden_size)
         network_params = agent.network.init(_rng, init_hstate, init_x)
 
+        random_rewards_params = None
+        if args.n_random_rewards > 0:
+            rng, _rng = jax.random.split(rng)
+            random_rewards_params = agent.random_reward_network.init(_rng, init_x[0])
+
         if args.anneal_lr:
             tx = optax.chain(
                 optax.clip_by_global_norm(args.max_grad_norm),
@@ -261,10 +304,11 @@ def make_train(args: SFPPOHyperparams, rand_key: jax.random.PRNGKey):
                 optax.clip_by_global_norm(args.max_grad_norm),
                 optax.adam(lr, eps=1e-5),
             )
-        train_state = TrainState.create(
+        train_state = RRTrainState.create(
             apply_fn=agent.network.apply,
             params=network_params,
             tx=tx,
+            random_rewards_params=random_rewards_params
         )
 
         # INIT ENV
@@ -318,6 +362,9 @@ def make_train(args: SFPPOHyperparams, rand_key: jax.random.PRNGKey):
             last_val = last_val.squeeze(0)
 
             advantages, targets = _calculate_gae(traj_batch, last_val, last_done, gae_lambda, args.gamma)
+
+            # We assume that the true reward policy advantages is always 0th index
+            advantages = advantages[..., 0]
 
             # UPDATE NETWORK
             def _update_epoch(update_state, unused):
