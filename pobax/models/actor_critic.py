@@ -65,6 +65,7 @@ class SFActorCritic(nn.Module):
     hidden_size: int = 128
     memoryless: bool = False
     double_critic: bool = False
+    n_rewards: int = 1
 
     def setup(self) -> None:
         self.encoder = Encoder(self.hidden_size)
@@ -82,7 +83,7 @@ class SFActorCritic(nn.Module):
                               axis_size=2)(hidden_size=self.hidden_size)
         else:
             self.sf = SFNetwork(hidden_size=self.hidden_size)
-        self.reward_fn = nn.Dense(1, name='r', kernel_init=orthogonal(2), bias_init=constant(0.0))
+        self.reward_fn = nn.Dense(self.n_rewards, name='r', kernel_init=orthogonal(2), bias_init=constant(0.0))
 
     def __call__(self, hidden, x):
         """
@@ -105,12 +106,12 @@ class SFActorCritic(nn.Module):
 
         sf_embedding = self.sf(hs)
 
-        v = jnp.squeeze(self.reward_fn(sf_embedding), axis=-1)
+        v = self.reward_fn(sf_embedding)
 
         return hidden, pi, v
 
     def get_reward(self, encoding):
-        return jnp.squeeze(self.reward_fn(normalize(encoding, p=2, axis=-1)), axis=-1)
+        return self.reward_fn(normalize(encoding, p=2, axis=-1))
 
     def get_encoding(self, obs):
         return self.encoder(obs)
@@ -132,7 +133,6 @@ class SFActorCritic(nn.Module):
 
         rew_w, rew_b = rew_params
         v = sf_embedding @ rew_w + rew_b
-        v = jnp.squeeze(v, axis=-1)
 
         return hidden, pi, v, sf_embedding
 
@@ -298,4 +298,18 @@ class CumulantGammaNetwork(nn.Module):
             hangman = jnp.zeros((x.shape[0], 1)) + self.gamma
 
         return cumulant_mapped, hangman
+
+
+class RandomRewardNetwork(nn.Module):
+    n_rewards: int = 1
+    @nn.compact
+    def __call__(self, x):
+        if len(x.shape) > 3:
+            # If x is an image, flatten it
+            x = x.reshape((x.shape[:-3], -1))
+
+        rewards = nn.Dense(
+            self.n_rewards, kernel_init=orthogonal_random_projection(), use_bias=False
+        )(x)
+        return rewards
 

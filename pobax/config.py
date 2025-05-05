@@ -100,6 +100,7 @@ class GDPPOHyperparams(PPOHyperparams):
 
 class SFPPOHyperparams(PPOHyperparams):
     discrep_over: str = 'sf'  # (sf | val) what do we take our discrepancy over?
+    n_random_rewards: int = 0
 
 
 class DQNHyperparams(Tap):
