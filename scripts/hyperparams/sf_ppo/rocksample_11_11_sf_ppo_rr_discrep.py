@@ -24,6 +24,7 @@ hparams = {
             'lambda1': lambda1s,
             'alpha': ' '.join(map(str, alphas)),
             'ld_weight': ld_weights,
+            'discrep_over': ['rew', 'sf'],
             'hidden_size': 256,
             'num_envs': 8,
             'n_random_rewards': [0, 2, 8],
