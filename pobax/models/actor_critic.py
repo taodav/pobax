@@ -266,8 +266,29 @@ def orthogonal_random_projection() -> jax.nn.initializers.Initializer:
           raise ValueError("orthogonal initializer requires at least a 2D shape")
         bern = jax.random.bernoulli(key, shape=shape).astype(float)
         shifted_bern = bern - (bern == 0).astype(float)
-        scaled_shifted_bern = jnp.sqrt(shape[0]) * shifted_bern.astype(dtype)
+        scaled_shifted_bern = (1 / jnp.sqrt(shape[0])) * shifted_bern.astype(dtype)
         return scaled_shifted_bern
+    return init
+
+def sparse_orthogonal_random_projection() -> jax.nn.initializers.Initializer:
+    """
+    Builds an initializer that returns random projections of a vector.
+
+    Implemented as per https://en.wikipedia.org/wiki/Random_projection#Orthogonal_random_projection
+
+    Returns:
+    An orthogonal initializer.
+    """
+    def init(key: jnp.ndarray,
+             shape: tuple,
+             dtype: Any = float) -> jnp.ndarray:
+        dtype = jax._src.dtypes.canonicalize_dtype(dtype)
+        if len(shape) < 2:
+            raise ValueError("orthogonal initializer requires at least a 2D shape")
+        p = jnp.array([1, 4, 1]) / 6  # we do this to make sure things sum to 1
+        multnom = jax.random.choice(key, jnp.array([-1, 0, 1]), p=p, shape=shape).astype(float)
+        scaled_multnom = (3 / jnp.sqrt(shape[0])) * multnom.astype(dtype)
+        return scaled_multnom
     return init
 
 
@@ -285,7 +306,7 @@ class CumulantGammaNetwork(nn.Module):
             x = x.reshape((x.shape[:-3], -1))
 
         cumulant_mapped = nn.Dense(
-            self.cumulant_size, kernel_init=orthogonal_random_projection(), use_bias=False
+            self.cumulant_size, kernel_init=sparse_orthogonal_random_projection(), use_bias=False
         )(x)
         # cumulant_mapped = nn.Dense(features=self.cumulant_size)(x)
         # cumulant_mapped = nn.LayerNorm()(cumulant_mapped)
@@ -309,7 +330,7 @@ class RandomRewardNetwork(nn.Module):
             x = x.reshape((x.shape[:-3], -1))
 
         rewards = nn.Dense(
-            self.n_rewards, kernel_init=orthogonal_random_projection(), use_bias=False
+            self.n_rewards, kernel_init=sparse_orthogonal_random_projection(), use_bias=False
         )(x)
         return rewards
 
