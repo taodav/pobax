@@ -10,14 +10,16 @@ from definitions import ROOT_DIR
 
 labels = {
     'hidden_size': 'hsize',
-    'num_envs': 'nenvs'
+    'num_envs': 'nenvs',
+    'n_random_rewards': 'num_rr'
 }
 
 
 if __name__ == "__main__":
-    hparam = 'hidden_size'
-    parent_dir = Path(ROOT_DIR, 'results/walker_v_hsize_sweep')
-    study_hparam_parent_dir = Path(ROOT_DIR, 'scripts/hyperparams/masked_mujoco/ablation')
+    hparam = 'n_random_rewards'
+    parent_dir = Path(ROOT_DIR, 'results/sf_ppo_rr')
+    study_hparam_parent_dir = Path(ROOT_DIR, 'scripts/hyperparams/sf_ppo')
+    study_hparam_parent_dir.mkdir(exist_ok=True)
 
     study_paths = [s for s in parent_dir.iterdir() if s.is_dir()]
     for study_path in tqdm(study_paths):
