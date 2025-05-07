@@ -23,8 +23,8 @@ from pobax.algos.ppo import PPO
 from pobax.config import GDPPOHyperparams
 from pobax.envs import get_env
 from pobax.envs.wrappers.gymnax import LogEnvState
-from pobax.models import get_gymnax_network_fn, ScannedRNN
-from pobax.models.actor_critic import CumulantGammaNetwork, ActorCritic
+from pobax.models import ScannedRNN
+from pobax.models.actor_critic import CumulantNetwork, HangmanNetwork, ActorCritic
 from pobax.utils.file_system import get_results_path, numpyify
 
 
@@ -36,19 +36,20 @@ class Transition(NamedTuple):
     cumulant_value: jnp.ndarray
     reward: jnp.ndarray
     log_prob: jnp.ndarray
-    hstate_cumulant: jnp.ndarray
+    cumulant: jnp.ndarray
     obs: jnp.ndarray
-    obs_encoding: jnp.ndarray
     info: jnp.ndarray = None
 
 
 class GDTrainState(TrainState):
-    cumulant_gamma_params: dict
+    cumulant_params: dict
+    hangman_params: dict
 
 
 class GDPPO(PPO):
     def __init__(self, network,
-                 cumulant_gamma_network,
+                 cumulant_network,
+                 hangman_network,
                  double_critic: bool = False,
                  ld_weight: float = 0.,
                  alpha: float = 0.,
@@ -56,13 +57,16 @@ class GDPPO(PPO):
                  ld_exploration_bonus_scale: float = 0.,
                  cumulant_loss_weight: float = 0.5,
                  entropy_coeff: float = 0.01,
-                 clip_eps: float = 0.2):
+                 clip_eps: float = 0.2,
+                 cumulant_type: str = 'hs'):
         super().__init__(network, double_critic, ld_weight,
                          alpha, vf_coeff, ld_exploration_bonus_scale,
                          entropy_coeff, clip_eps)
 
-        self.cumulant_gamma_network = cumulant_gamma_network
+        self.cumulant_network = cumulant_network
+        self.hangman_network = hangman_network
         self.cumulant_loss_weight = cumulant_loss_weight
+        self.cumulant_type = cumulant_type
 
     def act(self, rng: chex.PRNGKey,
             train_state: flax.training.train_state.TrainState,
@@ -71,19 +75,20 @@ class GDPPO(PPO):
 
         # SELECT ACTION
         ac_in = (obs[np.newaxis, :], done[np.newaxis, :])
-        hstate, pi, value, c_value, obs_encoding = self.network.apply(train_state.params, hidden_state, ac_in)
-        hstate_cumulant, hangman = self.cumulant_gamma_network.apply(train_state.cumulant_gamma_params, obs)
+        next_hstate, pi, value, c_value, obs_encoding = self.network.apply(train_state.params, hidden_state, ac_in)
+        if c_value is not None:
+            c_value = c_value.squeeze(0)
+        hangman = self.hangman_network.apply(train_state.hangman_params, obs)
 
         action = pi.sample(seed=rng)
         log_prob = pi.log_prob(action)
-        value, c_value, action, log_prob, obs_encoding = (
+        value, action, log_prob, obs_encoding = (
             value.squeeze(0),
-            c_value.squeeze(0),
             action.squeeze(0),
             log_prob.squeeze(0),
             obs_encoding.squeeze(0)
         )
-        return value, c_value, action, log_prob, hstate, hstate_cumulant, hangman, obs_encoding
+        return value, c_value, action, log_prob, next_hstate, hangman, obs_encoding
 
     def loss(self, params, init_hstate, traj_batch, gae, targets, cumulant_targets, next_vals):
         # RERUN NETWORK
@@ -148,20 +153,45 @@ class GDPPO(PPO):
         return total_loss, (value_loss, loss_actor, entropy)
 
 
-def env_step(runner_state, unused, agent: GDPPO, env, env_params):
-    train_state, env_state, last_obs, last_done, hstate, rng = runner_state
+def env_step(runner_state, unused, agent: GDPPO, env, env_params,
+             cumulant_type: str = None):
+    train_state, env_state, last_obs, last_done, last_hstate, rng = runner_state
     rng, _rng = jax.random.split(rng)
 
     # gamma_offset is between -1 and 1
-    value, cumulant_value, action, log_prob, hstate, hstate_cumulant, hangman, last_obs_encoding = agent.act(_rng, train_state, hstate, last_obs, last_done)
+    value, cumulant_value, action, log_prob, hstate, hangman, obs_encoding = agent.act(_rng, train_state, last_hstate, last_obs, last_done)
 
     # STEP ENV
     rng, _rng = jax.random.split(rng)
     rng_step = jax.random.split(_rng, hstate.shape[0])
     obsv, env_state, reward, done, info = env.step(rng_step, env_state, action, env_params)
 
+    cumulant = None
+    if cumulant_type == 'random_proj_hs':
+        cumulant = agent.cumulant_network.apply(train_state.cumulant_params, last_hstate)
+    if cumulant_type == 'random_proj_hs_diff':
+        proj_last_hstate = agent.cumulant_network.apply(train_state.cumulant_params, last_hstate)
+        proj_hstate = agent.cumulant_network.apply(train_state.cumulant_params, hstate)
+        cumulant = (1 - done[..., None]) * proj_hstate - proj_last_hstate
+    elif cumulant_type == 'random_proj_obs':
+        cumulant = agent.cumulant_network.apply(train_state.cumulant_params, obsv)
+    elif cumulant_type == 'random_proj_obs_diff':
+        proj_last_obs = agent.cumulant_network.apply(train_state.cumulant_params, last_obs)
+        proj_obs = agent.cumulant_network.apply(train_state.cumulant_params, obsv)
+        cumulant = (1 - done[..., None]) * proj_obs - proj_last_obs
+    elif cumulant_type == 'hs':
+        cumulant = last_hstate
+    elif cumulant_type == 'hs_diff':
+        cumulant = (1 - done[..., None]) * hstate - last_hstate
+    elif cumulant_type == 'obs':
+        cumulant = last_obs
+    elif cumulant_type == 'obs_diff':
+        cumulant = (1 - done[..., None]) * obsv - last_obs
+    elif cumulant_type == 'enc_obs':
+        cumulant = obs_encoding
+
     transition = Transition(
-        last_done, hangman, action, value, cumulant_value, reward, log_prob, hstate_cumulant, last_obs, last_obs_encoding, info
+        last_done, hangman, action, value, cumulant_value, reward, log_prob, cumulant, last_obs, info
     )
 
     runner_state = (train_state, env_state, obsv, done, hstate, rng)
@@ -183,27 +213,14 @@ def calculate_gae(traj_batch, last_val, last_done, gae_lambda, gamma):
     return advantages, target
 
 
-def calculate_gvf_lambda(traj_batch, last_cumulant_val, last_done, gae_lambda,
-                         cumulant_type: str = 'rew'):
+def calculate_gvf_lambda(traj_batch, last_cumulant_val, last_done, gae_lambda):
     def _get_advantages(carry, transition):
         gae_cumulant, next_cumulant_value, gae_lambda, next_done = carry
-        done, cumulant_value, reward, hstate_cumulant, hangman, obs, obs_encoding\
+        done, cumulant_value, reward, cumulant, hangman, obs\
             = (transition.done, transition.cumulant_value, transition.reward,
-               transition.hstate_cumulant, transition.hangman,
-               transition.obs, transition.obs_encoding)
+               transition.cumulant, transition.hangman,
+               transition.obs)
         next_done = next_done[..., None]
-        # hstate_cumulant is a random fixed linear layer applied to hstate,
-        # with a sigmoid over the output.
-        if cumulant_type == 'hs':
-            cumulant = hstate_cumulant
-        elif cumulant_type == 'rew':
-            cumulant = reward[..., None]
-        elif cumulant_type == 'hs_rew':
-            cumulant = jnp.concatenate((hstate_cumulant, reward[..., None]), axis=-1)
-        elif cumulant_type == 'obs':
-            cumulant = obs
-        elif cumulant_type == 'enc_obs':
-            cumulant = obs_encoding
 
         delta_cumulant = cumulant + hangman * next_cumulant_value * (1 - next_done) - cumulant_value
         gae_cumulant = delta_cumulant + hangman * gae_lambda * (1 - next_done) * gae_cumulant
@@ -242,19 +259,22 @@ def make_train(args: GDPPOHyperparams, rand_key: jax.random.PRNGKey):
     assert hasattr(env_params, 'max_steps_in_episode')
 
     cumulant_size = None
-    if args.cumulant_type == 'hs':
+    if args.cumulant_type in ['random_proj_hs', 'random_proj_hs_diff', 'random_proj_obs', 'random_proj_obs_diff']:
+        # randomly projected hidden state
         cumulant_size = args.cumulant_map_size
     elif args.cumulant_type == 'rew':
         cumulant_size = 1
+    elif args.cumulant_type == 'hs' or args.cumulant_type == 'hs_diff':
+        # Raw hidden state and raw hs difference
+        cumulant_size = args.hidden_size
     elif args.cumulant_type == 'hs_rew':
         cumulant_size = args.cumulant_map_size + 1
-    elif args.cumulant_type == 'obs':
+    elif args.cumulant_type == 'obs' or args.cumulant_type == 'obs_diff':
         obs_shape = env.observation_space(env_params).shape
         assert len(obs_shape) <= 1, 'no support for images for obs cumulant'
         cumulant_size = obs_shape[0]
     elif args.cumulant_type == 'enc_obs':
         cumulant_size = args.hidden_size
-
 
     network = ActorCritic(env.action_space(env_params),
                           memoryless=args.memoryless,
@@ -262,11 +282,12 @@ def make_train(args: GDPPOHyperparams, rand_key: jax.random.PRNGKey):
                           hidden_size=args.hidden_size,
                           cumulant_size=cumulant_size)
 
-    cumulant_gamma_network = CumulantGammaNetwork(cumulant_size=args.cumulant_map_size,
-                                                  gamma=args.gamma,
-                                                  gamma_type=args.gamma_type,
-                                                  gamma_max=args.gamma_max,
-                                                  gamma_min=args.gamma_min)
+    cumulant_network = CumulantNetwork(cumulant_size=args.cumulant_map_size,)
+    hangman_network = HangmanNetwork(gamma=args.gamma,
+                                     gamma_type=args.gamma_type,
+                                     gamma_max=args.gamma_max,
+                                     gamma_min=args.gamma_min)
+
 
     steps_filter = partial(filter_period_first_dim, n=args.steps_log_freq)
     update_filter = partial(filter_period_first_dim, n=args.update_log_freq)
@@ -277,7 +298,7 @@ def make_train(args: GDPPOHyperparams, rand_key: jax.random.PRNGKey):
     )
 
     _calculate_gae = calculate_gae
-    _calculate_gvf_lambda = partial(calculate_gvf_lambda, cumulant_type=args.cumulant_type)
+    _calculate_gvf_lambda = calculate_gvf_lambda
 
     if args.double_critic:
         # last_val is index 1 here b/c we squeezed earlier.
@@ -290,14 +311,14 @@ def make_train(args: GDPPOHyperparams, rand_key: jax.random.PRNGKey):
                                          out_axes=2)
 
     def train(vf_coeff, ld_weight, alpha, lambda1, lambda0, lr, rng):
-        agent = GDPPO(network, cumulant_gamma_network,
+        agent = GDPPO(network, cumulant_network, hangman_network,
                       double_critic=args.double_critic, ld_weight=ld_weight, alpha=alpha, vf_coeff=vf_coeff,
                       clip_eps=args.clip_eps, entropy_coeff=args.entropy_coeff,
                       ld_exploration_bonus_scale=args.ld_exploration_bonus_scale,
                       cumulant_loss_weight=args.cumulant_loss_weight)
 
         # initialize functions
-        _env_step = partial(env_step, agent=agent, env=env, env_params=env_params)
+        _env_step = partial(env_step, agent=agent, env=env, env_params=env_params, cumulant_type=args.cumulant_type)
 
         gae_lambda = jnp.array(lambda0)
         # if args.double_critic:
@@ -313,7 +334,7 @@ def make_train(args: GDPPOHyperparams, rand_key: jax.random.PRNGKey):
 
 
         # INIT NETWORK
-        rng, _rng = jax.random.split(rng)
+        rng, network_rng, hangman_rng, cumulant_rng = jax.random.split(rng, 4)
         init_x = (
             jnp.zeros(
                 (1, args.num_envs, *env.observation_space(env_params).shape)
@@ -321,9 +342,14 @@ def make_train(args: GDPPOHyperparams, rand_key: jax.random.PRNGKey):
             jnp.zeros((1, args.num_envs)),
         )
         init_hstate = ScannedRNN.initialize_carry(args.num_envs, args.hidden_size)
-        network_params = agent.network.init(_rng, init_hstate, init_x)
-        # cumulant_gamma_params = agent.cumulant_gamma_network.init(_rng, init_hstate)
-        cumulant_gamma_params = agent.cumulant_gamma_network.init(_rng, init_x[0])
+        network_params = agent.network.init(network_rng, init_hstate, init_x)
+
+        hangman_params = agent.hangman_network.init(hangman_rng, init_x[0])
+        cumulant_params = None
+        if args.cumulant_type in ['random_proj_hs', 'random_proj_hs_diff']:
+            cumulant_params = agent.cumulant_network.init(cumulant_rng, init_hstate)
+        elif args.cumulant_type in ['random_proj_obs', 'random_proj_obs_diff']:
+            cumulant_params = agent.cumulant_network.init(cumulant_rng, init_x[0])
 
         if args.anneal_lr:
             tx = optax.chain(
@@ -335,11 +361,13 @@ def make_train(args: GDPPOHyperparams, rand_key: jax.random.PRNGKey):
                 optax.clip_by_global_norm(args.max_grad_norm),
                 optax.adam(lr, eps=1e-5),
             )
+
         train_state = GDTrainState.create(
             apply_fn=agent.network.apply,
             params=network_params,
             tx=tx,
-            cumulant_gamma_params=cumulant_gamma_params
+            cumulant_params=cumulant_params,
+            hangman_params=hangman_params,
         )
 
         # INIT ENV

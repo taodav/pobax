@@ -16,7 +16,7 @@ hparams = {
     'args': [
         {
             'env': 'rocksample_11_11',
-            'double_critic': False,
+            'double_critic': True,
             'action_concat': True,
             'reward_concat': False,
             'lr': ' '.join(map(str, lrs)),

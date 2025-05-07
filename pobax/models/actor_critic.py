@@ -235,8 +235,23 @@ def sparse_orthogonal_random_projection() -> jax.nn.initializers.Initializer:
     return init
 
 
-class CumulantGammaNetwork(nn.Module):
+class CumulantNetwork(nn.Module):
     cumulant_size: int
+    @nn.compact
+    def __call__(self, x):
+        if len(x.shape) > 3:
+            # If x is an image, flatten it
+            x = x.reshape((x.shape[:-3], -1))
+
+        cumulant_mapped = nn.Dense(
+            self.cumulant_size, kernel_init=sparse_orthogonal_random_projection(), use_bias=False
+        )(x)
+
+        # cumulant_mapped = nn.Dense(features=self.cumulant_size)(x)
+        # cumulant_mapped = nn.LayerNorm()(cumulant_mapped)
+        return cumulant_mapped
+
+class HangmanNetwork(nn.Module):
     gamma: float = 0.9
     gamma_type: str = 'nn_gamma_sigmoid'
     gamma_max: float = 1.
@@ -248,12 +263,6 @@ class CumulantGammaNetwork(nn.Module):
             # If x is an image, flatten it
             x = x.reshape((x.shape[:-3], -1))
 
-        cumulant_mapped = nn.Dense(
-            self.cumulant_size, kernel_init=sparse_orthogonal_random_projection(), use_bias=False
-        )(x)
-        # cumulant_mapped = nn.Dense(features=self.cumulant_size)(x)
-        # cumulant_mapped = nn.LayerNorm()(cumulant_mapped)
-
         if self.gamma_type == 'nn_gamma_sigmoid':
             hangman = nn.Dense(features=1)(x)
             hangman = nn.sigmoid(hangman)
@@ -261,7 +270,7 @@ class CumulantGammaNetwork(nn.Module):
         elif self.gamma_type == 'fixed':
             hangman = jnp.zeros((x.shape[0], 1)) + self.gamma
 
-        return cumulant_mapped, hangman
+        return hangman
 
 
 class RandomRewardNetwork(nn.Module):

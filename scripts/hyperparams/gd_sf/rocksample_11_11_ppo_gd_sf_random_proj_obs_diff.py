@@ -4,9 +4,9 @@ exp_name = Path(__file__).stem
 
 lrs = [2.5e-3, 2.5e-4, 2.5e-5, 2.5e-6]  # Learning rates
 lambda0s = [0.1, 0.3, 0.5, 0.7, 0.95]
-lambda1s = [0.1, 0.3, 0.5, 0.7, 0.95]
+lambda1s = [0.95]
 alphas = [1]
-ld_weights = [0., 0.25, 0.5]
+ld_weights = [0.]
 vf_coeffs = [0.5]  # Value function coefficients
 
 hparams = {
@@ -16,7 +16,7 @@ hparams = {
     'args': [
         {
             'env': 'rocksample_11_11',
-            'double_critic': True,
+            'double_critic': False,
             'action_concat': True,
             'reward_concat': False,
             'lr': ' '.join(map(str, lrs)),
@@ -26,7 +26,8 @@ hparams = {
             'ld_weight': ld_weights,
             'hidden_size': 256,
             'num_envs': 8,
-            'cumulant_type': 'hs_rew',
+            'cumulant_type': 'random_proj_obs_diff',
+            'cumulant_loss_weight': 0.25,
             'entropy_coeff': 0.2,
             'steps_log_freq': 4,
             'update_log_freq': 5,

@@ -16,7 +16,7 @@ hparams = {
     'args': [
         {
             'env': 'rocksample_11_11',
-            'double_critic': True,
+            'double_critic': False,
             'action_concat': True,
             'reward_concat': False,
             'lr': ' '.join(map(str, lrs)),
@@ -26,7 +26,7 @@ hparams = {
             'ld_weight': ld_weights,
             'hidden_size': 256,
             'num_envs': 8,
-            'cumulant_type': 'hs_rew',
+            'cumulant_type': 'hs_diff',
             'entropy_coeff': 0.2,
             'steps_log_freq': 4,
             'update_log_freq': 5,

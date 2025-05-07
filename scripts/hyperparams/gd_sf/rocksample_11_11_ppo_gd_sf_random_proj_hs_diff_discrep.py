@@ -26,7 +26,7 @@ hparams = {
             'ld_weight': ld_weights,
             'hidden_size': 256,
             'num_envs': 8,
-            'cumulant_type': 'hs_rew',
+            'cumulant_type': 'random_proj_hs_diff',
             'entropy_coeff': 0.2,
             'steps_log_freq': 4,
             'update_log_freq': 5,
