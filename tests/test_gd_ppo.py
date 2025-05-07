@@ -18,7 +18,7 @@ import numpy as np
 from pobax.algos.gd_ppo import GDPPO, GDPPOHyperparams, make_train, env_step
 from pobax.envs import get_env
 from pobax.models import ScannedRNN
-from pobax.models.actor_critic import CumulantGammaNetwork, ActorCritic
+from pobax.models.actor_critic import CumulantNetwork, HangmanNetwork, ActorCritic
 
 
 def load_vars(args: GDPPOHyperparams, rng: jax.random.PRNGKey):
@@ -31,16 +31,22 @@ def load_vars(args: GDPPOHyperparams, rng: jax.random.PRNGKey):
                               reward_concat=args.reward_concat)
 
     cumulant_size = None
-    if args.cumulant_type == 'hs':
+    if args.cumulant_type == 'random_proj_hs' or args.cumulant_type == 'random_proj_obs':
+        # randomly projected hidden state
         cumulant_size = args.cumulant_map_size
     elif args.cumulant_type == 'rew':
         cumulant_size = 1
+    elif args.cumulant_type == 'hs' or args.cumulant_type == 'hs_diff':
+        # Raw hidden state and raw hs difference
+        cumulant_size = args.hidden_size
     elif args.cumulant_type == 'hs_rew':
         cumulant_size = args.cumulant_map_size + 1
-    elif args.cumulant_type == 'obs':
+    elif args.cumulant_type == 'obs' or args.cumulant_type == 'obs_diff':
         obs_shape = env.observation_space(env_params).shape
         assert len(obs_shape) <= 1, 'no support for images for obs cumulant'
         cumulant_size = obs_shape[0]
+    elif args.cumulant_type == 'enc_obs':
+        cumulant_size = args.hidden_size
 
     network = ActorCritic(env.action_space(env_params),
                           memoryless=args.memoryless,
@@ -48,10 +54,13 @@ def load_vars(args: GDPPOHyperparams, rng: jax.random.PRNGKey):
                           hidden_size=args.hidden_size,
                           cumulant_size=cumulant_size)
 
-    cumulant_gamma_network = CumulantGammaNetwork(cumulant_size=cumulant_size,
-                                                  gamma_type=args.gamma_type)
+    cumulant_network = CumulantNetwork(cumulant_size=args.cumulant_map_size,)
+    hangman_network = HangmanNetwork(gamma=args.gamma,
+                                     gamma_type=args.gamma_type,
+                                     gamma_max=args.gamma_max,
+                                     gamma_min=args.gamma_min)
 
-    agent = GDPPO(network, cumulant_gamma_network,
+    agent = GDPPO(network, cumulant_network, hangman_network,
                   double_critic=args.double_critic,
                   ld_weight=args.ld_weight[0],
                   alpha=args.alpha[0],
@@ -74,7 +83,7 @@ def run_n_steps_with_args(args: GDPPOHyperparams, n: int = 10):
     ts = res['runner_state'][0]
 
     # initialize functions
-    _env_step = partial(env_step, agent=agent, env=env, env_params=env_params)
+    _env_step = partial(env_step, agent=agent, env=env, env_params=env_params, cumulant_type=args.cumulant_type)
 
     # INIT NETWORK
     rng, _rng = jax.random.split(rng)
@@ -196,5 +205,5 @@ if __name__ == "__main__":
     # jax.disable_jit(True)
     # test_rew_cumulant()
     # test_ld()
-    # test_obs_sr()
-    test_hangman_gamma()
+    test_obs_sr()
+    # test_hangman_gamma()
