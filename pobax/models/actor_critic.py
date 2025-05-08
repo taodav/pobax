@@ -9,9 +9,11 @@ import jax.numpy as jnp
 
 from pobax.models.actor import Actor
 from pobax.models.critic import Critic, GVF
+from pobax.models.distributional import QuantileV
 from pobax.models.network import SimpleNN, ScannedRNN, FullImageCNN
 
 
+<<<<<<< HEAD
 class Encoder(nn.Module):
     hidden_size: int = 128
 
@@ -140,6 +142,7 @@ class ActorCritic(nn.Module):
     cumulant_size: int = None
     memoryless: bool = False
     double_critic: bool = False
+    n_atoms: int = None
 
     @nn.compact
     def __call__(self, hidden, x):
@@ -147,7 +150,6 @@ class ActorCritic(nn.Module):
 
         if len(obs.shape) > 3:
             obs_encoding = FullImageCNN(hidden_size=self.hidden_size)(obs)
-            obs_encoding = nn.LayerNorm()(obs_encoding)
             embedding = nn.relu(obs_encoding)
         else:
             obs_encoding = nn.Dense(
@@ -157,7 +159,6 @@ class ActorCritic(nn.Module):
             obs_encoding = nn.Dense(
                 self.hidden_size, kernel_init=orthogonal(jnp.sqrt(2)), bias_init=constant(0.0)
             )(obs_encoding)
-            obs_encoding = nn.LayerNorm()(obs_encoding)
             embedding = nn.relu(obs_encoding)
 
         if self.memoryless:
@@ -169,7 +170,10 @@ class ActorCritic(nn.Module):
         actor = Actor(self.action_space, hidden_size=self.hidden_size)
         pi = actor(embedding)
 
-        critic = Critic(hidden_size=self.hidden_size)
+        if self.n_atoms is not None and self.n_atoms > 0:
+            critic = QuantileV(n_atoms=self.n_atoms, hidden_size=self.hidden_size)
+        else:
+            critic = Critic(hidden_size=self.hidden_size)
 
         # GVF prediction
         gvf_critic = None
@@ -360,3 +364,58 @@ class RandomRewardNetwork(nn.Module):
         )(x)
         return rewards
 
+
+class ActorCritic(nn.Module):
+    action_space: Union[spaces.Discrete, spaces.Box]
+    hidden_size: int = 128
+    memoryless: bool = False
+    double_critic: bool = False
+    n_atoms: int = None
+
+    @nn.compact
+    def __call__(self, hidden, x):
+        # TODO: Battleship/action masking.
+        obs, dones = x
+
+        if len(obs.shape) > 3:
+            obs_encoding = FullImageCNN(hidden_size=self.hidden_size)(obs)
+            embedding = nn.relu(obs_encoding)
+        else:
+            obs_encoding = nn.Dense(
+                self.hidden_size, kernel_init=orthogonal(jnp.sqrt(2)), bias_init=constant(0.0)
+            )(obs)
+            obs_encoding = nn.relu(obs_encoding)
+            obs_encoding = nn.Dense(
+                self.hidden_size, kernel_init=orthogonal(jnp.sqrt(2)), bias_init=constant(0.0)
+            )(obs_encoding)
+            embedding = nn.relu(obs_encoding)
+
+        if self.memoryless:
+            embedding = SimpleNN(hidden_size=self.hidden_size)(embedding)
+        else:
+            rnn_in = (embedding, dones)
+            hidden, embedding = ScannedRNN(hidden_size=self.hidden_size)(hidden, rnn_in)
+
+        actor = Actor(self.action_space, hidden_size=self.hidden_size)
+        pi = actor(embedding)
+
+        args = {'hidden_size': self.hidden_size}
+        critic_class = Critic
+        if self.n_atoms is not None and self.n_atoms > 0:
+            critic_class = QuantileV
+            args['n_atoms'] = self.n_atoms
+
+        if self.double_critic:
+            critic_class = nn.vmap(critic_class,
+                                   variable_axes={'params': 0},
+                                   split_rngs={'params': True},
+                                   in_axes=None,
+                                   out_axes=2,
+                                   axis_size=2)
+        critic = critic_class(**args)
+
+        v = critic(embedding)
+        if v.shape[-1] == 1:
+            v = jnp.squeeze(v, axis=-1)
+
+        return hidden, pi, v

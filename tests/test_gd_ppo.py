@@ -49,10 +49,10 @@ def load_vars(args: GDPPOHyperparams, rng: jax.random.PRNGKey):
         cumulant_size = args.hidden_size
 
     network = ActorCritic(env.action_space(env_params),
-                          memoryless=args.memoryless,
-                          double_critic=args.double_critic,
-                          hidden_size=args.hidden_size,
-                          cumulant_size=cumulant_size)
+                             memoryless=args.memoryless,
+                             double_critic=args.double_critic,
+                             hidden_size=args.hidden_size,
+                             cumulant_size=cumulant_size)
 
     cumulant_network = CumulantNetwork(cumulant_size=args.cumulant_map_size,)
     hangman_network = HangmanNetwork(gamma=args.gamma,
