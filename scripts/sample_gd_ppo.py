@@ -11,7 +11,7 @@ from pobax.algos.gd_ppo import GDPPO, GDTrainState, env_step
 from pobax.config import GDPPOHyperparams
 from pobax.envs import get_env
 from pobax.models import ScannedRNN
-from pobax.models.actor_critic import CumulantGammaNetwork, ActorCritic
+from pobax.models.actor_critic import CumulantGammaNetwork, GVFActorCritic
 
 
 def load_train_state(fpath: Path, key: chex.PRNGKey):
@@ -44,11 +44,11 @@ def load_train_state(fpath: Path, key: chex.PRNGKey):
         cumulant_size = args.hidden_size
 
 
-    network = ActorCritic(env.action_space(env_params),
-                          memoryless=args.memoryless,
-                          double_critic=args.double_critic,
-                          hidden_size=args.hidden_size,
-                          cumulant_size=cumulant_size)
+    network = GVFActorCritic(env.action_space(env_params),
+                             memoryless=args.memoryless,
+                             double_critic=args.double_critic,
+                             hidden_size=args.hidden_size,
+                             cumulant_size=cumulant_size)
 
     cumulant_gamma_network = CumulantGammaNetwork(cumulant_size=args.cumulant_map_size,
                                                   gamma=args.gamma,
