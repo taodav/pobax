@@ -195,59 +195,65 @@ if __name__ == "__main__":
     discounted = False
     hyperparam_type = 'per_env'  # (all_env | per_env)
 
-    # env_name = 'rocksample_11_11'
-    # super_dir = 'rocksample_11_11'
-    #
-    # # ylims = None
-    # ylims = (0, 40)  # for rocksample_11_11 hsize
-    #
-    # plot_name = f'{env_name}_{hyperparam_type}'
-    #
-    # # normal
-    # study_paths = [
-    #     ('RNN', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo'), 'purple'),
-    #     # ('Trace', Path(ROOT_DIR, 'results', 'trace_experiments', f'{env_name}_ppo_trace_memoryless'), 'blue'),
-    #     ('SF', Path(ROOT_DIR, 'results', 'sf_ppo_rr', f'{env_name}_sf_ppo_rr'), 'cyan'),
-    #     ('SF discrep', Path(ROOT_DIR, 'results', 'sf_ppo_rr', f'{env_name}_sf_ppo_rr_discrep'), 'yellow'),
-    #     # ('SF obs', Path(ROOT_DIR, 'results', f'{env_name}_ppo_gd_sf_obs'), 'blue'),
-    #     # ('SF obs discrep', Path(ROOT_DIR, 'results', 'gd_sf_obs_discrep', f'{env_name}_ppo_gd_sf_obs_discrep'), 'cyan'),
-    #     # ('SF encoded obs', Path(ROOT_DIR, 'results', 'gd_sf_enc_obs', f'{env_name}_ppo_gd_sf_enc_obs'), 'cyan'),
-    #     # ('SF encoded obs discrep', Path(ROOT_DIR, 'results', 'gd_sf_enc_obs', f'{env_name}_ppo_gd_sf_enc_obs_discrep'), 'yellow'),
-    #     # ('Hangman', Path(ROOT_DIR, 'results', 'gd_hangman', f'{env_name}_ppo_gd_hangman'), 'blue'),
-    #     # ('Hangman Discrep', Path(ROOT_DIR, 'results', 'gd_hangman_discrep', f'{env_name}_ppo_gd_hangman_discrep'), 'cyan'),
-    #     ('LD', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_LD'), 'blue'),
-    #     ('Memoryless', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_memoryless'), 'dark gray'),
-    #     ('STATE', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_perfect_memory_memoryless'), 'green'),
-    #     # ('TRANFORMER', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_transformer'), 'cyan'),
-    # ]
-
     env_name = 'rocksample_11_11'
-    sweep_var = 'random_rewards'
-    # nenvs = 128
-    # ylims = (0., 0.68)  # for navix_01 nenvs
-    # ylims = (50, 2500)  # for walker_v hsize
-    ylims = (0, 40)  # for rocksample_11_11 hsize
+    super_dir = 'rocksample_11_11'
+
     # ylims = None
+    ylims = (0, 40)  # for rocksample_11_11 hsize
 
-    plot_discrep = True
+    plot_name = f'{env_name}_{hyperparam_type}'
 
-    plot_discrep_str = '_discrep' if plot_discrep else ''
-    plot_name = f'{env_name}_{hyperparam_type}_{sweep_var}{plot_discrep_str}'
-
+    # normal
     study_paths = [
-        ('0 random rewards', Path(ROOT_DIR, 'results', 'sf_ppo_rr', f'{env_name}_sf_ppo_rr{plot_discrep_str}', f'rocksample_11_11_sf_ppo_rr{plot_discrep_str}_num_rr_0'), 'cyan'),
-        ('2 random rewards', Path(ROOT_DIR, 'results', 'sf_ppo_rr', f'{env_name}_sf_ppo_rr{plot_discrep_str}', f'rocksample_11_11_sf_ppo_rr{plot_discrep_str}_num_rr_2'), 'yellow'),
-        ('8 random rewards', Path(ROOT_DIR, 'results', 'sf_ppo_rr', f'{env_name}_sf_ppo_rr{plot_discrep_str}', f'rocksample_11_11_sf_ppo_rr{plot_discrep_str}_num_rr_8'), 'orange'),
+        ('RNN', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo'), 'purple'),
+        # ('Trace', Path(ROOT_DIR, 'results', 'trace_experiments', f'{env_name}_ppo_trace_memoryless'), 'blue'),
+        # ('SF', Path(ROOT_DIR, 'results', 'sf_ppo_rr', f'{env_name}_sf_ppo_rr'), 'cyan'),
         # ('SF discrep', Path(ROOT_DIR, 'results', 'sf_ppo_rr', f'{env_name}_sf_ppo_rr_discrep'), 'yellow'),
-        # ('RNN', Path(ROOT_DIR, 'results', f'{env_name}_{sweep_var}_sweep/{env_name}_ppo_{sweep_var}_sweep', f'{env_name}_ppo_{sweep_var}_sweep_{sweep_var}_{nenvs}'), 'purple'),
-        # ('RNN', Path(ROOT_DIR, 'results', f'entropy_sweep_{env_name}'), 'purple'),
-        # ('RNN + Two Heads', Path(ROOT_DIR, 'results', f'second_head_sweep_{env_name}'), 'cyan'),
-        # ('RNN + LD', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_LD'), 'blue'),
-        # ('RNN + LD exploration', Path(ROOT_DIR, 'results', f'ld_exploration_{env_name}'), 'blue'),
-        # ('Memoryless', Path(ROOT_DIR, 'results', f'{env_name}_{sweep_var}_sweep/{env_name}_ppo_memoryless_{sweep_var}_sweep', f'{env_name}_ppo_memoryless_{sweep_var}_sweep_{sweep_var}_{nenvs}'), 'dark gray'),
-        # ('STATE', Path(ROOT_DIR, 'results', f'{env_name}_{sweep_var}_sweep/{env_name}_ppo_perfect_memory_{sweep_var}_sweep', f'{env_name}_ppo_perfect_memory_{sweep_var}_sweep_{sweep_var}_{nenvs}'), 'green'),
+        # ('SF obs', Path(ROOT_DIR, 'results', f'{env_name}_ppo_gd_sf_obs'), 'blue'),
+        # ('SF obs discrep', Path(ROOT_DIR, 'results', 'gd_sf_obs_discrep', f'{env_name}_ppo_gd_sf_obs_discrep'), 'cyan'),
+        # ('SF raw hs', Path(ROOT_DIR, 'results', 'gd_sf_hs', f'{env_name}_ppo_gd_sf_hs'), 'cyan'),
+        # ('SF raw hs discrep', Path(ROOT_DIR, 'results', 'gd_sf_hs', f'{env_name}_ppo_gd_sf_hs_discrep'), 'yellow'),
+        ('SF raw hs diff', Path(ROOT_DIR, 'results', 'gd_sf_hs', f'{env_name}_ppo_gd_sf_hs_diff'), 'cyan'),
+        ('SF raw hs diff discrep', Path(ROOT_DIR, 'results', 'gd_sf_hs', f'{env_name}_ppo_gd_sf_hs_diff_discrep'), 'yellow'),
+        # ('SF obs diff', Path(ROOT_DIR, 'results', 'gd_sf_obs_diff', f'{env_name}_ppo_gd_sf_obs_diff'), 'cyan'),
+        # ('SF obs diff discrep', Path(ROOT_DIR, 'results', 'gd_sf_obs_diff', f'{env_name}_ppo_gd_sf_obs_diff_discrep'), 'yellow'),
+        # ('SF encoded obs', Path(ROOT_DIR, 'results', 'gd_sf_enc_obs', f'{env_name}_ppo_gd_sf_enc_obs'), 'cyan'),
+        # ('SF encoded obs discrep', Path(ROOT_DIR, 'results', 'gd_sf_enc_obs', f'{env_name}_ppo_gd_sf_enc_obs_discrep'), 'yellow'),
+        # ('Hangman', Path(ROOT_DIR, 'results', 'gd_hangman', f'{env_name}_ppo_gd_hangman'), 'blue'),
+        # ('Hangman Discrep', Path(ROOT_DIR, 'results', 'gd_hangman_discrep', f'{env_name}_ppo_gd_hangman_discrep'), 'cyan'),
+        ('LD', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_LD'), 'blue'),
+        ('Memoryless', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_memoryless'), 'dark gray'),
+        ('STATE', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_perfect_memory_memoryless'), 'green'),
         # ('TRANFORMER', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_transformer'), 'cyan'),
     ]
+
+    # env_name = 'rocksample_11_11'
+    # sweep_var = 'random_rewards'
+    # # nenvs = 128
+    # # ylims = (0., 0.68)  # for navix_01 nenvs
+    # # ylims = (50, 2500)  # for walker_v hsize
+    # ylims = (0, 40)  # for rocksample_11_11 hsize
+    # # ylims = None
+    #
+    # plot_discrep = True
+    #
+    # plot_discrep_str = '_discrep' if plot_discrep else ''
+    # plot_name = f'{env_name}_{hyperparam_type}_{sweep_var}{plot_discrep_str}'
+    #
+    # study_paths = [
+    #     ('0 random rewards', Path(ROOT_DIR, 'results', 'sf_ppo_rr', f'{env_name}_sf_ppo_rr{plot_discrep_str}', f'rocksample_11_11_sf_ppo_rr{plot_discrep_str}_num_rr_0'), 'cyan'),
+    #     ('2 random rewards', Path(ROOT_DIR, 'results', 'sf_ppo_rr', f'{env_name}_sf_ppo_rr{plot_discrep_str}', f'rocksample_11_11_sf_ppo_rr{plot_discrep_str}_num_rr_2'), 'yellow'),
+    #     ('8 random rewards', Path(ROOT_DIR, 'results', 'sf_ppo_rr', f'{env_name}_sf_ppo_rr{plot_discrep_str}', f'rocksample_11_11_sf_ppo_rr{plot_discrep_str}_num_rr_8'), 'orange'),
+    #     # ('SF discrep', Path(ROOT_DIR, 'results', 'sf_ppo_rr', f'{env_name}_sf_ppo_rr_discrep'), 'yellow'),
+    #     # ('RNN', Path(ROOT_DIR, 'results', f'{env_name}_{sweep_var}_sweep/{env_name}_ppo_{sweep_var}_sweep', f'{env_name}_ppo_{sweep_var}_sweep_{sweep_var}_{nenvs}'), 'purple'),
+    #     # ('RNN', Path(ROOT_DIR, 'results', f'entropy_sweep_{env_name}'), 'purple'),
+    #     # ('RNN + Two Heads', Path(ROOT_DIR, 'results', f'second_head_sweep_{env_name}'), 'cyan'),
+    #     # ('RNN + LD', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_LD'), 'blue'),
+    #     # ('RNN + LD exploration', Path(ROOT_DIR, 'results', f'ld_exploration_{env_name}'), 'blue'),
+    #     # ('Memoryless', Path(ROOT_DIR, 'results', f'{env_name}_{sweep_var}_sweep/{env_name}_ppo_memoryless_{sweep_var}_sweep', f'{env_name}_ppo_memoryless_{sweep_var}_sweep_{sweep_var}_{nenvs}'), 'dark gray'),
+    #     # ('STATE', Path(ROOT_DIR, 'results', f'{env_name}_{sweep_var}_sweep/{env_name}_ppo_perfect_memory_{sweep_var}_sweep', f'{env_name}_ppo_perfect_memory_{sweep_var}_sweep_{sweep_var}_{nenvs}'), 'green'),
+    #     # ('TRANFORMER', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_transformer'), 'cyan'),
+    # ]
 
     # best
     # study_paths = [
