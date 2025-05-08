@@ -318,7 +318,7 @@ class HangmanNetwork(nn.Module):
     def __call__(self, x):
         if len(x.shape) > 3:
             # If x is an image, flatten it
-            x = x.reshape((x.shape[:-3], -1))
+            x = x.reshape((*x.shape[:-3], -1))
 
         if self.gamma_type == 'nn_gamma_sigmoid':
             hangman = nn.Dense(features=1)(x)

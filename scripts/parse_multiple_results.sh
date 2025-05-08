@@ -1,4 +1,4 @@
-RESULTS_DIR='../results/sf_ppo_rr/rocksample_11_11_sf_ppo_rr'
+RESULTS_DIR='../results/gd_sf_hs'
 
 for item in $RESULTS_DIR/*/;
 do

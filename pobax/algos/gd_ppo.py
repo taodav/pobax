@@ -1,3 +1,4 @@
+from functools import reduce
 from typing import NamedTuple
 
 from collections import deque
@@ -184,9 +185,17 @@ def env_step(runner_state, unused, agent: GDPPO, env, env_params,
     elif cumulant_type == 'hs_diff':
         cumulant = (1 - done[..., None]) * hstate - last_hstate
     elif cumulant_type == 'obs':
-        cumulant = last_obs
+        if len(last_obs.shape[1:]) > 1:
+            cumulant = last_obs.reshape((last_obs.shape[0], -1))
+        else:
+            cumulant = last_obs
     elif cumulant_type == 'obs_diff':
-        cumulant = (1 - done[..., None]) * obsv - last_obs
+        if len(last_obs.shape[1:]) > 1:
+            flat_last_obs = last_obs.reshape((last_obs.shape[0], -1))
+            flat_obs = obsv.reshape((obsv.shape[0], -1))
+            cumulant = (1 - done[..., None]) * flat_obs - flat_last_obs
+        else:
+            cumulant = (1 - done[..., None]) * obsv - last_obs
     elif cumulant_type == 'enc_obs':
         cumulant = obs_encoding
 
@@ -271,8 +280,10 @@ def make_train(args: GDPPOHyperparams, rand_key: jax.random.PRNGKey):
         cumulant_size = args.cumulant_map_size + 1
     elif args.cumulant_type == 'obs' or args.cumulant_type == 'obs_diff':
         obs_shape = env.observation_space(env_params).shape
-        assert len(obs_shape) <= 1, 'no support for images for obs cumulant'
-        cumulant_size = obs_shape[0]
+        if len(obs_shape) > 1:
+            cumulant_size = reduce(lambda x, y: x * y, obs_shape)
+        else:
+            cumulant_size = obs_shape[0]
     elif args.cumulant_type == 'enc_obs':
         cumulant_size = args.hidden_size
 
