@@ -195,8 +195,8 @@ if __name__ == "__main__":
     discounted = True
     hyperparam_type = 'per_env'  # (all_env | per_env)
 
-    env_name = 'navix_01'
-    super_dir = 'navix_01'
+    env_name = 'navix_03'
+    super_dir = 'navix_03'
     best = True
     best_str = '_best' if best else ''
     super_dir += best_str
@@ -209,7 +209,8 @@ if __name__ == "__main__":
 
     # normal
     study_paths = [
-        ('RNN', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo{best_str}'), 'purple'),
+        # ('RNN', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo{best_str}'), 'purple'),
+
         # ('Trace', Path(ROOT_DIR, 'results', 'trace_experiments', f'{env_name}_ppo_trace_memoryless'), 'blue'),
         # ('SF', Path(ROOT_DIR, 'results', 'sf_ppo_rr', f'{env_name}_sf_ppo_rr'), 'cyan'),
         # ('SF discrep', Path(ROOT_DIR, 'results', 'sf_ppo_rr', f'{env_name}_sf_ppo_rr_discrep'), 'yellow'),
@@ -227,29 +228,28 @@ if __name__ == "__main__":
         # ('SF random proj hs diff', Path(ROOT_DIR, 'results', 'gd_sf_random_proj_hs', f'{env_name}_ppo_gd_sf_random_proj_hs_diff'), 'cyan'),
         # ('SF random proj hs diff discrep', Path(ROOT_DIR, 'results', 'gd_sf_random_proj_hs', f'{env_name}_ppo_gd_sf_random_proj_hs_diff_discrep'), 'yellow'),
 
-        ('SF random proj hs diff', Path(ROOT_DIR, 'results', 'gd_sf_random_proj_hs', env_name, f'{env_name}_gd_sf_ppo_random_proj_hs_diff'), 'cyan'),
-        ('SF random proj hs diff discrep', Path(ROOT_DIR, 'results', 'gd_sf_random_proj_hs', env_name, f'{env_name}_gd_sf_ppo_random_proj_hs_diff_discrep'), 'yellow'),
+        # ('SF random proj hs diff', Path(ROOT_DIR, 'results', 'gd_sf_random_proj_hs', env_name, f'{env_name}_gd_sf_ppo_random_proj_hs_diff'), 'cyan'),
+        # ('SF random proj hs diff discrep', Path(ROOT_DIR, 'results', 'gd_sf_random_proj_hs', env_name, f'{env_name}_gd_sf_ppo_random_proj_hs_diff_discrep'), 'yellow'),
 
         # ('SF random proj obs', Path(ROOT_DIR, 'results', 'gd_sf_random_proj_obs', f'{env_name}_ppo_gd_sf_random_proj_obs'), 'cyan'),
         # ('SF random proj obs discrep', Path(ROOT_DIR, 'results', 'gd_sf_random_proj_obs', f'{env_name}_ppo_gd_sf_random_proj_obs_discrep'), 'yellow'),
-        # ('SF random proj obs diff', Path(ROOT_DIR, 'results', 'gd_sf_random_proj_obs', f'{env_name}_ppo_gd_sf_random_proj_obs_diff'), 'cyan'),
-        # ('SF random proj obs diff discrep', Path(ROOT_DIR, 'results', 'gd_sf_random_proj_obs', f'{env_name}_ppo_gd_sf_random_proj_obs_diff_discrep'), 'yellow'),
+        # ('SF random proj obs diff', Path(ROOT_DIR, 'results', 'gd_sf_random_proj_obs', env_name, f'{env_name}_ppo_gd_sf_random_proj_obs_diff'), 'cyan'),
+        # ('SF random proj obs diff discrep', Path(ROOT_DIR, 'results', 'gd_sf_random_proj_obs', env_name, f'{env_name}_ppo_gd_sf_random_proj_obs_diff_discrep'), 'yellow'),
 
         # ('SF obs', Path(ROOT_DIR, 'results', f'{env_name}_ppo_gd_sf_obs'), 'blue'),
         # ('SF obs discrep', Path(ROOT_DIR, 'results', 'gd_sf_obs_discrep', f'{env_name}_ppo_gd_sf_obs_discrep'), 'cyan'),
-        # ('SF obs diff', Path(ROOT_DIR, 'results', 'gd_sf_obs_diff', env_name, f'{env_name}_gd_sf_ppo_obs_diff'), 'cyan'),
-        # ('SF obs diff discrep', Path(ROOT_DIR, 'results', 'gd_sf_obs_diff', env_name, f'{env_name}_gd_sf_ppo_obs_diff_discrep'), 'yellow'),
-
-        # ('SF obs diff', Path(ROOT_DIR, 'results', 'gd_sf_obs_diff', env_name, f'{env_name}_ppo_gd_sf_obs_diff'), 'cyan'),
-        # ('SF obs diff discrep', Path(ROOT_DIR, 'results', 'gd_sf_obs_diff', env_name, f'{env_name}_ppo_gd_sf_obs_diff_discrep'), 'yellow'),
+        ('SF obs diff', Path(ROOT_DIR, 'results', 'gd_sf_obs_diff', env_name, f'{env_name}_ppo_gd_sf_obs_diff'), 'cyan'),
+        ('SF obs diff discrep', Path(ROOT_DIR, 'results', 'gd_sf_obs_diff', env_name, f'{env_name}_ppo_gd_sf_obs_diff_discrep'), 'yellow'),
 
         # ('SF encoded obs', Path(ROOT_DIR, 'results', 'gd_sf_enc_obs', f'{env_name}_ppo_gd_sf_enc_obs'), 'cyan'),
         # ('SF encoded obs discrep', Path(ROOT_DIR, 'results', 'gd_sf_enc_obs', f'{env_name}_ppo_gd_sf_enc_obs_discrep'), 'yellow'),
         # ('Hangman', Path(ROOT_DIR, 'results', 'gd_hangman', f'{env_name}_ppo_gd_hangman'), 'blue'),
         # ('Hangman Discrep', Path(ROOT_DIR, 'results', 'gd_hangman_discrep', f'{env_name}_ppo_gd_hangman_discrep'), 'cyan'),
-        ('LD', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_LD{best_str}'), 'blue'),
-        ('Memoryless', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_memoryless{best_str}'), 'dark gray'),
-        ('STATE', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_perfect_memory_memoryless{best_str}'), 'green'),
+
+        # ('LD', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_LD{best_str}'), 'blue'),
+        # ('Memoryless', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_memoryless{best_str}'), 'dark gray'),
+        # ('STATE', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_perfect_memory_memoryless{best_str}'), 'green'),
+
         # ('TRANFORMER', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_transformer'), 'cyan'),
     ]
 

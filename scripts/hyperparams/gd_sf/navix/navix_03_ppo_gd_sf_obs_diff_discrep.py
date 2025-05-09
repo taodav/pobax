@@ -15,7 +15,7 @@ hparams = {
     'entry': '-m pobax.algos.gd_ppo',
     'args': [
         {
-            'env': 'Navix-DMLab-Maze-01-v0',
+            'env': 'Navix-DMLab-Maze-03-v0',
             'double_critic': True,
             'memoryless': False,
             'action_concat': True,
