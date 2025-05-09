@@ -241,7 +241,7 @@ class CumulantNetwork(nn.Module):
     def __call__(self, x):
         if len(x.shape) > 3:
             # If x is an image, flatten it
-            x = x.reshape((x.shape[:-3], -1))
+            x = x.reshape((*x.shape[:-3], -1))
 
         cumulant_mapped = nn.Dense(
             self.cumulant_size, kernel_init=sparse_orthogonal_random_projection(), use_bias=False
