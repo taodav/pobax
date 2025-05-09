@@ -11,7 +11,7 @@ ld_weights = [0]
 hparams = {
     'file_name':
         f'runs_{exp_name}.txt',
-    'entry': '-m pobax.algos.ppo',
+    'entry': '-m pobax.algos.gd_ppo',
     'args': [{
         'env': 'Walker-V-v0',
         'action_concat': True,
