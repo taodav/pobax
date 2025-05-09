@@ -25,14 +25,15 @@ class Actor(nn.Module):
             )(actor_mean)
             pi = distrax.Categorical(logits=actor_mean)
         elif isinstance(self.action_space, spaces.Box):
+            action_dim = self.action_space.shape[0]
             actor_mean = nn.Dense(
                 2 * self.hidden_size, kernel_init=orthogonal(jnp.sqrt(2)), bias_init=constant(0.0)
             )(x)
             actor_mean = nn.tanh(actor_mean)
             actor_mean = nn.Dense(
-                self.action_dim, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
+                action_dim, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
             )(actor_mean)
-            actor_logtstd = self.param("log_std", nn.initializers.zeros, (self.action_dim,))
+            actor_logtstd = self.param("log_std", nn.initializers.zeros, (action_dim,))
             pi = distrax.MultivariateNormalDiag(actor_mean, jnp.exp(actor_logtstd))
         else:
             raise NotImplementedError
