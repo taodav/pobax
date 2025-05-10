@@ -32,11 +32,13 @@ class QRPPO(PPO):
                  entropy_coeff: float = 0.01,
                  clip_eps: float = 0.2,
                  n_atoms: int = 51,
-                 kappa: float = 1.):
+                 kappa: float = 1.,
+                 quantile_entropy_coeff: float = 0.):
         super().__init__(network, double_critic, ld_weight, alpha, vf_coeff, entropy_coeff, clip_eps)
         self.n_atoms = n_atoms
         self.atoms = jnp.arange(self.n_atoms)
         self.kappa = kappa
+        self.quantile_entropy_coeff = quantile_entropy_coeff
 
     def loss(self, params, init_hstate, traj_batch, gae, targets):
         # RERUN NETWORK
@@ -80,10 +82,12 @@ class QRPPO(PPO):
         # Quantile lambda discrepancy loss.
         # the mean l2 distance between quantiles is the Wasserstein-2 distance, as per
         # https://stats.stackexchange.com/questions/465229/measuring-the-distance-between-two-probability-measures-using-quantile-functions
+        wasserstein_2_dist = 0
         if self.double_critic:
             wasserstein_2_dist = (jnp.square(quantiles[..., 0, :] - quantiles[..., 1, :])).mean()
-            value_loss = self.ld_weight * wasserstein_2_dist + \
-                         (1 - self.ld_weight) * value_loss
+
+        # Minimizing quantile entropy
+        quantile_entropy_loss = jnp.log(quantiles[..., 1:] - quantiles[..., :-1])
 
         # CALCULATE ACTOR LOSS
         ratio = jnp.exp(log_prob - traj_batch.log_prob)
@@ -109,6 +113,8 @@ class QRPPO(PPO):
         total_loss = (
                 loss_actor
                 + self.vf_coeff * value_loss
+                + self.ld_weight * wasserstein_2_dist
+                + self.quantile_entropy_coeff * quantile_entropy_loss
                 - self.entropy_coeff * entropy
         )
         return total_loss, (value_loss, loss_actor, entropy)

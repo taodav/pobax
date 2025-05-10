@@ -13,7 +13,6 @@ from pobax.models.distributional import QuantileV
 from pobax.models.network import SimpleNN, ScannedRNN, FullImageCNN
 
 
-<<<<<<< HEAD
 class Encoder(nn.Module):
     hidden_size: int = 128
 
@@ -136,7 +135,7 @@ class SFActorCritic(nn.Module):
         return hidden, pi, v, sf_embedding
 
 
-class ActorCritic(nn.Module):
+class GVFActorCritic(nn.Module):
     action_space: Union[spaces.Discrete, spaces.Box]
     hidden_size: int = 128
     cumulant_size: int = None

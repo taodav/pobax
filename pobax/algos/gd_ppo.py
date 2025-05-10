@@ -26,7 +26,7 @@ from pobax.envs import get_env
 from pobax.envs.wrappers.gymnax import LogEnvState
 from pobax.envs.jax.battleship import Battleship
 from pobax.models import ScannedRNN
-from pobax.models.actor_critic import CumulantNetwork, HangmanNetwork, ActorCritic, BattleShipActorCritic
+from pobax.models.actor_critic import CumulantNetwork, HangmanNetwork, GVFActorCritic, BattleShipActorCritic
 from pobax.utils.file_system import get_results_path, numpyify
 from pobax.utils.sweep import get_grid_hparams, get_randomly_sampled_hparams
 
@@ -265,7 +265,7 @@ def make_train(args: GDPPOHyperparams, rand_key: jax.random.PRNGKey):
                                         hidden_size=args.hidden_size,
                                         cumulant_size=cumulant_size)
     else:
-        network = ActorCritic(env.action_space(env_params),
+        network = GVFActorCritic(env.action_space(env_params),
                               memoryless=args.memoryless,
                               double_critic=args.double_critic,
                               hidden_size=args.hidden_size,

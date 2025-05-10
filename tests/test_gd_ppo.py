@@ -18,7 +18,7 @@ import numpy as np
 from pobax.algos.gd_ppo import GDPPO, GDPPOHyperparams, make_train, env_step
 from pobax.envs import get_env
 from pobax.models import ScannedRNN
-from pobax.models.actor_critic import CumulantNetwork, HangmanNetwork, ActorCritic
+from pobax.models.actor_critic import CumulantNetwork, HangmanNetwork, GVFActorCritic
 
 
 def load_vars(args: GDPPOHyperparams, rng: jax.random.PRNGKey):
@@ -48,7 +48,7 @@ def load_vars(args: GDPPOHyperparams, rng: jax.random.PRNGKey):
     elif args.cumulant_type == 'enc_obs':
         cumulant_size = args.hidden_size
 
-    network = ActorCritic(env.action_space(env_params),
+    network = GVFActorCritic(env.action_space(env_params),
                              memoryless=args.memoryless,
                              double_critic=args.double_critic,
                              hidden_size=args.hidden_size,
