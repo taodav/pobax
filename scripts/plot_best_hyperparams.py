@@ -192,18 +192,18 @@ def find_file_in_dir(file_name: str, base_dir: Path) -> Path:
 
 if __name__ == "__main__":
 
-    discounted = True
+    discounted = False
     hyperparam_type = 'per_env'  # (all_env | per_env)
 
-    env_name = 'navix_02'
-    super_dir = 'navix_02'
-    best = True
+    env_name = 'battleship_10'
+    super_dir = 'battleship'
+    best = False
     best_str = '_best' if best else ''
     super_dir += best_str
 
-    # ylims = None
+    ylims = None
     # ylims = (0, 40)  # for rocksample_11_11 hsize
-    ylims = (0, 1)  # for navix
+    # ylims = (0, 1)  # for navix
 
     plot_name = f'{env_name}_{hyperparam_type}'
 
@@ -242,8 +242,7 @@ if __name__ == "__main__":
         ('RNN', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo{best_str}'), 'purple'),
         ('LD', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_LD{best_str}'), 'blue'),
         ('Memoryless', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_memoryless{best_str}'), 'dark gray'),
-        ('STATE', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_perfect_memory_memoryless{best_str}'), 'green'),
-
+        # ('STATE', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_perfect_memory_memoryless{best_str}'), 'green'),
         # ('TRANFORMER', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_transformer'), 'cyan'),
     ]
 
