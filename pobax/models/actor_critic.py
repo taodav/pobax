@@ -1,6 +1,6 @@
-import math
 from typing import Union, Any
 
+import distrax
 import flax.linen as nn
 import jax.lax
 from gymnax.environments import spaces
@@ -168,6 +168,81 @@ class ActorCritic(nn.Module):
 
         actor = Actor(self.action_space, hidden_size=self.hidden_size)
         pi = actor(embedding)
+
+        critic = Critic(hidden_size=self.hidden_size)
+
+        # GVF prediction
+        gvf_critic = None
+        if self.cumulant_size is not None:
+            gvf_critic = GVF(hidden_size=self.hidden_size, out_size=self.cumulant_size)
+            if self.double_critic:
+                gvf_critic = nn.vmap(GVF,
+                                     variable_axes={'params': 0},
+                                     split_rngs={'params': True},
+                                     in_axes=None,
+                                     out_axes=2,
+                                     axis_size=2)(hidden_size=self.hidden_size, out_size=self.cumulant_size)
+
+        v = jnp.squeeze(critic(embedding), axis=-1)
+
+        gvf_prediction = None
+        if gvf_critic is not None:
+            gvf_prediction = gvf_critic(embedding)
+
+        return hidden, pi, v, gvf_prediction, obs_encoding
+
+
+class BattleShipActorCritic(nn.Module):
+    action_space: Union[spaces.Discrete, spaces.Box]
+    hidden_size: int = 128
+    cumulant_size: int = None
+    memoryless: bool = False
+    double_critic: bool = False
+
+    @nn.compact
+    def __call__(self, hidden, x):
+        obs, dones = x
+        action_dim = self.action_space.n
+
+        if len(obs.shape) > 3:
+            valid_action_mask = (obs == 0).reshape(*obs.shape[:-2], -1)
+            obs_encoding = FullImageCNN(hidden_size=self.hidden_size)(obs)
+            obs_encoding = nn.LayerNorm()(obs_encoding)
+            embedding = nn.relu(obs_encoding)
+        else:
+            hit = obs[..., 0:1]
+            valid_action_mask = obs[..., 1:action_dim + 1]
+            obs = jnp.concatenate([hit, obs[..., action_dim + 1:]], axis=-1)
+
+            obs_encoding = nn.Dense(
+                self.hidden_size, kernel_init=orthogonal(jnp.sqrt(2)), bias_init=constant(0.0)
+            )(obs)
+            obs_encoding = nn.relu(obs_encoding)
+            obs_encoding = nn.Dense(
+                self.hidden_size, kernel_init=orthogonal(jnp.sqrt(2)), bias_init=constant(0.0)
+            )(obs_encoding)
+            obs_encoding = nn.LayerNorm()(obs_encoding)
+            embedding = nn.relu(obs_encoding)
+
+        if self.memoryless:
+            embedding = SimpleNN(hidden_size=self.hidden_size)(embedding)
+        else:
+            rnn_in = (embedding, dones)
+            hidden, embedding = ScannedRNN(hidden_size=self.hidden_size)(hidden, rnn_in)
+
+        # MLP actor
+        actor_mean = nn.Dense(self.hidden_size, kernel_init=orthogonal(2), bias_init=constant(0.0))(
+            embedding
+        )
+        actor_mean = nn.relu(actor_mean)
+        actor_mean = nn.Dense(
+            action_dim, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
+        )(actor_mean)
+
+        # Do masking here for invalid actions.
+        actor_mean = actor_mean * valid_action_mask + (1 - valid_action_mask) * (-1e6)
+
+        pi = distrax.Categorical(logits=actor_mean)
 
         critic = Critic(hidden_size=self.hidden_size)
 
