@@ -16,7 +16,6 @@ from pobax.models.network import SimpleNN, ScannedRNN, FullImageCNN
 from pobax.models.embedding import CNN
 
 
-<<<<<<< HEAD
 class Encoder(nn.Module):
     hidden_size: int = 128
 
@@ -422,7 +421,7 @@ class RandomRewardNetwork(nn.Module):
         return rewards
 
 
-class ActorCritic(nn.Module):
+class QuantileActorCritic(nn.Module):
     action_space: Union[spaces.Discrete, spaces.Box]
     hidden_size: int = 128
     memoryless: bool = False
