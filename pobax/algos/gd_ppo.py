@@ -24,8 +24,9 @@ from pobax.algos.ppo import PPO
 from pobax.config import GDPPOHyperparams
 from pobax.envs import get_env
 from pobax.envs.wrappers.gymnax import LogEnvState
+from pobax.envs.jax.battleship import Battleship
 from pobax.models import ScannedRNN
-from pobax.models.actor_critic import CumulantNetwork, HangmanNetwork, ActorCritic
+from pobax.models.actor_critic import CumulantNetwork, HangmanNetwork, ActorCritic, BattleShipActorCritic
 from pobax.utils.file_system import get_results_path, numpyify
 
 
@@ -287,11 +288,18 @@ def make_train(args: GDPPOHyperparams, rand_key: jax.random.PRNGKey):
     elif args.cumulant_type == 'enc_obs':
         cumulant_size = args.hidden_size
 
-    network = ActorCritic(env.action_space(env_params),
-                          memoryless=args.memoryless,
-                          double_critic=args.double_critic,
-                          hidden_size=args.hidden_size,
-                          cumulant_size=cumulant_size)
+    if isinstance(env, Battleship) or ((hasattr(env, '_unwrapped') and isinstance(env._unwrapped, Battleship))):
+        network = BattleShipActorCritic(env.action_space(env_params),
+                                        memoryless=args.memoryless,
+                                        double_critic=args.double_critic,
+                                        hidden_size=args.hidden_size,
+                                        cumulant_size=cumulant_size)
+    else:
+        network = ActorCritic(env.action_space(env_params),
+                              memoryless=args.memoryless,
+                              double_critic=args.double_critic,
+                              hidden_size=args.hidden_size,
+                              cumulant_size=cumulant_size)
 
     cumulant_network = CumulantNetwork(cumulant_size=args.cumulant_map_size,)
     hangman_network = HangmanNetwork(gamma=args.gamma,

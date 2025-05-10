@@ -1,4 +1,4 @@
-RESULTS_DIR='../results/gd_sf_obs_diff/navix_03'
+RESULTS_DIR='../results/gd_sf_random_proj_obs/navix_02'
 
 for item in $RESULTS_DIR/*/;
 do
