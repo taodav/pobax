@@ -155,9 +155,14 @@ class GDPPO(PPO):
         return total_loss, (value_loss, loss_actor, entropy)
 
 
-def env_step(runner_state, unused, agent: GDPPO, env, env_params,
-             cumulant_type: str = None):
-    train_state, env_state, last_obs, last_done, last_hstate, rng = runner_state
+def env_step(runner_state, unused,
+             agent: GDPPO, env, env_params,
+             cumulant_type: str = None,
+             add_reward_to_cumulant: bool = False,
+             scale_cumulant: bool = False,
+             gamma: float = 1.
+             ):
+    train_state, env_state, last_obs, last_done, last_hstate, last_reward, rng = runner_state
     rng, _rng = jax.random.split(rng)
 
     # gamma_offset is between -1 and 1
@@ -200,11 +205,17 @@ def env_step(runner_state, unused, agent: GDPPO, env, env_params,
     elif cumulant_type == 'enc_obs':
         cumulant = obs_encoding
 
+    if scale_cumulant:
+        cumulant = (1 - gamma) * cumulant
+
+    if add_reward_to_cumulant:
+        cumulant = jnp.concatenate([cumulant, last_reward[..., None]], axis=-1)
+
     transition = Transition(
         last_done, hangman, action, value, cumulant_value, reward, log_prob, cumulant, last_obs, info
     )
 
-    runner_state = (train_state, env_state, obsv, done, hstate, rng)
+    runner_state = (train_state, env_state, obsv, done, hstate, reward, rng)
     return runner_state, transition
 
 
@@ -288,6 +299,9 @@ def make_train(args: GDPPOHyperparams, rand_key: jax.random.PRNGKey):
     elif args.cumulant_type == 'enc_obs':
         cumulant_size = args.hidden_size
 
+    if args.add_reward_to_cumulant:
+        cumulant_size += 1
+
     if isinstance(env, Battleship) or ((hasattr(env, '_unwrapped') and isinstance(env._unwrapped, Battleship))):
         network = BattleShipActorCritic(env.action_space(env_params),
                                         memoryless=args.memoryless,
@@ -337,7 +351,11 @@ def make_train(args: GDPPOHyperparams, rand_key: jax.random.PRNGKey):
                       cumulant_loss_weight=args.cumulant_loss_weight)
 
         # initialize functions
-        _env_step = partial(env_step, agent=agent, env=env, env_params=env_params, cumulant_type=args.cumulant_type)
+        _env_step = partial(env_step, agent=agent, env=env, env_params=env_params,
+                            cumulant_type=args.cumulant_type,
+                            add_reward_to_cumulant=args.add_reward_to_cumulant,
+                            scale_cumulant=args.scale_cumulant,
+                            gamma=args.gamma)
 
         gae_lambda = jnp.array(lambda0)
         # if args.double_critic:
@@ -408,6 +426,7 @@ def make_train(args: GDPPOHyperparams, rand_key: jax.random.PRNGKey):
                 init_obsv,
                 jnp.zeros(args.num_envs, dtype=bool),
                 init_init_hstate,
+                jnp.zeros(args.num_envs, dtype=float),
                 _rng,
             )
 
@@ -428,13 +447,13 @@ def make_train(args: GDPPOHyperparams, rand_key: jax.random.PRNGKey):
         # TRAIN LOOP
         def _update_step(runner_state, i):
             # COLLECT TRAJECTORIES
-            initial_hstate = runner_state[-2]
+            initial_hstate = runner_state[4]
             runner_state, traj_batch = jax.lax.scan(
                 _env_step, runner_state, jnp.arange(args.num_steps), args.num_steps
             )
 
             # CALCULATE ADVANTAGE
-            train_state, env_state, last_obs, last_done, hstate, rng = runner_state
+            train_state, env_state, last_obs, last_done, hstate, last_reward, rng = runner_state
             ac_in = (last_obs[np.newaxis, :], last_done[np.newaxis, :])
             _, _, last_val, last_cumulant_val, _ = network.apply(train_state.params, hstate, ac_in)
             next_vals = jnp.concatenate((traj_batch.value[1:], last_val), axis=0)
@@ -550,7 +569,7 @@ def make_train(args: GDPPOHyperparams, rand_key: jax.random.PRNGKey):
 
                 jax.debug.callback(callback, metric)
 
-            runner_state = (train_state, env_state, last_obs, last_done, hstate, rng)
+            runner_state = (train_state, env_state, last_obs, last_done, hstate, last_reward, rng)
 
             return runner_state, metric
 
@@ -559,8 +578,9 @@ def make_train(args: GDPPOHyperparams, rand_key: jax.random.PRNGKey):
             train_state,
             env_state,
             obsv,
-            jnp.zeros((args.num_envs), dtype=bool),
+            jnp.zeros(args.num_envs, dtype=bool),
             init_hstate,
+            jnp.zeros(args.num_envs, dtype=float),
             _rng,
         )
 
@@ -587,8 +607,9 @@ def make_train(args: GDPPOHyperparams, rand_key: jax.random.PRNGKey):
             final_train_state,
             eval_env_state,
             eval_obsv,
-            jnp.zeros((args.num_envs), dtype=bool),
+            jnp.zeros(args.num_envs, dtype=bool),
             eval_init_hstate,
+            jnp.zeros(args.num_envs, dtype=float),
             _rng,
         )
 

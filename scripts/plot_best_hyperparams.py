@@ -146,7 +146,7 @@ def plot_reses(all_reses: list[tuple], n_rows: int = 2,
             ax.spines[['right', 'top']].set_visible(False)
 
     # Customize legend to use square markers
-    legend = plt.legend(loc='upper left')
+    # legend = plt.legend(loc='upper left')
 
     # # Change line in legend to square
     # for line in legend.get_lines():
@@ -216,8 +216,8 @@ if __name__ == "__main__":
 
         # ('SF raw hs', Path(ROOT_DIR, 'results', 'gd_sf_hs', f'{env_name}_ppo_gd_sf_hs'), 'cyan'),
         # ('SF raw hs discrep', Path(ROOT_DIR, 'results', 'gd_sf_hs', f'{env_name}_ppo_gd_sf_hs_discrep'), 'yellow'),
-        ('SF raw hs diff', Path(ROOT_DIR, 'results', 'gd_sf_hs', env_name, f'{env_name}_ppo_gd_sf_hs_diff'), 'cyan'),
-        ('SF raw hs diff discrep', Path(ROOT_DIR, 'results', 'gd_sf_hs', env_name, f'{env_name}_ppo_gd_sf_hs_diff_discrep'), 'yellow'),
+        # ('SF raw hs diff', Path(ROOT_DIR, 'results', 'gd_sf_hs', env_name, f'{env_name}_ppo_gd_sf_hs_diff'), 'cyan'),
+        # ('SF raw hs diff discrep', Path(ROOT_DIR, 'results', 'gd_sf_hs', env_name, f'{env_name}_ppo_gd_sf_hs_diff_discrep'), 'yellow'),
 
         # ('SF random proj hs', Path(ROOT_DIR, 'results', 'gd_sf_random_proj_hs', f'{env_name}_ppo_gd_sf_random_proj_hs'), 'cyan'),
         # ('SF random proj hs discrep', Path(ROOT_DIR, 'results', 'gd_sf_random_proj_hs', f'{env_name}_ppo_gd_sf_random_proj_hs_discrep'), 'yellow'),
@@ -226,8 +226,8 @@ if __name__ == "__main__":
 
         # ('SF random proj obs', Path(ROOT_DIR, 'results', 'gd_sf_random_proj_obs', f'{env_name}_ppo_gd_sf_random_proj_obs'), 'cyan'),
         # ('SF random proj obs discrep', Path(ROOT_DIR, 'results', 'gd_sf_random_proj_obs', f'{env_name}_ppo_gd_sf_random_proj_obs_discrep'), 'yellow'),
-        # ('SF random proj obs diff', Path(ROOT_DIR, 'results', 'gd_sf_random_proj_obs', env_name, f'{env_name}_ppo_gd_sf_random_proj_obs_diff'), 'cyan'),
-        # ('SF random proj obs diff discrep', Path(ROOT_DIR, 'results', 'gd_sf_random_proj_obs', env_name, f'{env_name}_ppo_gd_sf_random_proj_obs_diff_discrep'), 'yellow'),
+        ('SF random proj obs diff', Path(ROOT_DIR, 'results', 'gd_sf_random_proj_obs', env_name, f'{env_name}_ppo_gd_sf_random_proj_obs_diff'), 'cyan'),
+        ('SF random proj obs diff discrep', Path(ROOT_DIR, 'results', 'gd_sf_random_proj_obs', env_name, f'{env_name}_ppo_gd_sf_random_proj_obs_diff_discrep'), 'yellow'),
 
         # ('SF obs', Path(ROOT_DIR, 'results', f'{env_name}_ppo_gd_sf_obs'), 'blue'),
         # ('SF obs discrep', Path(ROOT_DIR, 'results', 'gd_sf_obs_discrep', f'{env_name}_ppo_gd_sf_obs_discrep'), 'cyan'),
