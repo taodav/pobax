@@ -228,7 +228,7 @@ class Battleship(Environment):
         return (
             lax.stop_gradient(new_obs),
             lax.stop_gradient(new_state),
-            reward,
+            reward.astype(float),
             done,
             {}
         )
