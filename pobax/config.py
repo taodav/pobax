@@ -90,7 +90,7 @@ class PPOHyperparams(Tap):
 
 class GDPPOHyperparams(PPOHyperparams):
     cumulant_map_size: int = 32
-    cumulant_type: str = None  # hs | rew | obs | obs_enc
+    cumulant_type: str = None  # hs | rew | obs
     cumulant_transform: str = None  # None | random_proj
     cumulant_diff: bool = False
     scale_cumulant: bool = False
