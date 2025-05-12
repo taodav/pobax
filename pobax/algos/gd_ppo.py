@@ -157,11 +157,7 @@ class GDPPO(PPO):
 
 def env_step(runner_state, unused,
              agent: GDPPO, env, env_params,
-             cumulant_type: str = None,
-             add_reward_to_cumulant: bool = False,
-             scale_cumulant: bool = False,
-             gamma: float = 1.
-             ):
+             args: GDPPOHyperparams):
     train_state, env_state, last_obs, last_done, last_hstate, last_reward, rng = runner_state
     rng, _rng = jax.random.split(rng)
 
@@ -205,10 +201,10 @@ def env_step(runner_state, unused,
     elif cumulant_type == 'enc_obs':
         cumulant = obs_encoding
 
-    if scale_cumulant:
-        cumulant = (1 - gamma) * cumulant
+    if args.scale_cumulant:
+        cumulant = (1 - args.gamma) * cumulant
 
-    if add_reward_to_cumulant:
+    if args.add_reward_to_cumulant:
         cumulant = jnp.concatenate([cumulant, last_reward[..., None]], axis=-1)
 
     transition = Transition(
@@ -280,24 +276,23 @@ def make_train(args: GDPPOHyperparams, rand_key: jax.random.PRNGKey):
     assert hasattr(env_params, 'max_steps_in_episode')
 
     cumulant_size = None
-    if args.cumulant_type in ['random_proj_hs', 'random_proj_hs_diff', 'random_proj_obs', 'random_proj_obs_diff']:
+    if args.cumulant_transform == 'random_proj':
         # randomly projected hidden state
         cumulant_size = args.cumulant_map_size
-    elif args.cumulant_type == 'rew':
-        cumulant_size = 1
-    elif args.cumulant_type == 'hs' or args.cumulant_type == 'hs_diff':
-        # Raw hidden state and raw hs difference
-        cumulant_size = args.hidden_size
-    elif args.cumulant_type == 'hs_rew':
-        cumulant_size = args.cumulant_map_size + 1
-    elif args.cumulant_type == 'obs' or args.cumulant_type == 'obs_diff':
-        obs_shape = env.observation_space(env_params).shape
-        if len(obs_shape) > 1:
-            cumulant_size = reduce(lambda x, y: x * y, obs_shape)
-        else:
-            cumulant_size = obs_shape[0]
-    elif args.cumulant_type == 'enc_obs':
-        cumulant_size = args.hidden_size
+    else:
+        if args.cumulant_type == 'rew':
+            cumulant_size = 1
+        elif args.cumulant_type == 'hs':
+            # Raw hidden state and raw hs difference
+            cumulant_size = args.hidden_size
+        elif args.cumulant_type == 'obs':
+            obs_shape = env.observation_space(env_params).shape
+            if len(obs_shape) > 1:
+                cumulant_size = reduce(lambda x, y: x * y, obs_shape)
+            else:
+                cumulant_size = obs_shape[0]
+        elif args.cumulant_type == 'enc_obs':
+            cumulant_size = args.hidden_size
 
     if args.add_reward_to_cumulant:
         cumulant_size += 1
