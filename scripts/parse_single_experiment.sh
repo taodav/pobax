@@ -1,4 +1,4 @@
-RESULTS_DIR='../results/gd_sf_obs_diff/navix_03/navix_03_ppo_gd_sf_obs_diff_discrep'
+RESULTS_DIR='../results/gd_sf_obs_diff/walker_v/walker_v_ppo_gd_sf_random_proj_obs_diff_discrep'
 
 printf "\n"
 echo "Parsing $RESULTS_DIR"
