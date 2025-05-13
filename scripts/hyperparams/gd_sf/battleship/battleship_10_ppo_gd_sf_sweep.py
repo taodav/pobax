@@ -25,7 +25,7 @@ hparams = {
             'hidden_size': 512,
             'cumulant_type': ['hs', 'obs'],
             'cumulant_transform': [None, 'random_proj'],
-            'cumulant_loss_weight': 0.25,
+            'cumulant_loss_weight': 0.5,
             'add_reward_to_cumulant': True,
             'num_envs': 32,
             'entropy_coeff': 0.05,

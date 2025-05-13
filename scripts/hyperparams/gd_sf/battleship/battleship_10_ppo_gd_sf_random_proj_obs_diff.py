@@ -24,7 +24,7 @@ hparams = {
             'ld_weight': ' '.join(map(str, ld_weights)),
             'hidden_size': 512,
             'cumulant_type': 'random_proj_obs_diff',
-            'cumulant_loss_weight': 0.25,
+            'cumulant_loss_weight': 0.5,
             'num_envs': 32,
             'entropy_coeff': 0.05,
             'steps_log_freq': 8,
