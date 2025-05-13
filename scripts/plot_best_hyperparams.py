@@ -192,12 +192,12 @@ def find_file_in_dir(file_name: str, base_dir: Path) -> Path:
 
 if __name__ == "__main__":
 
-    discounted = True
+    discounted = False
     hyperparam_type = 'per_env'  # (all_env | per_env)
 
-    env_name = 'navix_01'
-    super_dir = 'navix_01'
-    best = True
+    env_name = 'battleship_10'
+    super_dir = 'battleship'
+    best = False
     best_str = '_best' if best else ''
     super_dir += best_str
 
@@ -216,11 +216,8 @@ if __name__ == "__main__":
 
         # ('SF raw hs', Path(ROOT_DIR, 'results', 'gd_sf_hs', f'{env_name}_ppo_gd_sf_hs'), 'cyan'),
         # ('SF raw hs discrep', Path(ROOT_DIR, 'results', 'gd_sf_hs', f'{env_name}_ppo_gd_sf_hs_discrep'), 'yellow'),
-        # ('SF raw hs diff', Path(ROOT_DIR, 'results', 'gd_sf_hs', env_name, f'{env_name}_ppo_gd_sf_hs_diff'), 'cyan'),
-        # ('SF raw hs diff discrep', Path(ROOT_DIR, 'results', 'gd_sf_hs', env_name, f'{env_name}_ppo_gd_sf_hs_diff_discrep'), 'yellow'),
-
-        # ('SF scaled hs', Path(ROOT_DIR, 'results', 'gd_sf_scale_hs', env_name, f'{env_name}_ppo_gd_sf_scale_hs'), 'cyan'),
-        # ('SF scaled hs discrep', Path(ROOT_DIR, 'results', 'gd_sf_scale_hs', env_name, f'{env_name}_ppo_gd_sf_scale_hs_discrep'), 'yellow'),
+        ('SF raw hs diff', Path(ROOT_DIR, 'results', 'gd_sf_hs', env_name, f'{env_name}_ppo_gd_sf_hs_diff'), 'cyan'),
+        ('SF raw hs diff discrep', Path(ROOT_DIR, 'results', 'gd_sf_hs', env_name, f'{env_name}_ppo_gd_sf_hs_diff_discrep'), 'yellow'),
 
         # ('SF random proj hs', Path(ROOT_DIR, 'results', 'gd_sf_random_proj_hs', f'{env_name}_ppo_gd_sf_random_proj_hs'), 'cyan'),
         # ('SF random proj hs discrep', Path(ROOT_DIR, 'results', 'gd_sf_random_proj_hs', f'{env_name}_ppo_gd_sf_random_proj_hs_discrep'), 'yellow'),
@@ -237,9 +234,6 @@ if __name__ == "__main__":
         # ('SF obs diff', Path(ROOT_DIR, 'results', 'gd_sf_obs_diff', env_name, f'{env_name}_ppo_gd_sf_obs_diff'), 'cyan'),
         # ('SF obs diff discrep', Path(ROOT_DIR, 'results', 'gd_sf_obs_diff', env_name, f'{env_name}_ppo_gd_sf_obs_diff_discrep'), 'yellow'),
 
-        ('SF scale obs', Path(ROOT_DIR, 'results', 'gd_sf_scale_obs', env_name, f'{env_name}_ppo_gd_sf_scale_obs'), 'cyan'),
-        ('SF scale obs discrep', Path(ROOT_DIR, 'results', 'gd_sf_scale_obs', env_name, f'{env_name}_ppo_gd_sf_scale_obs_discrep'), 'yellow'),
-
         # ('SF encoded obs', Path(ROOT_DIR, 'results', 'gd_sf_enc_obs', f'{env_name}_ppo_gd_sf_enc_obs'), 'cyan'),
         # ('SF encoded obs discrep', Path(ROOT_DIR, 'results', 'gd_sf_enc_obs', f'{env_name}_ppo_gd_sf_enc_obs_discrep'), 'yellow'),
         # ('Hangman', Path(ROOT_DIR, 'results', 'gd_hangman', f'{env_name}_ppo_gd_hangman'), 'blue'),
@@ -248,7 +242,7 @@ if __name__ == "__main__":
         ('RNN', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo{best_str}'), 'purple'),
         ('LD', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_LD{best_str}'), 'blue'),
         ('Memoryless', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_memoryless{best_str}'), 'dark gray'),
-        ('STATE', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_perfect_memory_memoryless{best_str}'), 'green'),
+        # ('STATE', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_perfect_memory_memoryless{best_str}'), 'green'),
         # ('TRANFORMER', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_transformer'), 'cyan'),
     ]
 
