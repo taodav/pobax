@@ -27,7 +27,7 @@ hparams = {
             'hidden_size': 256,
             'num_envs': 8,
             'cumulant_type': 'random_proj_obs_diff',
-            'cumulant_loss_weight': 0.25,
+            'cumulant_loss_weight': 0.5,
             'entropy_coeff': 0.2,
             'steps_log_freq': 4,
             'update_log_freq': 5,

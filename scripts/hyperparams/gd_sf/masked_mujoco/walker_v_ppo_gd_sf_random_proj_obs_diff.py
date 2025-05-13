@@ -22,7 +22,7 @@ hparams = {
         'alpha': ' '.join(map(str, alphas)),
         'hidden_size': 256,
         'cumulant_type': 'random_proj_obs_diff',
-        'cumulant_loss_weight': 0.25,
+        'cumulant_loss_weight': 0.5,
         'steps_log_freq': 16,
         'update_log_freq': 20,
         'total_steps': int(5e7),

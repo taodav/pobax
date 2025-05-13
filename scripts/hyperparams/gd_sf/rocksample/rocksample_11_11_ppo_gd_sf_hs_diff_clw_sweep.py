@@ -2,11 +2,11 @@ from pathlib import Path
 
 exp_name = Path(__file__).stem
 
-lrs = [2.5e-3, 2.5e-4, 2.5e-5]
-lambda0s = [0.1, 0.95]
-lambda1s = [0.5, 0.7, 0.95]
+lrs = [2.5e-3, 2.5e-4, 2.5e-5, 2.5e-6]  # Learning rates
+lambda0s = [0.1, 0.3, 0.5, 0.7, 0.95]
+lambda1s = [0.95]
 alphas = [1]
-ld_weights = [0., 0.25, 0.5]
+ld_weights = [0.]
 vf_coeffs = [0.5]  # Value function coefficients
 
 hparams = {
@@ -15,28 +15,26 @@ hparams = {
     'entry': '-m pobax.algos.gd_ppo',
     'args': [
         {
-            'env': 'Navix-DMLab-Maze-02-v0',
-            'double_critic': True,
-            'memoryless': False,
+            'env': 'rocksample_11_11',
+            'double_critic': False,
             'action_concat': True,
-            'lr': lrs,
-            'anneal_lr': True,
-            'hidden_size': 512,
+            'reward_concat': False,
+            'lr': ' '.join(map(str, lrs)),
             'lambda0': ' '.join(map(str, lambda0s)),
             'lambda1': lambda1s,
             'alpha': ' '.join(map(str, alphas)),
             'ld_weight': ld_weights,
-            'entropy_coeff': 0.02,
-            'num_steps': 128,
-            'num_envs': 64,
+            'hidden_size': 256,
+            'num_envs': 8,
             'cumulant_type': 'hs',
-            'cumulant_loss_weight': 0.5,
+            'cumulant_loss_weight': [0.1, 0.25, 0.5, 0.75, 1.],
             'cumulant_diff': True,
             'add_reward_to_cumulant': True,
-            'steps_log_freq': 8,
-            'update_log_freq': 10,
-            'total_steps': int(1e8),
-            'seed': 2025,
+            'entropy_coeff': 0.2,
+            'steps_log_freq': 4,
+            'update_log_freq': 5,
+            'total_steps': int(5e6),
+            'seed': 2024,
             'n_seeds': 5,
             'platform': 'gpu',
             'study_name': exp_name

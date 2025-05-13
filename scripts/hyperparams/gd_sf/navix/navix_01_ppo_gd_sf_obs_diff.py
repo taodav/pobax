@@ -29,7 +29,7 @@ hparams = {
             'num_steps': 128,
             'num_envs': 32,
             'cumulant_type': 'obs_diff',
-            'cumulant_loss_weight': 0.25,
+            'cumulant_loss_weight': 0.5,
             'steps_log_freq': 8,
             'update_log_freq': 5,
             'total_steps': int(1e7),

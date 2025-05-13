@@ -24,7 +24,7 @@ hparams = {
             'ld_weight': ' '.join(map(str, ld_weights)),
             'hidden_size': 512,
             'cumulant_type': 'hs',
-            'cumulant_loss_weight': 0.25,
+            'cumulant_loss_weight': 0.5,
             'scale_cumulant': True,
             'add_reward_to_cumulant': True,
             'num_envs': 32,
