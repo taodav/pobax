@@ -164,12 +164,9 @@ def make_train(args: QRPPOHyperparams, rand_key: jax.random.PRNGKey):
                                   out_axes=2)
 
     def train(vf_coeff, ld_weight, alpha, lambda1, lambda0, lr, rng):
-        if isinstance(args, QRPPOHyperparams):
-            agent = QRPPO(network, double_critic=double_critic, ld_weight=ld_weight, alpha=alpha, vf_coeff=vf_coeff,
-                          clip_eps=args.clip_eps, entropy_coeff=args.entropy_coeff)
-        else:
-            agent = PPO(network, double_critic=double_critic, ld_weight=ld_weight, alpha=alpha, vf_coeff=vf_coeff,
-                        clip_eps=args.clip_eps, entropy_coeff=args.entropy_coeff)
+        agent = QRPPO(network, double_critic=double_critic, ld_weight=ld_weight, alpha=alpha, vf_coeff=vf_coeff,
+                      clip_eps=args.clip_eps, entropy_coeff=args.entropy_coeff,
+                      quantile_entropy_coeff=args.quantile_entropy_coeff)
 
         # initialize functions
         _env_step = partial(env_step, agent=agent, env=env, env_params=env_params)

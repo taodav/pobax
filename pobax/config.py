@@ -98,9 +98,11 @@ class SFPPOHyperparams(PPOHyperparams):
     discrep_over: str = 'sf'  # (sf | val) what do we take our discrepancy over?
     n_random_rewards: int = 0
 
+
 class QRPPOHyperparams(PPOHyperparams):
     n_atoms: int = 51
     kappa: float = 1.
+    quantile_entropy_coeff: float = 0.
 
 
 class DQNHyperparams(Tap):
