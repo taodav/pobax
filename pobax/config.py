@@ -44,17 +44,15 @@ class PPOHyperparams(Tap):
     lr: list[float] = [2.5e-4]  # Learning rate
     lambda0: list[float] = [0.95]  # GAE lambda_0
     lambda1: list[float] = [0.5]  # GAE lambda_1
-    alpha: list[float] = [1.]  # adv = alpha * adv_lambda_0 + (1 - alpha) * adv_lambda_1
-    ld_weight: list[float] = [0.0]  # How much to we weight the LD loss? only applies when double_critic is True.
-    vf_coeff: list[float] = [0.5]  # How much do we weight value loss?
+    ld_weight: list[float] = [0.0]  # how much to we weight the LD loss vs. value loss? only applies when optimize LD is True.
+    vf_coeff: list[float] = [0.5]
+    entropy_coeff: list[float] = [0.01]
 
     use_trace_features: bool = False
     trace_lambdas: str = '0. 0.5 0.7 0.9 0.95'
     hidden_size: int = 128
     total_steps: int = int(1.5e6)
-    entropy_coeff: float = 0.01
     ld_exploration_bonus_scale: float = 0.
-    cumulant_loss_weight: float = 0.5
     clip_eps: float = 0.2
     max_grad_norm: float = 0.5
     anneal_lr: bool = True
@@ -66,6 +64,8 @@ class PPOHyperparams(Tap):
     update_log_freq: int = 1  # Over all updates, how often do we save training statistics?
     save_checkpoints: bool = False  # Do we save train_state along with our per timestep outputs?
     save_runner_state: bool = False  # Do we save the checkpoint in the end?
+    sweep_type: str = 'grid'  # grid (sweeps all listed hyperparams) | random (randomly rejection samples sets of hyperparams)
+    n_random_hparams: int = 1
     seed: int = 2020
     n_seeds: int = 5  # How many seeds to run in our experiment?
     platform: Literal['cpu', 'gpu'] = 'cpu'  # use CPU or GPU?
@@ -74,21 +74,18 @@ class PPOHyperparams(Tap):
 
     study_name: str = 'batch_ppo_test'  # Save checkpoints and run statistics into results/{study_name}.
 
-    def process_args(self) -> None:
-        self.vf_coeff = jnp.array(self.vf_coeff)
-        self.lr = jnp.array(self.lr)
-        self.lambda0 = jnp.array(self.lambda0)
-        self.lambda1 = jnp.array(self.lambda1)
-        self.alpha = jnp.array(self.alpha)
-        self.ld_weight = jnp.array(self.ld_weight)
+    # def process_args(self) -> None:
+    #     self.vf_coeff = jnp.array(self.vf_coeff)
+    #     self.lr = jnp.array(self.lr)
+    #     self.lambda0 = jnp.array(self.lambda0)
+    #     self.lambda1 = jnp.array(self.lambda1)
+    #     self.ld_weight = jnp.array(self.ld_weight)
+    #     self.entropy_coeff = jnp.array(self.ld_weight)
 
-        if self.use_trace_features:
-            self.trace_lambdas = jnp.array([float(t) for t in self.trace_lambdas.split(' ')])
-        else:
-            self.trace_lambdas = None
 
 
 class GDPPOHyperparams(PPOHyperparams):
+    cumulant_loss_weight: float = 0.5
     cumulant_map_size: int = 32
     cumulant_type: str = None  # hs | rew | obs
     cumulant_transform: str = None  # None | random_proj
