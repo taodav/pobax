@@ -34,7 +34,7 @@ hparams = {
             'sweep_type': 'random',
             'n_random_hparams': 30,
             'seed': 2024,
-            'n_seeds': 10,
+            'n_seeds': 5,
             'platform': 'gpu',
             'study_name': exp_name
         }
