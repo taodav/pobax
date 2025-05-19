@@ -75,20 +75,11 @@ class PPOHyperparams(Tap):
 
     study_name: str = 'batch_ppo_test'
 
-    # def process_args(self) -> None:
-    #     self.vf_coeff = jnp.array(self.vf_coeff)
-    #     self.lr = jnp.array(self.lr)
-    #     self.lambda0 = jnp.array(self.lambda0)
-    #     self.lambda1 = jnp.array(self.lambda1)
-    #     self.ld_weight = jnp.array(self.ld_weight)
-    #     self.entropy_coeff = jnp.array(self.ld_weight)
-
-
 
 class GDPPOHyperparams(PPOHyperparams):
-    cumulant_loss_weight: float = 0.5
+    cumulant_loss_weight: list[float] = [0.5]
     cumulant_map_size: int = 32
-    cumulant_type: str = None  # hs | rew | obs
+    cumulant_type: str = None  # None | hs | rew | obs
     cumulant_transform: str = None  # None | random_proj
     cumulant_diff: bool = False
     scale_cumulant: bool = False
@@ -98,6 +89,10 @@ class GDPPOHyperparams(PPOHyperparams):
     gamma_min: float = 0.75
     action_concat: bool = True
     reward_concat: bool = False  # TODO: Fix this? Gym does rewards weirdly
+
+    def process_args(self) -> None:
+        if isinstance(self.cumulant_type, str) and self.cumulant_type.lower() == 'none':
+            self.cumulant_type = None
 
 
 class SFPPOHyperparams(PPOHyperparams):
