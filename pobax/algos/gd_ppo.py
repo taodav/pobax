@@ -28,6 +28,7 @@ from pobax.envs.jax.battleship import Battleship
 from pobax.models import ScannedRNN
 from pobax.models.actor_critic import CumulantNetwork, HangmanNetwork, ActorCritic, BattleShipActorCritic
 from pobax.utils.file_system import get_results_path, numpyify
+from pobax.utils.sweep import get_grid_hparams, get_randomly_sampled_hparams
 
 
 class Transition(NamedTuple):
@@ -55,15 +56,17 @@ class GDPPO(PPO):
                  hangman_network,
                  double_critic: bool = False,
                  ld_weight: float = 0.,
-                 alpha: float = 0.,
                  vf_coeff: float = 0.,
-                 ld_exploration_bonus_scale: float = 0.,
                  cumulant_loss_weight: float = 0.5,
                  entropy_coeff: float = 0.01,
                  clip_eps: float = 0.2):
-        super().__init__(network, double_critic, ld_weight,
-                         alpha, vf_coeff, ld_exploration_bonus_scale,
-                         entropy_coeff, clip_eps)
+        super().__init__(network,
+                         double_critic=double_critic,
+                         ld_weight=ld_weight,
+                         vf_coeff=vf_coeff,
+                         ld_exploration_bonus_scale=0.,
+                         entropy_coeff=entropy_coeff,
+                         clip_eps=clip_eps)
 
         self.hangman_network = hangman_network
         self.cumulant_loss_weight = cumulant_loss_weight
@@ -92,7 +95,6 @@ class GDPPO(PPO):
 
     def loss(self, params, init_hstate, traj_batch, gae, targets, cumulant_targets, next_vals):
         # RERUN NETWORK
-        # TODO: BPTT for obs_encoding w/ trace?
         _, pi, value, cumulant_value, obs_encoding = self.network.apply(
             params, init_hstate[0], (traj_batch.obs, traj_batch.done)
         )
@@ -297,19 +299,21 @@ def make_train(args: GDPPOHyperparams, rand_key: jax.random.PRNGKey):
                                          in_axes=[transition_axes_map, 1, None, 0],
                                          out_axes=2)
 
-    def train(vf_coeff, ld_weight, alpha, lambda1, lambda0, lr, rng):
+    def train(sweep_args_dict, rng):
+        lr, ld_weight, vf_coeff, lambda0, lambda1, entropy_coeff, cumulant_loss_weight = \
+            sweep_args_dict['lr'], sweep_args_dict['ld_weight'], sweep_args_dict['vf_coeff'], \
+                sweep_args_dict['lambda0'], sweep_args_dict['lambda1'], sweep_args_dict['entropy_coeff'], \
+                sweep_args_dict['cumulant_loss_weight']
+
         agent = GDPPO(network, hangman_network,
-                      double_critic=args.double_critic, ld_weight=ld_weight, alpha=alpha, vf_coeff=vf_coeff,
-                      clip_eps=args.clip_eps, entropy_coeff=args.entropy_coeff,
-                      ld_exploration_bonus_scale=args.ld_exploration_bonus_scale,
-                      cumulant_loss_weight=args.cumulant_loss_weight)
+                      double_critic=args.double_critic, ld_weight=ld_weight, vf_coeff=vf_coeff,
+                      clip_eps=args.clip_eps, entropy_coeff=entropy_coeff,
+                      cumulant_loss_weight=cumulant_loss_weight)
 
         # initialize functions
         _env_step = partial(env_step, agent=agent, env=env, env_params=env_params)
 
         gae_lambda = jnp.array(lambda0)
-        # if args.double_critic:
-        #     gae_lambda = jnp.array([lambda0, lambda1])
 
         def linear_schedule(count):
             frac = (
@@ -619,26 +623,40 @@ if __name__ == "__main__":
     make_train_rng, rng = jax.random.split(rng)
     rngs = jax.random.split(rng, args.n_seeds)
     train_fn = make_train(args, make_train_rng)
-    train_args = list(inspect.signature(train_fn).parameters.keys())
 
-    vmaps_train = train_fn
-    swept_args = deque()
+    # train_args = list(inspect.signature(train_fn).parameters.keys())
+    #
+    # vmaps_train = train_fn
+    # swept_args = deque()
+    #
+    # # we need to go backwards, since JAX returns indices
+    # # in the order in which they're vmapped.
+    # for i, arg in reversed(list(enumerate(train_args))):
+    #     dims = [None] * len(train_args)
+    #     dims[i] = 0
+    #     vmaps_train = jax.vmap(vmaps_train, in_axes=dims)
+    #     if arg == 'rng':
+    #         swept_args.appendleft(rngs)
+    #     else:
+    #         assert hasattr(args, arg)
+    #         swept_args.appendleft(getattr(args, arg))
+    #
+    # train_jit = jax.jit(vmaps_train)
 
-    # we need to go backwards, since JAX returns indices
-    # in the order in which they're vmapped.
-    for i, arg in reversed(list(enumerate(train_args))):
-        dims = [None] * len(train_args)
-        dims[i] = 0
-        vmaps_train = jax.vmap(vmaps_train, in_axes=dims)
-        if arg == 'rng':
-            swept_args.appendleft(rngs)
-        else:
-            assert hasattr(args, arg)
-            swept_args.appendleft(getattr(args, arg))
+    if args.sweep_type == 'grid':
+        hparams, _ = get_grid_hparams(args)
+    elif args.sweep_type == 'random':
+        _rng, rng = jax.random.split(rng)
+        hparams = get_randomly_sampled_hparams(_rng, args, n_samples=args.n_random_hparams)
+    else:
+        raise NotImplementedError
 
-    train_jit = jax.jit(vmaps_train)
+    vmap_seeds_train_fn = jax.vmap(train_fn, in_axes=[None, 0])
+    vmap_train_fn = jax.vmap(vmap_seeds_train_fn, in_axes=[0, None])
+    train_jit = jax.jit(vmap_train_fn)
+
     t = time()
-    out = train_jit(*swept_args)
+    out = jax.block_until_ready(train_jit(hparams, rngs))
     new_t = time()
     total_runtime = new_t - t
     print('Total runtime:', total_runtime)
@@ -648,21 +666,13 @@ if __name__ == "__main__":
     final_eval = out['final_eval_metric']
     final_train_state = out['runner_state'][0]
 
-    # # the +1 at the end is to include the done step
-    # largest_episode = final_eval['returned_episode'].argmax(axis=-2).max() + 1
-
-    # def get_first_n_filter(x):
-    #     return x[..., :largest_episode, :]
-    # out['final_eval_metric'] = jax.tree.map(get_first_n_filter, final_eval)
-
-    final_train_state = out['runner_state'][0]
     if not args.save_runner_state:
         del out['runner_state']
 
     results_path = get_results_path(args, return_npy=False)  # returns a results directory
 
     all_results = {
-        'argument_order': train_args,
+        'swept_hparams': hparams,
         'out': out,
         'args': args.as_dict(),
         'total_runtime': total_runtime,

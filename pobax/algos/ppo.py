@@ -498,7 +498,7 @@ def main(args):
 
     t = time()
 
-    out = train_jit(hparams, rngs)
+    out = jax.block_until_ready(train_jit(hparams, rngs))
 
     new_t = time()
     total_runtime = new_t - t
