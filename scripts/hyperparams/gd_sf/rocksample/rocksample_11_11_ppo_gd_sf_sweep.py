@@ -25,7 +25,7 @@ hparams = {
             'ld_weight': ' '.join(map(str, ld_weights)),
             'hidden_size': 256,
             'num_envs': 8,
-            'cumulant_type': ['hs', 'obs'],
+            'cumulant_type': ['hs', 'obs', 'enc_obs'],
             'cumulant_transform': ['none', 'random_proj'],
             'cumulant_loss_weight': ' '.join(map(str, cumulant_loss_weights)),
             'add_reward_to_cumulant': True,
