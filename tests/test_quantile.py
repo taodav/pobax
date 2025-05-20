@@ -119,5 +119,5 @@ def test_rnn_value():
 
 if __name__ == "__main__":
     # jax.disable_jit(True)
-    # test_fo_value()
-    test_rnn_value()
+    test_fo_value()
+    # test_rnn_value()
