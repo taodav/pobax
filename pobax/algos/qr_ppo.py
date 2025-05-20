@@ -84,8 +84,8 @@ class QRPPO(PPO):
             wasserstein_2_dist = (jnp.square(quantiles[..., 0, :] - quantiles[..., 1, :])).mean()
 
         # Minimizing quantile entropy
-        quantile_entropy_loss = 0
-        # quantile_entropy_loss = jnp.log(quantiles[..., 1:] - quantiles[..., :-1] + 1e-10).sum(axis=-1).mean()
+        # quantile_entropy_loss = 0
+        quantile_entropy_loss = jnp.log(quantiles[..., 1:] - quantiles[..., :-1] + 1e-10).sum(axis=-1).mean()
 
         # CALCULATE ACTOR LOSS
         ratio = jnp.exp(log_prob - traj_batch.log_prob)
