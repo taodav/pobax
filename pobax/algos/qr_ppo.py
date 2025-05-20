@@ -11,7 +11,7 @@ import numpy as np
 import optax
 import orbax.checkpoint
 
-from pobax.algos.ppo import PPO, env_step, calculate_gae, filter_period_first_dim, Transition
+from pobax.algos.ppo import PPO, env_step, filter_period_first_dim, Transition
 from pobax.config import QRPPOHyperparams
 from pobax.envs import get_env
 from pobax.envs.wrappers.gymnax import LogEnvState
@@ -90,6 +90,9 @@ class QRPPO(PPO):
         # CALCULATE ACTOR LOSS
         ratio = jnp.exp(log_prob - traj_batch.log_prob)
 
+        if self.double_critic:
+            gae = gae[..., 0]
+
         # which advantage do we use to update our policy?
         gae = (gae - gae.mean()) / (gae.std() + 1e-8)
         loss_actor1 = ratio * gae
@@ -115,6 +118,25 @@ class QRPPO(PPO):
         return total_loss, (value_loss, loss_actor, entropy)
 
 
+def calculate_gae(traj_batch, last_quantiles, last_done, gae_lambda, gamma):
+    def _get_advantage_and_target(carry, transition):
+        gae, next_quantiles, next_done, gae_lambda = carry
+        done, quantiles, reward = transition.done, transition.value, transition.reward
+
+        expanded_discounts = gamma * (1 - next_done)[..., None]
+        targets = reward[..., None] + expanded_discounts * next_quantiles
+
+        delta = targets - quantiles
+        gae = delta + gae_lambda * expanded_discounts * gae
+        return (gae, quantiles, done, gae_lambda), gae
+
+    _, quantile_advantages = jax.lax.scan(_get_advantage_and_target,
+                                          (jnp.zeros_like(last_quantiles), last_quantiles, last_done, gae_lambda),
+                                          traj_batch, reverse=True, unroll=16)
+
+    return jnp.mean(quantile_advantages, axis=-1), quantile_advantages + traj_batch.value
+
+
 def make_train(args: QRPPOHyperparams, rand_key: jax.random.PRNGKey):
     num_updates = (
             args.total_steps // args.num_steps // args.num_envs
@@ -135,20 +157,13 @@ def make_train(args: QRPPOHyperparams, rand_key: jax.random.PRNGKey):
     assert hasattr(env_params, 'max_steps_in_episode')
 
     double_critic = args.double_critic
-    memoryless = args.memoryless
 
     n_atoms = args.n_atoms if isinstance(args, QRPPOHyperparams) else None
     network = QuantileActorCritic(env.action_space(env_params),
                                   memoryless=args.memoryless,
                                   double_critic=args.double_critic,
                                   hidden_size=args.hidden_size,
-                                  n_atoms=n_atoms)
-    # network_fn, action_size = get_network_fn(env, env_params, memoryless=memoryless)
-    #
-    # network = network_fn(action_size,
-    #                      double_critic=double_critic,
-    #                      hidden_size=args.hidden_size,
-    #                      n_atoms=args.n_atoms)
+                                  n_atoms=args.n_atoms)
 
     steps_filter = partial(filter_period_first_dim, n=args.steps_log_freq)
     update_filter = partial(filter_period_first_dim, n=args.update_log_freq)
