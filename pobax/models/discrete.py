@@ -6,6 +6,7 @@ import numpy as np
 
 from . import FullImageCNN
 from .network import SimpleNN, ScannedRNN, SmallImageCNN
+from .distributional import QuantileV
 from .critic import Critic
 from pobax.models.transformerXL import Transformer
 
@@ -61,6 +62,7 @@ class DiscreteActorCriticRNN(nn.Module):
     action_dim: int
     hidden_size: int = 128
     double_critic: bool = False
+    n_atoms: int = None
 
     @nn.compact
     def __call__(self, hidden, x):
@@ -76,19 +78,24 @@ class DiscreteActorCriticRNN(nn.Module):
         actor = DiscreteActor(self.action_dim, hidden_size=self.hidden_size)
         pi = actor(embedding)
 
-        critic = Critic(hidden_size=self.hidden_size)
+        critic_class = Critic
+        args = {'hidden_size': self.hidden_size}
+        if self.n_atoms is not None:
+            args['n_atoms'] = self.n_atoms
+            critic_class = QuantileV
 
         if self.double_critic:
-            critic = nn.vmap(Critic,
-                             variable_axes={'params': 0},
-                             split_rngs={'params': True},
-                             in_axes=None,
-                             out_axes=2,
-                             axis_size=2)(hidden_size=self.hidden_size)
+            critic_class = nn.vmap(critic_class,
+                                   variable_axes={'params': 0},
+                                   split_rngs={'params': True},
+                                   in_axes=None,
+                                   out_axes=2,
+                                   axis_size=2)
+        critic = critic_class(**args)
 
         v = critic(embedding)
 
-        return hidden, pi, jnp.squeeze(v, axis=-1)
+        return hidden, pi, v
 
 
 class ImageDiscreteActorCritic(nn.Module):

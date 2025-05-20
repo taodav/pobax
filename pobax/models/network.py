@@ -54,7 +54,7 @@ class ScannedRNN(nn.Module):
         # Use a dummy key since the default state init fn is just zeros.
         return nn.GRUCell(features=hidden_size).initialize_carry(
             jax.random.PRNGKey(0), (batch_size, hidden_size)
-        )
+        ).astype(float)
 
 
 class FixedHorizonPlanningRNN(ScannedRNN):

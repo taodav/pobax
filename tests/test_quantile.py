@@ -2,6 +2,7 @@
 from functools import partial
 
 import jax
+jax.config.update("jax_debug_nans", True)
 import jax.numpy as jnp
 import numpy as np
 
@@ -29,10 +30,9 @@ def load_vars(args: QRPPOHyperparams, rng: jax.random.PRNGKey):
     agent = QRPPO(network,
                   double_critic=args.double_critic,
                   ld_weight=args.ld_weight[0],
-                  alpha=args.alpha[0],
                   vf_coeff=args.vf_coeff[0],
                   clip_eps=args.clip_eps,
-                  entropy_coeff=args.entropy_coeff,
+                  entropy_coeff=args.entropy_coeff[0],
                   n_atoms=args.n_atoms)
 
     return env, env_params, agent
@@ -43,8 +43,17 @@ def run_n_steps_with_args(args: QRPPOHyperparams, n: int = 10):
     make_rng, train_rng, env_rng, rng = jax.random.split(rng, 4)
     train_fn = jax.jit(make_train(args, rng))
     # train_fn = make_train(args, rng)
+    swept_hparams = {
+        'lr': args.lr[0],
+        'ld_weight': args.ld_weight[0],
+        'vf_coeff': args.vf_coeff[0],
+        'lambda0': args.lambda0[0],
+        'lambda1': args.lambda1[0],
+        'entropy_coeff': args.entropy_coeff[0],
+        'quantile_entropy_coeff': args.quantile_entropy_coeff[0],
+    }
 
-    res = train_fn(args.vf_coeff[0], args.ld_weight[0], args.alpha[0], args.lambda1[0], args.lambda0[0], args.lr[0], train_rng)
+    res = train_fn(swept_hparams, train_rng)
 
     env, env_params, agent = load_vars(args, env_rng)
     ts = res['runner_state'][0]

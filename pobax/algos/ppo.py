@@ -1,9 +1,7 @@
 from typing import NamedTuple
 
-from collections import deque
 from dataclasses import replace
 from functools import partial
-import inspect
 from time import time
 # import os
 # os.environ["CRAFTAX_RELOAD_TEXTURES"] = "True"
@@ -211,8 +209,7 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
                 sweep_args_dict['lambda0'], sweep_args_dict['lambda1'], sweep_args_dict['entropy_coeff']
 
         agent = PPO(network, double_critic=double_critic, ld_weight=ld_weight, vf_coeff=vf_coeff,
-                    clip_eps=args.clip_eps, entropy_coeff=entropy_coeff,
-                    ld_exploration_bonus_scale=args.ld_exploration_bonus_scale)
+                    clip_eps=args.clip_eps, entropy_coeff=entropy_coeff)
 
         # initialize functions
         _env_step = partial(env_step, agent=agent, env=env, env_params=env_params)
