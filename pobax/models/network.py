@@ -53,7 +53,7 @@ class ScannedRNN(nn.Module):
     def initialize_carry(batch_size, hidden_size):
         return nn.GRUCell(features=hidden_size).initialize_carry(
             jax.random.PRNGKey(0), (batch_size, hidden_size)
-        )
+        ).astype(float)
 
 
 class FixedHorizonPlanningRNN(ScannedRNN):

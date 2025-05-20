@@ -1,14 +1,11 @@
 from functools import partial
-from collections import deque
 from dataclasses import replace
-import inspect
 from time import time
 
-import chex
-import flax.training.train_state
 from flax.training.train_state import TrainState
 from flax.training import orbax_utils
 import jax
+# jax.config.update("jax_debug_nans", True)
 import jax.numpy as jnp
 import numpy as np
 import optax
@@ -18,23 +15,23 @@ from pobax.algos.ppo import PPO, env_step, calculate_gae, filter_period_first_di
 from pobax.config import QRPPOHyperparams
 from pobax.envs import get_env
 from pobax.envs.wrappers.gymnax import LogEnvState
-from pobax.models import ScannedRNN
 from pobax.models.actor_critic import QuantileActorCritic
+from pobax.models import ScannedRNN, get_network_fn
 from pobax.utils.file_system import get_results_path, numpyify
+from pobax.utils.sweep import get_grid_hparams, get_randomly_sampled_hparams
 
 
 class QRPPO(PPO):
     def __init__(self, network,
                  double_critic: bool = False,
                  ld_weight: float = 0.,
-                 alpha: float = 0.,
                  vf_coeff: float = 0.,
                  entropy_coeff: float = 0.01,
                  clip_eps: float = 0.2,
                  n_atoms: int = 51,
                  kappa: float = 1.,
                  quantile_entropy_coeff: float = 0.):
-        super().__init__(network, double_critic, ld_weight, alpha, vf_coeff, entropy_coeff, clip_eps)
+        super().__init__(network, double_critic, ld_weight, vf_coeff, entropy_coeff, clip_eps)
         self.n_atoms = n_atoms
         self.atoms = jnp.arange(self.n_atoms)
         self.kappa = kappa
@@ -87,15 +84,13 @@ class QRPPO(PPO):
             wasserstein_2_dist = (jnp.square(quantiles[..., 0, :] - quantiles[..., 1, :])).mean()
 
         # Minimizing quantile entropy
-        quantile_entropy_loss = jnp.log(quantiles[..., 1:] - quantiles[..., :-1])
+        quantile_entropy_loss = 0
+        # quantile_entropy_loss = jnp.log(quantiles[..., 1:] - quantiles[..., :-1] + 1e-10).sum(axis=-1).mean()
 
         # CALCULATE ACTOR LOSS
         ratio = jnp.exp(log_prob - traj_batch.log_prob)
 
         # which advantage do we use to update our policy?
-        if self.double_critic:
-            gae = (self.alpha * gae[..., 0] +
-                   (1 - self.alpha) * gae[..., 1])
         gae = (gae - gae.mean()) / (gae.std() + 1e-8)
         loss_actor1 = ratio * gae
         loss_actor2 = (
@@ -140,13 +135,20 @@ def make_train(args: QRPPOHyperparams, rand_key: jax.random.PRNGKey):
     assert hasattr(env_params, 'max_steps_in_episode')
 
     double_critic = args.double_critic
+    memoryless = args.memoryless
 
     n_atoms = args.n_atoms if isinstance(args, QRPPOHyperparams) else None
     network = QuantileActorCritic(env.action_space(env_params),
-                          memoryless=args.memoryless,
-                          double_critic=args.double_critic,
-                          hidden_size=args.hidden_size,
-                          n_atoms=n_atoms)
+                                  memoryless=args.memoryless,
+                                  double_critic=args.double_critic,
+                                  hidden_size=args.hidden_size,
+                                  n_atoms=n_atoms)
+    # network_fn, action_size = get_network_fn(env, env_params, memoryless=memoryless)
+    #
+    # network = network_fn(action_size,
+    #                      double_critic=double_critic,
+    #                      hidden_size=args.hidden_size,
+    #                      n_atoms=args.n_atoms)
 
     steps_filter = partial(filter_period_first_dim, n=args.steps_log_freq)
     update_filter = partial(filter_period_first_dim, n=args.update_log_freq)
@@ -163,10 +165,15 @@ def make_train(args: QRPPOHyperparams, rand_key: jax.random.PRNGKey):
                                   in_axes=[transition_axes_map, 1, None, 0, None],
                                   out_axes=2)
 
-    def train(vf_coeff, ld_weight, alpha, lambda1, lambda0, lr, rng):
-        agent = QRPPO(network, double_critic=double_critic, ld_weight=ld_weight, alpha=alpha, vf_coeff=vf_coeff,
-                      clip_eps=args.clip_eps, entropy_coeff=args.entropy_coeff,
-                      quantile_entropy_coeff=args.quantile_entropy_coeff)
+    def train(sweep_args_dict, rng):
+        lr, ld_weight, vf_coeff, lambda0, lambda1, entropy_coeff, quantile_entropy_coeff = \
+            sweep_args_dict['lr'], sweep_args_dict['ld_weight'], sweep_args_dict['vf_coeff'], \
+                sweep_args_dict['lambda0'], sweep_args_dict['lambda1'], sweep_args_dict['entropy_coeff'],\
+                sweep_args_dict['quantile_entropy_coeff']
+
+        agent = QRPPO(network, double_critic=double_critic, ld_weight=ld_weight, vf_coeff=vf_coeff,
+                      clip_eps=args.clip_eps, entropy_coeff=entropy_coeff,
+                      quantile_entropy_coeff=quantile_entropy_coeff)
 
         # initialize functions
         _env_step = partial(env_step, agent=agent, env=env, env_params=env_params)
@@ -414,6 +421,8 @@ def make_train(args: QRPPOHyperparams, rand_key: jax.random.PRNGKey):
 
 if __name__ == "__main__":
     # jax.disable_jit(True)
+    # jax.config.update("jax_enable_x64", True)
+
     args = QRPPOHyperparams().parse_args()
     jax.config.update('jax_platform_name', args.platform)
 
@@ -421,26 +430,22 @@ if __name__ == "__main__":
     make_train_rng, rng = jax.random.split(rng)
     rngs = jax.random.split(rng, args.n_seeds)
     train_fn = make_train(args, make_train_rng)
-    train_args = list(inspect.signature(train_fn).parameters.keys())
 
-    vmaps_train = train_fn
-    swept_args = deque()
 
-    # we need to go backwards, since JAX returns indices
-    # in the order in which they're vmapped.
-    for i, arg in reversed(list(enumerate(train_args))):
-        dims = [None] * len(train_args)
-        dims[i] = 0
-        vmaps_train = jax.vmap(vmaps_train, in_axes=dims)
-        if arg == 'rng':
-            swept_args.appendleft(rngs)
-        else:
-            assert hasattr(args, arg)
-            swept_args.appendleft(getattr(args, arg))
+    if args.sweep_type == 'grid':
+        hparams, _ = get_grid_hparams(args)
+    elif args.sweep_type == 'random':
+        _rng, rng = jax.random.split(rng)
+        hparams = get_randomly_sampled_hparams(_rng, args, n_samples=args.n_random_hparams)
+    else:
+        raise NotImplementedError
 
-    train_jit = jax.jit(vmaps_train)
+    vmap_seeds_train_fn = jax.vmap(train_fn, in_axes=[None, 0])
+    vmap_train_fn = jax.vmap(vmap_seeds_train_fn, in_axes=[0, None])
+    train_jit = jax.jit(vmap_train_fn)
+
     t = time()
-    out = train_jit(*swept_args)
+    out = jax.block_until_ready(train_jit(hparams, rngs))
     new_t = time()
     total_runtime = new_t - t
     print('Total runtime:', total_runtime)
@@ -464,7 +469,7 @@ if __name__ == "__main__":
     results_path = get_results_path(args, return_npy=False)  # returns a results directory
 
     all_results = {
-        'argument_order': train_args,
+        'swept_hparams': hparams,
         'out': out,
         'args': args.as_dict(),
         'total_runtime': total_runtime,

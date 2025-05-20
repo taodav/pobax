@@ -102,7 +102,7 @@ class SFPPOHyperparams(PPOHyperparams):
 class QRPPOHyperparams(PPOHyperparams):
     n_atoms: int = 51
     kappa: float = 1.
-    quantile_entropy_coeff: float = 0.
+    quantile_entropy_coeff: list[float] = [0.]
 
 
 class DQNHyperparams(Tap):
