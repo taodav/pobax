@@ -3,8 +3,8 @@ from pathlib import Path
 exp_name = Path(__file__).stem
 
 lrs = [2.5e-3, 2.5e-4, 2.5e-5, 2.5e-6]
-lambda0s = [0.1, 0.3, 0.5, 0.7, 0.9, 0.95]
-lambda1s = [0.95]
+lambda0s = [0.1, 0.5, 0.7, 0.9, 0.95]
+lambda1s = [0.5]
 alphas = [1]
 ld_weights = [0]
 
@@ -14,22 +14,29 @@ hparams = {
     'entry': '-m pobax.algos.ppo',
     'args': [
         {
-            'env': 'rocksample_15_15',
+            'env': 'craftax',
             'double_critic': False,
+            'memoryless': True,
             'action_concat': True,
             'lr': lrs,
+            'anneal_lr': True,
+            'hidden_size': 512,
             'lambda0': lambda0s,
             'lambda1': ' '.join(map(str, lambda1s)),
             'alpha': ' '.join(map(str, alphas)),
             'ld_weight': ' '.join(map(str, ld_weights)),
-            'hidden_size': 512,
-            'num_envs': 16,
-            'entropy_coeff': 0.2,
-            'steps_log_freq': 8,
-            'update_log_freq': 10,
-            'total_steps': int(1e7),
+            'normalize_env': True,
+            'use_trace_features': True,
+            'trace_in_obs': True,
+            'entropy_coeff': 0.01,
+            'steps_log_freq': 20,
+            'update_log_freq': 16,
+            'num_minibatches': 4,
+            'num_steps': 64,
+            'num_envs': 32,
+            'total_steps': int(5e6),
             'seed': 2024,
-            'n_seeds': 5,
+            'n_seeds': 3,
             'platform': 'gpu',
             'study_name': exp_name
         }

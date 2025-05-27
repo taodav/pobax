@@ -32,6 +32,8 @@ class TraceFeaturesWrapper(GymnaxWrapper):
         super().__init__(env)
         self.lambdas = lambdas
         self.trace_in_obs = trace_in_obs
+        if trace_in_obs:
+            assert jnp.any(jnp.isclose(self.lambdas, 0)), 'observation not in trace obs!'
 
     def observation_space(self, params) -> spaces.Box:
         og_obs_space_shape = self._env.observation_space(params).shape
@@ -40,7 +42,7 @@ class TraceFeaturesWrapper(GymnaxWrapper):
 
             if len(og_obs_space_shape) == 1:
                 obs_length = og_obs_space_shape[0]
-                shape = obs_length * n_lambdas
+                shape = (obs_length * n_lambdas,)
             elif len(og_obs_space_shape) == 3:
                 # images
                 shape = (og_obs_space_shape[0], og_obs_space_shape[1], og_obs_space_shape[2] * n_lambdas)
@@ -66,6 +68,11 @@ class TraceFeaturesWrapper(GymnaxWrapper):
 
         state = TraceFeatureState(env_state=state,
                                   trace_features=trace_features)
+        if self.trace_in_obs:
+            # here we assume that the last two dimensions
+            unflatten_dims = trace_features.shape[:-2]
+            obs = trace_features.reshape((*unflatten_dims, -1))
+            print('Replacing obs with trace features')
 
         return obs, state
 
@@ -82,9 +89,16 @@ class TraceFeaturesWrapper(GymnaxWrapper):
         leading_dims = (1,) * len(obs.shape)
         lambdas = jnp.broadcast_to(self.lambdas, leading_dims + self.lambdas.shape)
 
-        next_trace = (1 - done) * lambdas * state.trace_features + (1 - lambdas) * obs[..., None]
+        curr_obs_lambda = (1 - done) * (1 - lambdas) + done
+
+        next_trace = (1 - done) * lambdas * state.trace_features + curr_obs_lambda * obs[..., None]
 
         next_state = TraceFeatureState(env_state=next_state,
                                        trace_features=next_trace)
+
+        if self.trace_in_obs:
+            # here we assume that the last two dimensions
+            unflatten_dims = next_trace.shape[:-2]
+            obs = next_trace.reshape((*unflatten_dims, -1))
 
         return obs, next_state, reward, done, info

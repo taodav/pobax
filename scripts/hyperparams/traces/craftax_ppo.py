@@ -30,12 +30,11 @@ hparams = {
             'update_log_freq': 16,
             'num_minibatches': 4,
             'num_steps': 64,
-            'num_envs': 256,
-            'total_steps': int(5e8),
-            'seed': 2020,
+            'num_envs': 32,
+            'total_steps': int(5e6),
+            'seed': 2024,
             'n_seeds': 3,
             'platform': 'gpu',
-            'debug': True,
             'study_name': exp_name
         }
     ]

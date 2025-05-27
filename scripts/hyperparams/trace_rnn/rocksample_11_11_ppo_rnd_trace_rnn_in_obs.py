@@ -3,7 +3,7 @@ from pathlib import Path
 exp_name = Path(__file__).stem
 
 lrs = [2.5e-4]
-lambda0s = [0.95]
+lambda0s = [0.9]
 lambda1s = [0.5]
 alphas = [1]
 ld_weights = [0]
@@ -13,10 +13,10 @@ rnd_lrs = [2.5e-4, 2.5e-5, 2.5e-6, 2.5e-7]
 hparams = {
     'file_name':
         f'runs_{exp_name}.txt',
-    'entry': '-m pobax.algos.ppo_rnd_trace',
+    'entry': '-m pobax.algos.ppo_trace_rnn',
     'args': [
         {
-            'env': 'Navix-DMLab-Maze-02-v0',
+            'env': 'rocksample_11_11',
             'double_critic': False,
             'action_concat': True,
             'memoryless': True,
@@ -34,12 +34,12 @@ hparams = {
             'use_trace_features': True,
             'trace_in_obs': True,
             'normalize_env': True,
-            'hidden_size': 512,
-            'num_envs': 32,
-            'entropy_coeff': 0.01,
+            'hidden_size': 256,
+            'num_envs': 8,
+            'entropy_coeff': 0.05,
             'steps_log_freq': 4,
             'update_log_freq': 5,
-            'total_steps': int(2e7),
+            'total_steps': int(5e6),
             'seed': 2024,
             'n_seeds': 5,
             'platform': 'gpu',

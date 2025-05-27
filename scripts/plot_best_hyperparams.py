@@ -71,8 +71,10 @@ def plot_rnd_loss(path, rnd_loss):
     and then plots the mean loss over time with an error band representing one standard deviation.
     """
     # Remove singleton dimensions. Expected shape becomes (num_seeds, time_steps) i.e. (5, 1953).
+    print(f"Original shape of rnd_loss: {rnd_loss.shape}")
     loss = np.squeeze(rnd_loss)
-    
+    # loss = np.expand_dims(loss, axis=0)
+    print(f"Shape of loss after squeezing: {loss.shape}")
     if loss.ndim != 2:
         raise ValueError("After squeezing, expected a 2D array of shape (num_seeds, time_steps)")
     
@@ -80,6 +82,7 @@ def plot_rnd_loss(path, rnd_loss):
     
     # Compute the mean and standard deviation over the seeds dimension.
     mean_loss = np.mean(loss, axis=0)
+    print('Mean loss', mean_loss)
     std_loss = np.std(loss, axis=0)
     
     plt.figure(figsize=(10, 6))
@@ -130,7 +133,7 @@ def plot_reses(all_reses: list[tuple], env_name, n_rows: int = 2,
 
     for k, (study_name, res, color) in enumerate(all_reses):
         scores = res['scores']
-        if 'RND' in study_name and 'rnd_loss' in res:
+        if 'rnd_loss' in res:
             rnd_loss = res['rnd_loss']
             # Define an output folder for rnd_loss plots.
             rnd_output_folder = Path(ROOT_DIR, 'results')
@@ -231,19 +234,24 @@ def find_file_in_dir(file_name: str, base_dir: Path) -> Path:
             return path
 
 if __name__ == "__main__":
-    env_name = 'rocksample_11_11'
+    env_name = 'navix_02'
 
     # normal
     study_paths = [
         # ('$\lambda$-discrepancy + Quantile PPO', Path(ROOT_DIR, 'results', f'{env_name}_quantile_LD_ppo'), 'green'),
-        # ('$\lambda$-discrepancy + PPO', Path(ROOT_DIR, 'results', f'{env_name}_LD_ppo'), 'dark gray'),
+        ('PPO + Memoryless', Path(ROOT_DIR, 'results', f'{env_name}_ppo_memoryless'), 'dark gray'),
         ('PPO + RNN', Path(ROOT_DIR, 'results', f'{env_name}_ppo'), 'purple'),
+        ('PPO + LD', Path(ROOT_DIR, 'results', f'{env_name}_ppo_LD'), 'blue'),
         # ('PPO + TRANSFORMER + No Frame', Path(ROOT_DIR, 'results', f'{env_name}_transformer'), 'yellow'),
         # ('PPO + TRANSFORMER', Path(ROOT_DIR, 'results', f'{env_name}_transformer_best'), 'cyan'),
-        ('PPO + RND MEMORY', Path(ROOT_DIR, 'results', f'{env_name}_ppo_rnd_memory'), 'blue'),
-        ('PPO + MEMORYLESS', Path(ROOT_DIR, 'results', f'{env_name}_ppo_memoryless'), 'dark gray'),
-        ('PPO + OBSERVABLE', Path(ROOT_DIR, 'results', f'{env_name}_ppo_perfect_memory'), 'green'),
-        # ('TEST', Path(ROOT_DIR, 'results', f'test_rnd_ppo'), 'blue'),
+        # ('PPO + RND MEMORY', Path(ROOT_DIR, 'results', f'{env_name}_ppo_memory_rnd'), 'blue'),
+        # ('PPO + RND TRACE + Lambda 0', Path(ROOT_DIR, 'results', f'{env_name}_ppo_rnd_trace_lambda0'), 'cyan'),
+        # ('PPO + RND TRACE + Lambdas', Path(ROOT_DIR, 'results', f'{env_name}_ppo_rnd_trace'), 'green'),
+        # ('PPO + RND TRACE + Trace Obs', Path(ROOT_DIR, 'results', f'{env_name}_ppo_rnd_trace_in_obs'), 'yellow'),
+        # ('PPO + MEMORYLESS Trace', Path(ROOT_DIR, 'results', f'{env_name}_ppo_memoryless_trace'), 'orange'),
+        # ('PPO + TRACE RNN', Path(ROOT_DIR, 'results', f'{env_name}_ppo_rnd_trace_rnn_in_obs'), 'dark gray'),
+        ('PPO + OBSERVABLE', Path(ROOT_DIR, 'results', f'{env_name}_ppo_observable'), 'green'),
+        # ('TEST', Path(ROOT_DIR, 'results', f'test_trace_rnd'), 'blue'),
         # ('Perfect Memory PPO (NN)', Path(ROOT_DIR, 'results', f'{env_name}_perfect_memory_memoryless_ppo'), 'pink'),
         # ('PPO (RNN)', Path(ROOT_DIR, 'results', f'{env_name}_ppo'), 'blue'),
         # ('PPO (NN)', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_ppo'), 'dark gray'),

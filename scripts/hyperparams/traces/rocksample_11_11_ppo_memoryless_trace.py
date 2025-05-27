@@ -22,6 +22,7 @@ hparams = {
         'lambda1': ' '.join(map(str, lambda1s)),
         'alpha': ' '.join(map(str, alphas)),
         'use_trace_features': True,
+        'trace_in_obs': True,
         'num_envs': 8,
         'hidden_size': 256,
         'entropy_coeff': 0.2,

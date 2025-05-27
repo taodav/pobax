@@ -12,7 +12,7 @@
 source ~/pobax_baseline/bin/activate
 
 # Specify the filename
-input_file="../runs/runs_rocksample_11_11_ppo_rnd_memory.txt"
+input_file="../runs/runs_navix_02_ppo_observable.txt"
 job_name=$(basename "$input_file" .txt) # Extract the base name of the file without extension
 
 # Read commands from the file and submit each as a separate job

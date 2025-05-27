@@ -3,7 +3,7 @@ from pathlib import Path
 exp_name = Path(__file__).stem
 
 lrs = [2.5e-4]
-lambda0s = [0.95]
+lambda0s = [0.9]
 lambda1s = [0.5]
 alphas = [1]
 ld_weights = [0]
@@ -13,7 +13,7 @@ rnd_lrs = [2.5e-4, 2.5e-5, 2.5e-6, 2.5e-7]
 hparams = {
     'file_name':
         f'runs_{exp_name}.txt',
-    'entry': '-m pobax.algos.ppo_rnd_trace',
+    'entry': '-m pobax.algos.ppo_trace_rnn',
     'args': [
         {
             'env': 'Navix-DMLab-Maze-02-v0',

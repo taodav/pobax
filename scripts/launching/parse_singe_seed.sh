@@ -12,4 +12,4 @@ cd ..
 # Activate the virtual environment
 source ~/pobax_baseline/bin/activate
 
-python parse_rnd_memory.py ../results/rocksample_11_11_ppo_rnd_memory
+python parse_single_seed.py ../results/navix_02_ppo

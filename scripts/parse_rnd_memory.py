@@ -79,7 +79,7 @@ def plot_rnd_loss(path, rnd_loss):
 
 def parse_exp_dir(study_path, study_hparam_path, discounted: bool = False):
     # TODO: THIS
-    train_sign_hparams = ['vf_coeff', 'lambda0', 'lr', 'lambda1', 'ld_weight', 'alpha', 'rnd_lr']
+    train_sign_hparams = ['vf_coeff', 'lambda0', 'lr', 'lambda1', 'ld_weight', 'alpha', 'rnd_lr', 'rnd_reward_coeff']
     study_paths = list(study_path.iterdir())
     files_to_remove = {"best_hyperparam_per_env_res_discounted.pkl", "best_hyperparam_per_env_res_undiscounted.pkl"}
     study_paths = [path for path in study_paths if path.name not in files_to_remove]

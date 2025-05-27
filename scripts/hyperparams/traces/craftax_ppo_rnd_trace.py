@@ -2,8 +2,8 @@ from pathlib import Path
 
 exp_name = Path(__file__).stem
 
-lrs = [2.5e-4]
-lambda0s = [0.95]
+lrs = [0.00025]
+lambda0s = [0.5]
 lambda1s = [0.5]
 alphas = [1]
 ld_weights = [0]
@@ -16,10 +16,9 @@ hparams = {
     'entry': '-m pobax.algos.ppo_rnd_trace',
     'args': [
         {
-            'env': 'Navix-DMLab-Maze-02-v0',
+            'env': 'craftax',
             'double_critic': False,
             'action_concat': True,
-            'memoryless': True,
             'lr': lrs,
             'lambda0': lambda0s,
             'lambda1': ' '.join(map(str, lambda1s)),
@@ -32,16 +31,18 @@ hparams = {
             'rnd_hidden_size': 512,
             'normalize_env': True,
             'use_trace_features': True,
-            'trace_in_obs': True,
+            'trace_in_obs': False,
             'normalize_env': True,
             'hidden_size': 512,
             'num_envs': 32,
             'entropy_coeff': 0.01,
-            'steps_log_freq': 4,
-            'update_log_freq': 5,
-            'total_steps': int(2e7),
+            'steps_log_freq': 20,
+            'update_log_freq': 16,
+            'num_minibatches': 4,
+            'num_steps': 64,
+            'total_steps': int(5e6),
             'seed': 2024,
-            'n_seeds': 5,
+            'n_seeds': 3,
             'platform': 'gpu',
             'study_name': exp_name
         }

@@ -27,7 +27,7 @@ hparams = {
             'entropy_coeff': 0.2,
             'steps_log_freq': 4,
             'update_log_freq': 5,
-            'total_steps': int(1e7),
+            'total_steps': int(5e6),
             'seed': 2024,
             'n_seeds': 5,
             'platform': 'gpu',
