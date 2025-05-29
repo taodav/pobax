@@ -235,6 +235,36 @@ all_paths = {
     },
 }
 
+all_gd_workshop_paths = {
+    'rocksample_11_11': {
+        'position': (0, 0),
+        'best': False,
+        'super_dir': 'rocksample_11_11',
+        'state_version': 'recurrent',
+        'title': 'RockSample(11, 11)',
+        'discounted': True,
+        'smoothen_curve': True,
+    },
+    'walker_v': {
+        'position': (0, 1),
+        'best': False,
+        'super_dir': 'walker_v',
+        'state_version': 'recurrent',
+        'title': 'Walker (Vel. Only)',
+        'discounted': True,
+        'smoothen_curve': True,
+    },
+    'navix_01': {
+        'position': (0, 2),
+        'best': True,
+        'super_dir': 'navix_01_best',
+        'state_version': 'memoryless',
+        'title': 'DMLab Minigrid (01)',
+        'discounted': True,
+        'smoothen_curve': True,
+    },
+}
+
 def generate_ablation_paths(paths: dict):
     all_study_paths = {}
     for var_val, info in paths.items():
@@ -289,6 +319,35 @@ def generate_study_paths(paths: dict):
         all_study_paths[name] = curr_path
     return all_study_paths
 
+
+def generate_gd_workshop_study_paths(paths: dict):
+    all_study_paths = {}
+    results_path = Path(ROOT_DIR) / 'results'
+
+    for name, info in paths.items():
+        super_dir = results_path / info['super_dir']
+        best_suffix = '_best' if info['best'] else ''
+
+        paths = [
+            ('RNN', super_dir / f"{name}_ppo{best_suffix}", "purple"),
+            ('RNN + LD', super_dir / f"{name}_ppo_LD{best_suffix}", 'blue'),
+            ('RNN + SF', results_path / 'gd_sf_random_proj_obs' / name / f"{name}_ppo_gd_sf_random_proj_obs_diff", 'cyan'),
+            ('RNN + GD', results_path / 'gd_sf_random_proj_obs' / name / f"{name}_ppo_gd_sf_random_proj_obs_diff_discrep", 'yellow'),
+            ('OBSERVATION', super_dir / f"{name}_ppo_memoryless{best_suffix}", 'dark gray'),
+        ]
+
+        # ORDER MATTERS HERE! Assume all the -F- runs are after the rest.
+        if info['state_version'] == 'memoryless':
+            paths.append(('STATE', super_dir / f"{name}_ppo_perfect_memory_memoryless{best_suffix}", 'green'))
+        elif info['state_version'] == 'recurrent':
+            paths.append(('STATE', super_dir / f"{name}_ppo_perfect_memory{best_suffix}", 'green'))
+
+        curr_path = {
+            **info,
+            'paths': paths
+        }
+        all_study_paths[name] = curr_path
+    return all_study_paths
 
 def plot_array(all_res: dict, row_mult: int = 10, col_mult: int = 5,
                legend_loc: tuple[float, float] = (0.78, 0.13),
@@ -363,7 +422,8 @@ def plot_array(all_res: dict, row_mult: int = 10, col_mult: int = 5,
     lines = [Line2D([], [], color=color, marker='s', markersize=16, linestyle='None')
              for (_, color) in all_titles_and_colors]
     labels = [label for (label, _) in all_titles_and_colors]
-    plt.figlegend(lines, labels, loc=legend_loc)
+    leg = plt.figlegend(lines, labels, loc=legend_loc)
+    leg.set_alpha(0.95)
 
     fig.supxlabel('Environment steps')
     fig.supylabel(f'Online returns')
@@ -376,7 +436,7 @@ def plot_array(all_res: dict, row_mult: int = 10, col_mult: int = 5,
 
 
 if __name__ == "__main__":
-    to_plot = 'ablation_walker_hsize'
+    to_plot = 'all_gd_workshop'
 
     if to_plot == 'all_envs':
         all_study_settings = generate_study_paths(all_paths)
@@ -398,6 +458,11 @@ if __name__ == "__main__":
         row_mult, col_mult = 30, 3
         legend_loc = (0.78, 0.000)
         smoothen_curve = True
+    elif to_plot == 'all_gd_workshop':
+        all_study_settings = generate_gd_workshop_study_paths(all_gd_workshop_paths)
+        row_mult, col_mult = 30, 3
+        legend_loc = (0.78, 0.07)
+        smoothen_curve = False
     else:
         raise NotImplementedError
 
