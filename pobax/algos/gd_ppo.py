@@ -64,7 +64,6 @@ class GDPPO(PPO):
                          double_critic=double_critic,
                          ld_weight=ld_weight,
                          vf_coeff=vf_coeff,
-                         ld_exploration_bonus_scale=0.,
                          entropy_coeff=entropy_coeff,
                          clip_eps=clip_eps)
 
@@ -299,12 +298,13 @@ def make_train(args: GDPPOHyperparams, rand_key: jax.random.PRNGKey):
                                          in_axes=[transition_axes_map, 1, None, 0],
                                          out_axes=2)
 
-    def train(sweep_args_dict, rng):
-        lr, ld_weight, vf_coeff, lambda0, lambda1, entropy_coeff, cumulant_loss_weight = \
-            sweep_args_dict['lr'], sweep_args_dict['ld_weight'], sweep_args_dict['vf_coeff'], \
-                sweep_args_dict['lambda0'], sweep_args_dict['lambda1'], sweep_args_dict['entropy_coeff'], \
-                sweep_args_dict['cumulant_loss_weight']
+    # def train(sweep_args_dict, rng):
+    #     lr, ld_weight, vf_coeff, lambda0, lambda1, entropy_coeff, cumulant_loss_weight = \
+    #         sweep_args_dict['lr'], sweep_args_dict['ld_weight'], sweep_args_dict['vf_coeff'], \
+    #             sweep_args_dict['lambda0'], sweep_args_dict['lambda1'], sweep_args_dict['entropy_coeff'], \
+    #             sweep_args_dict['cumulant_loss_weight']
 
+    def train(lr, ld_weight, vf_coeff, lambda0, lambda1, entropy_coeff, cumulant_loss_weight, rng):
         agent = GDPPO(network, hangman_network,
                       double_critic=args.double_critic, ld_weight=ld_weight, vf_coeff=vf_coeff,
                       clip_eps=args.clip_eps, entropy_coeff=entropy_coeff,
@@ -624,39 +624,40 @@ if __name__ == "__main__":
     rngs = jax.random.split(rng, args.n_seeds)
     train_fn = make_train(args, make_train_rng)
 
-    # train_args = list(inspect.signature(train_fn).parameters.keys())
-    #
-    # vmaps_train = train_fn
-    # swept_args = deque()
-    #
-    # # we need to go backwards, since JAX returns indices
-    # # in the order in which they're vmapped.
-    # for i, arg in reversed(list(enumerate(train_args))):
-    #     dims = [None] * len(train_args)
-    #     dims[i] = 0
-    #     vmaps_train = jax.vmap(vmaps_train, in_axes=dims)
-    #     if arg == 'rng':
-    #         swept_args.appendleft(rngs)
-    #     else:
-    #         assert hasattr(args, arg)
-    #         swept_args.appendleft(getattr(args, arg))
-    #
-    # train_jit = jax.jit(vmaps_train)
+    train_args = list(inspect.signature(train_fn).parameters.keys())
 
-    if args.sweep_type == 'grid':
-        hparams, _ = get_grid_hparams(args)
-    elif args.sweep_type == 'random':
-        _rng, rng = jax.random.split(rng)
-        hparams = get_randomly_sampled_hparams(_rng, args, n_samples=args.n_random_hparams)
-    else:
-        raise NotImplementedError
+    vmaps_train = train_fn
+    swept_args = deque()
 
-    vmap_seeds_train_fn = jax.vmap(train_fn, in_axes=[None, 0])
-    vmap_train_fn = jax.vmap(vmap_seeds_train_fn, in_axes=[0, None])
-    train_jit = jax.jit(vmap_train_fn)
+    # we need to go backwards, since JAX returns indices
+    # in the order in which they're vmapped.
+    for i, arg in reversed(list(enumerate(train_args))):
+        dims = [None] * len(train_args)
+        dims[i] = 0
+        vmaps_train = jax.vmap(vmaps_train, in_axes=dims)
+        if arg == 'rng':
+            swept_args.appendleft(rngs)
+        else:
+            assert hasattr(args, arg)
+            swept_args.appendleft(jnp.array(getattr(args, arg)))
+
+    train_jit = jax.jit(vmaps_train)
+
+    # if args.sweep_type == 'grid':
+    #     hparams, _ = get_grid_hparams(args)
+    # elif args.sweep_type == 'random':
+    #     _rng, rng = jax.random.split(rng)
+    #     hparams = get_randomly_sampled_hparams(_rng, args, n_samples=args.n_random_hparams)
+    # else:
+    #     raise NotImplementedError
+    #
+    # vmap_seeds_train_fn = jax.vmap(train_fn, in_axes=[None, 0])
+    # vmap_train_fn = jax.vmap(vmap_seeds_train_fn, in_axes=[0, None])
+    # train_jit = jax.jit(vmap_train_fn)
 
     t = time()
-    out = jax.block_until_ready(train_jit(hparams, rngs))
+    # out = jax.block_until_ready(train_jit(hparams, rngs))
+    out = jax.block_until_ready(train_jit(*swept_args))
     new_t = time()
     total_runtime = new_t - t
     print('Total runtime:', total_runtime)

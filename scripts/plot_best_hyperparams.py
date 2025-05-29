@@ -93,6 +93,15 @@ def plot_reses(all_reses: list[tuple], n_rows: int = 2,
             mean_over_steps = [score.mean(axis=1)[..., 0] for score in scores]
             mean = [m.mean(axis=-1) for m in mean_over_steps]
             std_err = [sem(m, axis=-1) for m in mean_over_steps]
+        elif isinstance(scores, dict):
+            mean, std_err = {}, {}
+            n_seeds = None
+            for k, v in scores.items():
+                mean_over_steps = v.mean(axis=1)
+                if n_seeds is None:
+                    n_seeds = mean_over_steps.shape[-1]
+                mean[k] = mean_over_steps.mean(axis=-1)
+                std_err[k] = sem(mean_over_steps, axis=-1)
         else:
             # take mean over both
             mean_over_steps = scores.mean(axis=1)
@@ -109,6 +118,8 @@ def plot_reses(all_reses: list[tuple], n_rows: int = 2,
             if isinstance(mean, list):
                 env_mean, env_std_err = mean[env_idx], std_err[env_idx]
                 n_seeds = mean_over_steps[0].shape[-1]
+            elif isinstance(mean, dict):
+                env_mean, env_std_err = mean[env], std_err[env]
             else:
                 env_mean, env_std_err = mean[..., env_idx], std_err[..., env_idx]
                 n_seeds = mean_over_steps.shape[-2]
@@ -192,12 +203,28 @@ def find_file_in_dir(file_name: str, base_dir: Path) -> Path:
 
 if __name__ == "__main__":
 
-    discounted = False
     hyperparam_type = 'per_env'  # (all_env | per_env)
 
-    env_name = 'battleship_10'
-    super_dir = 'battleship'
+    # discounted = False
+    # env_name = 'battleship_10'
+    # super_dir = 'battleship'
+    # best = False
+
+    # discounted = False
+    # env_name = 'rocksample_11_11'
+    # super_dir = 'rocksample_11_11'
+    # best = False
+
+    # discounted = True
+    # env_name = 'navix_01'
+    # super_dir = 'navix_01'
+    # best = True
+
+    discounted = True
+    env_name = 'walker_v'
+    super_dir = 'walker_v'
     best = False
+
     best_str = '_best' if best else ''
     super_dir += best_str
 
@@ -214,20 +241,23 @@ if __name__ == "__main__":
         # ('SF', Path(ROOT_DIR, 'results', 'sf_ppo_rr', f'{env_name}_sf_ppo_rr'), 'cyan'),
         # ('SF discrep', Path(ROOT_DIR, 'results', 'sf_ppo_rr', f'{env_name}_sf_ppo_rr_discrep'), 'yellow'),
 
+        # ('SF', Path(ROOT_DIR, 'results', 'gd_sf_grid_sweep', f'{env_name}_ppo_gd_sf_grid_sweep'), 'cyan'),
+        # ('SF discrep', Path(ROOT_DIR, 'results', 'gd_sf_grid_sweep', f'{env_name}_ppo_gd_sf_grid_sweep_discrep'), 'yellow'),
+
         # ('SF raw hs', Path(ROOT_DIR, 'results', 'gd_sf_hs', f'{env_name}_ppo_gd_sf_hs'), 'cyan'),
         # ('SF raw hs discrep', Path(ROOT_DIR, 'results', 'gd_sf_hs', f'{env_name}_ppo_gd_sf_hs_discrep'), 'yellow'),
-        ('SF raw hs diff', Path(ROOT_DIR, 'results', 'gd_sf_hs', env_name, f'{env_name}_ppo_gd_sf_hs_diff'), 'cyan'),
-        ('SF raw hs diff discrep', Path(ROOT_DIR, 'results', 'gd_sf_hs', env_name, f'{env_name}_ppo_gd_sf_hs_diff_discrep'), 'yellow'),
+        # ('SF raw hs diff', Path(ROOT_DIR, 'results', 'gd_sf_hs', env_name, f'{env_name}_ppo_gd_sf_hs_diff'), 'cyan'),
+        # ('SF raw hs diff discrep', Path(ROOT_DIR, 'results', 'gd_sf_hs', env_name, f'{env_name}_ppo_gd_sf_hs_diff_discrep'), 'yellow'),
 
         # ('SF random proj hs', Path(ROOT_DIR, 'results', 'gd_sf_random_proj_hs', f'{env_name}_ppo_gd_sf_random_proj_hs'), 'cyan'),
         # ('SF random proj hs discrep', Path(ROOT_DIR, 'results', 'gd_sf_random_proj_hs', f'{env_name}_ppo_gd_sf_random_proj_hs_discrep'), 'yellow'),
-        # ('SF random proj hs diff', Path(ROOT_DIR, 'results', 'gd_sf_random_proj_hs', f'{env_name}_ppo_gd_sf_random_proj_hs_diff'), 'cyan'),
-        # ('SF random proj hs diff discrep', Path(ROOT_DIR, 'results', 'gd_sf_random_proj_hs', f'{env_name}_ppo_gd_sf_random_proj_hs_diff_discrep'), 'yellow'),
+        # ('SF random proj hs diff', Path(ROOT_DIR, 'results', 'gd_sf_random_proj_hs', env_name, f'{env_name}_ppo_gd_sf_random_proj_hs_diff'), 'cyan'),
+        # ('SF random proj hs diff discrep', Path(ROOT_DIR, 'results', 'gd_sf_random_proj_hs', env_name, f'{env_name}_ppo_gd_sf_random_proj_hs_diff_discrep'), 'yellow'),
 
         # ('SF random proj obs', Path(ROOT_DIR, 'results', 'gd_sf_random_proj_obs', f'{env_name}_ppo_gd_sf_random_proj_obs'), 'cyan'),
         # ('SF random proj obs discrep', Path(ROOT_DIR, 'results', 'gd_sf_random_proj_obs', f'{env_name}_ppo_gd_sf_random_proj_obs_discrep'), 'yellow'),
-        # ('SF random proj obs diff', Path(ROOT_DIR, 'results', 'gd_sf_random_proj_obs', env_name, f'{env_name}_ppo_gd_sf_random_proj_obs_diff'), 'cyan'),
-        # ('SF random proj obs diff discrep', Path(ROOT_DIR, 'results', 'gd_sf_random_proj_obs', env_name, f'{env_name}_ppo_gd_sf_random_proj_obs_diff_discrep'), 'yellow'),
+        ('SF random proj obs diff', Path(ROOT_DIR, 'results', 'gd_sf_random_proj_obs', env_name, f'{env_name}_ppo_gd_sf_random_proj_obs_diff'), 'cyan'),
+        ('SF random proj obs diff discrep', Path(ROOT_DIR, 'results', 'gd_sf_random_proj_obs', env_name, f'{env_name}_ppo_gd_sf_random_proj_obs_diff_discrep'), 'yellow'),
 
         # ('SF obs', Path(ROOT_DIR, 'results', f'{env_name}_ppo_gd_sf_obs'), 'blue'),
         # ('SF random proj. obs', Path(ROOT_DIR, 'results', 'gd_sf_hs', f'{env_name}_ppo_gd_sf_hs'), 'cyan'),
@@ -244,7 +274,7 @@ if __name__ == "__main__":
         ('RNN', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo{best_str}'), 'purple'),
         ('LD', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_LD{best_str}'), 'blue'),
         ('Memoryless', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_memoryless{best_str}'), 'dark gray'),
-        # ('STATE', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_perfect_memory_memoryless{best_str}'), 'green'),
+        ('STATE', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_perfect_memory{best_str}'), 'green'),
         # ('TRANFORMER', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_transformer'), 'cyan'),
     ]
 
@@ -322,10 +352,15 @@ if __name__ == "__main__":
 
         all_reses.append((name, best_res, color))
 
+        if isinstance(best_res['scores'], dict):
+            denom = list(best_res['scores'].values())[0].shape[0]
+        else:
+            denom = best_res['scores'].shape[0]
+
         if 'all_hyperparams' in best_res:
-            step_multiplier = best_res['all_hyperparams']['total_steps'] // best_res['scores'].shape[0]
+            step_multiplier = best_res['all_hyperparams']['total_steps'] // denom
         elif 'total_steps' in best_res['hyperparams']:
-            step_multiplier = best_res['hyperparams']['total_steps'] // best_res['scores'].shape[0]
+            step_multiplier = best_res['hyperparams']['total_steps'] // denom
         else:
             raise NotImplementedError("Missing total steps")
 
