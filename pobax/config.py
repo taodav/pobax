@@ -35,10 +35,11 @@ class PPOHyperparams(Tap):
     update_epochs: int = 4
     num_minibatches: int = 4
 
-    memoryless: bool = False  # If true, don't use RNNs and use an FNN for func. approximation.
-    perfect_memory: bool = False  # [WIP] Do we use the perfect memory version of the environment?
-    double_critic: bool = False  # Do we have two critic heads?
-    action_concat: bool = False  # Do we concatenate actions to our observation?
+    memoryless: bool = False
+    perfect_memory: bool = False
+    double_critic: bool = False
+    action_concat: bool = False
+    reward_concat: bool = False  
 
     # Below are hyperparameters that can be swept with jax.vmap.
     lr: list[float] = [2.5e-4]  # Learning rate
@@ -87,7 +88,6 @@ class GDPPOHyperparams(PPOHyperparams):
     gamma_max: float = 1.
     gamma_min: float = 0.75
     action_concat: bool = True
-    reward_concat: bool = False  # TODO: Fix this? Gym does rewards weirdly
 
     def process_args(self) -> None:
         if isinstance(self.cumulant_type, str) and self.cumulant_type.lower() == 'none':
