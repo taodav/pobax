@@ -41,7 +41,7 @@ class PPOHyperparams(Tap):
     perfect_memory: bool = False
     double_critic: bool = False
     action_concat: bool = False
-    reward_concat: bool = False  
+    reward_concat: bool = False
 
     lr: list[float] = [2.5e-4]
     lambda0: list[float] = [0.95]  # GAE lambda_0
