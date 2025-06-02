@@ -629,35 +629,35 @@ if __name__ == "__main__":
     vmaps_train = train_fn
     swept_args = deque()
 
-    # we need to go backwards, since JAX returns indices
-    # in the order in which they're vmapped.
-    for i, arg in reversed(list(enumerate(train_args))):
-        dims = [None] * len(train_args)
-        dims[i] = 0
-        vmaps_train = jax.vmap(vmaps_train, in_axes=dims)
-        if arg == 'rng':
-            swept_args.appendleft(rngs)
-        else:
-            assert hasattr(args, arg)
-            swept_args.appendleft(jnp.array(getattr(args, arg)))
-
-    train_jit = jax.jit(vmaps_train)
-
-    # if args.sweep_type == 'grid':
-    #     hparams, _ = get_grid_hparams(args)
-    # elif args.sweep_type == 'random':
-    #     _rng, rng = jax.random.split(rng)
-    #     hparams = get_randomly_sampled_hparams(_rng, args, n_samples=args.n_random_hparams)
-    # else:
-    #     raise NotImplementedError
+    # # we need to go backwards, since JAX returns indices
+    # # in the order in which they're vmapped.
+    # for i, arg in reversed(list(enumerate(train_args))):
+    #     dims = [None] * len(train_args)
+    #     dims[i] = 0
+    #     vmaps_train = jax.vmap(vmaps_train, in_axes=dims)
+    #     if arg == 'rng':
+    #         swept_args.appendleft(rngs)
+    #     else:
+    #         assert hasattr(args, arg)
+    #         swept_args.appendleft(jnp.array(getattr(args, arg)))
     #
-    # vmap_seeds_train_fn = jax.vmap(train_fn, in_axes=[None, 0])
-    # vmap_train_fn = jax.vmap(vmap_seeds_train_fn, in_axes=[0, None])
-    # train_jit = jax.jit(vmap_train_fn)
+    # train_jit = jax.jit(vmaps_train)
+
+    if args.sweep_type == 'grid':
+        hparams, _ = get_grid_hparams(args)
+    elif args.sweep_type == 'random':
+        _rng, rng = jax.random.split(rng)
+        hparams = get_randomly_sampled_hparams(_rng, args, n_samples=args.n_random_hparams)
+    else:
+        raise NotImplementedError
+
+    vmap_seeds_train_fn = jax.vmap(train_fn, in_axes=[None, 0])
+    vmap_train_fn = jax.vmap(vmap_seeds_train_fn, in_axes=[0, None])
+    train_jit = jax.jit(vmap_train_fn)
 
     t = time()
-    # out = jax.block_until_ready(train_jit(hparams, rngs))
-    out = jax.block_until_ready(train_jit(*swept_args))
+    out = jax.block_until_ready(train_jit(hparams, rngs))
+    # out = jax.block_until_ready(train_jit(*swept_args))
     new_t = time()
     total_runtime = new_t - t
     print('Total runtime:', total_runtime)
