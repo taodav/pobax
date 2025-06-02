@@ -41,6 +41,7 @@ class PPOHyperparams(Tap):
     perfect_memory: bool = False
     double_critic: bool = False
     action_concat: bool = False
+    reward_concat: bool = False  
 
     lr: list[float] = [2.5e-4]
     lambda0: list[float] = [0.95]  # GAE lambda_0
@@ -88,7 +89,6 @@ class GDPPOHyperparams(PPOHyperparams):
     gamma_max: float = 1.
     gamma_min: float = 0.75
     action_concat: bool = True
-    reward_concat: bool = False  # TODO: Fix this? Gym does rewards weirdly
 
     def process_args(self) -> None:
         if isinstance(self.cumulant_type, str) and self.cumulant_type.lower() == 'none':
