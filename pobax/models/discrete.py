@@ -98,7 +98,7 @@ class DiscreteActorCriticRNN(nn.Module):
 
         v = critic(embedding)
 
-        return hidden, pi, v
+        return hidden, pi, jnp.squeeze(v, axis=-1)
 
 
 class ImageDiscreteActorCritic(nn.Module):
