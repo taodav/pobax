@@ -18,7 +18,7 @@ hparams = {
             'env': 'rocksample_11_11',
             'double_critic': False,
             'action_concat': True,
-            'reward_concat': False,
+            'reward_concat': True,
             'lr': ' '.join(map(str, lrs)),
             'lambda0': ' '.join(map(str, lambda0s)),
             'lambda1': ' '.join(map(str, lambda1s)),
