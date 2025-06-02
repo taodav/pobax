@@ -39,7 +39,7 @@ class PPOHyperparams(Tap):
     perfect_memory: bool = False
     double_critic: bool = False
     action_concat: bool = False
-    reward_concat: bool = False  
+    reward_concat: bool = False
 
     # Below are hyperparameters that can be swept with jax.vmap.
     lr: list[float] = [2.5e-4]  # Learning rate
