@@ -624,10 +624,10 @@ if __name__ == "__main__":
     rngs = jax.random.split(rng, args.n_seeds)
     train_fn = make_train(args, make_train_rng)
 
-    train_args = list(inspect.signature(train_fn).parameters.keys())
+    # train_args = list(inspect.signature(train_fn).parameters.keys())
 
-    vmaps_train = train_fn
-    swept_args = deque()
+    # vmaps_train = train_fn
+    # swept_args = deque()
 
     # # we need to go backwards, since JAX returns indices
     # # in the order in which they're vmapped.
