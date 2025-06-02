@@ -298,13 +298,13 @@ def make_train(args: GDPPOHyperparams, rand_key: jax.random.PRNGKey):
                                          in_axes=[transition_axes_map, 1, None, 0],
                                          out_axes=2)
 
-    # def train(sweep_args_dict, rng):
-    #     lr, ld_weight, vf_coeff, lambda0, lambda1, entropy_coeff, cumulant_loss_weight = \
-    #         sweep_args_dict['lr'], sweep_args_dict['ld_weight'], sweep_args_dict['vf_coeff'], \
-    #             sweep_args_dict['lambda0'], sweep_args_dict['lambda1'], sweep_args_dict['entropy_coeff'], \
-    #             sweep_args_dict['cumulant_loss_weight']
+    # def train(lr, ld_weight, vf_coeff, lambda0, lambda1, entropy_coeff, cumulant_loss_weight, rng):
+    def train(sweep_args_dict, rng):
+        lr, ld_weight, vf_coeff, lambda0, lambda1, entropy_coeff, cumulant_loss_weight = \
+            sweep_args_dict['lr'], sweep_args_dict['ld_weight'], sweep_args_dict['vf_coeff'], \
+                sweep_args_dict['lambda0'], sweep_args_dict['lambda1'], sweep_args_dict['entropy_coeff'], \
+                sweep_args_dict['cumulant_loss_weight']
 
-    def train(lr, ld_weight, vf_coeff, lambda0, lambda1, entropy_coeff, cumulant_loss_weight, rng):
         agent = GDPPO(network, hangman_network,
                       double_critic=args.double_critic, ld_weight=ld_weight, vf_coeff=vf_coeff,
                       clip_eps=args.clip_eps, entropy_coeff=entropy_coeff,
