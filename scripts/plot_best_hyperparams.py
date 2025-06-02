@@ -215,15 +215,15 @@ if __name__ == "__main__":
     # super_dir = 'rocksample_11_11'
     # best = False
 
-    # discounted = True
-    # env_name = 'navix_01'
-    # super_dir = 'navix_01'
-    # best = True
-
     discounted = True
-    env_name = 'walker_v'
-    super_dir = 'walker_v'
-    best = False
+    env_name = 'navix_01'
+    super_dir = 'navix_01'
+    best = True
+
+    # discounted = True
+    # env_name = 'walker_v'
+    # super_dir = 'walker_v'
+    # best = False
 
     best_str = '_best' if best else ''
     super_dir += best_str
@@ -274,7 +274,7 @@ if __name__ == "__main__":
         ('RNN', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo{best_str}'), 'purple'),
         ('LD', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_LD{best_str}'), 'blue'),
         ('Memoryless', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_memoryless{best_str}'), 'dark gray'),
-        ('STATE', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_perfect_memory{best_str}'), 'green'),
+        # ('STATE', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_perfect_memory{best_str}'), 'green'),
         # ('TRANFORMER', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_transformer'), 'cyan'),
     ]
 
