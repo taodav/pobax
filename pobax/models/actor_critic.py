@@ -136,12 +136,12 @@ class SFActorCritic(nn.Module):
 
 
 class GVFActorCritic(nn.Module):
+# class ActorCritic(nn.Module):
     action_space: Union[spaces.Discrete, spaces.Box]
     hidden_size: int = 128
     cumulant_size: int = None
     memoryless: bool = False
     double_critic: bool = False
-    n_atoms: int = None
 
     @nn.compact
     def __call__(self, hidden, x):
@@ -149,6 +149,7 @@ class GVFActorCritic(nn.Module):
 
         if len(obs.shape) > 3:
             obs_encoding = FullImageCNN(hidden_size=self.hidden_size)(obs)
+            obs_encoding = nn.LayerNorm()(obs_encoding)
             embedding = nn.relu(obs_encoding)
         else:
             obs_encoding = nn.Dense(
@@ -158,6 +159,7 @@ class GVFActorCritic(nn.Module):
             obs_encoding = nn.Dense(
                 self.hidden_size, kernel_init=orthogonal(jnp.sqrt(2)), bias_init=constant(0.0)
             )(obs_encoding)
+            obs_encoding = nn.LayerNorm()(obs_encoding)
             embedding = nn.relu(obs_encoding)
 
         if self.memoryless:
@@ -169,10 +171,7 @@ class GVFActorCritic(nn.Module):
         actor = Actor(self.action_space, hidden_size=self.hidden_size)
         pi = actor(embedding)
 
-        if self.n_atoms is not None and self.n_atoms > 0:
-            critic = QuantileV(n_atoms=self.n_atoms, hidden_size=self.hidden_size)
-        else:
-            critic = Critic(hidden_size=self.hidden_size)
+        critic = Critic(hidden_size=self.hidden_size)
 
         # GVF prediction
         gvf_critic = None
