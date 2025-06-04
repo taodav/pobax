@@ -23,6 +23,7 @@ from pobax.envs import get_env
 from pobax.envs.wrappers.gymnax import LogEnvState
 from pobax.models import get_gymnax_network_fn, ScannedRNN
 from pobax.utils.file_system import get_results_path, numpyify
+from pobax.envs import brax_envs
 
 
 class Transition(NamedTuple):
@@ -155,6 +156,16 @@ def filter_period_first_dim(x, n: int):
     if isinstance(x, jnp.ndarray) or isinstance(x, np.ndarray):
         return x[::n]
 
+def madrona_sys():
+    def limit_jax_mem(limit):
+        os.environ['XLA_PYTHON_CLIENT_MEM_FRACTION'] = f'{limit:.2f}'
+    os.environ['MADRONA_DISABLE_CUDA_HEAP_SIZE'] = '1'
+    limit_jax_mem(0.1)
+    # Tell XLA to use Triton GEMM
+    xla_flags = os.environ.get('XLA_FLAGS', '')
+    xla_flags += ' --xla_gpu_triton_gemm_any=True'
+    os.environ['XLA_FLAGS'] = xla_flags
+
 
 def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
     num_updates = (
@@ -165,6 +176,8 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
     )
     env_key, rand_key = jax.random.split(rand_key)
     env, env_params = get_env(args.env, env_key,
+                                     num_envs=args.num_envs,
+                                     image_size=args.image_size,
                                      gamma=args.gamma,
                                      normalize_image=False,
                                      perfect_memory=args.perfect_memory,
@@ -447,13 +460,7 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
 
     return train
 
-
-if __name__ == "__main__":
-    # jax.disable_jit(True)
-    # okay some weirdness here. NUM_ENVS needs to match with NUM_MINIBATCHES
-    args = PPOHyperparams().parse_args()
-    jax.config.update('jax_platform_name', args.platform)
-
+def main(args):
     rng = jax.random.PRNGKey(args.seed)
     make_train_rng, rng = jax.random.split(rng)
     rngs = jax.random.split(rng, args.n_seeds)
@@ -517,3 +524,86 @@ if __name__ == "__main__":
     print(f"Saving results to {results_path}")
     orbax_checkpointer.save(results_path, all_results, save_args=save_args)
     print("Done.")
+
+def madrona_main(args):
+    rng = jax.random.PRNGKey(args.seed)
+    make_train_rng, rng = jax.random.split(rng)
+    rngs = jax.random.split(rng, args.n_seeds)
+    train_fn = make_train(args, make_train_rng)
+
+    train_args = list(inspect.signature(train_fn).parameters.keys())
+
+    vmaps_train = train_fn
+    swept_args = deque()
+
+    # we need to go backwards, since JAX returns indices
+    # in the order in which they're vmapped.
+    for i, arg in reversed(list(enumerate(train_args))):
+        if arg == 'rng':
+            swept_args.appendleft(rng)
+        else:
+            assert hasattr(args, arg)
+            train_arg = getattr(args, arg)
+            swept_args.appendleft(train_arg[0])
+        
+    train_jit = jax.jit(vmaps_train)
+
+    t = time()
+    out = train_jit(*swept_args)
+    new_t = time()
+    total_runtime = new_t - t
+    print('Total runtime:', total_runtime)
+
+    # our final_eval_metric returns max_num_steps.
+    # we can filter that down by the max episode length amongst the runs.
+    # final_eval = out['final_eval_metric']
+
+    # the +1 at the end is to include the done step
+    # largest_episode = final_eval['returned_episode'].argmax(axis=-2).max() + 1
+
+    # def get_first_n_filter(x):
+    #     return x[..., :largest_episode, :]
+    # out['final_eval_metric'] = jax.tree.map(get_first_n_filter, final_eval)
+
+    final_train_state = out['runner_state'][0]
+    if not args.save_runner_state:
+        del out['runner_state']
+
+    results_path = get_results_path(args, return_npy=False)  # returns a results directory
+
+    all_results = {
+        'argument_order': train_args,
+        'out': out,
+        'args': args.as_dict(),
+        'total_runtime': total_runtime, 
+        'final_train_state': final_train_state
+    }
+
+    # Save all results with Orbax
+    orbax_checkpointer = orbax.checkpoint.PyTreeCheckpointer()
+    save_args = orbax_utils.save_args_from_target(all_results)
+
+    print(f"Saving results to {results_path}")
+    orbax_checkpointer.save(results_path, all_results, save_args=save_args)
+
+    print("Done.")
+
+if __name__ == "__main__":
+    # jax.disable_jit(True)
+    # okay some weirdness here. NUM_ENVS needs to match with NUM_MINIBATCHES
+    args = PPOHyperparams().parse_args()
+    jax.config.update('jax_platform_name', args.platform)
+
+    if args.env in brax_envs and args.env.endswith('pixels'):
+        def limit_jax_mem(limit):
+            os.environ['XLA_PYTHON_CLIENT_MEM_FRACTION'] = f'{limit:.2f}'
+        os.environ['MADRONA_DISABLE_CUDA_HEAP_SIZE'] = '1'
+        limit_jax_mem(0.1)
+        # Tell XLA to use Triton GEMM
+        xla_flags = os.environ.get('XLA_FLAGS', '')
+        xla_flags += ' --xla_gpu_triton_gemm_any=True'
+        os.environ['XLA_FLAGS'] = xla_flags
+
+        madrona_main(args)
+    else:
+        main(args)
