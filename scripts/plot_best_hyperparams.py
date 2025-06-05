@@ -210,15 +210,15 @@ if __name__ == "__main__":
     # super_dir = 'battleship'
     # best = False
 
-    # discounted = False
-    # env_name = 'rocksample_11_11'
-    # super_dir = 'rocksample_11_11'
-    # best = False
+    discounted = False
+    env_name = 'rocksample_11_11'
+    super_dir = 'rocksample_rew_concat'
+    best = False
 
-    discounted = True
-    env_name = 'navix_01'
-    super_dir = 'navix_01'
-    best = True
+    # discounted = True
+    # env_name = 'navix_01'
+    # super_dir = 'navix_01'
+    # best = True
 
     # discounted = True
     # env_name = 'walker_v'
@@ -241,8 +241,8 @@ if __name__ == "__main__":
         # ('SF', Path(ROOT_DIR, 'results', 'sf_ppo_rr', f'{env_name}_sf_ppo_rr'), 'cyan'),
         # ('SF discrep', Path(ROOT_DIR, 'results', 'sf_ppo_rr', f'{env_name}_sf_ppo_rr_discrep'), 'yellow'),
 
-        # ('SF', Path(ROOT_DIR, 'results', 'gd_sf_grid_sweep', f'{env_name}_ppo_gd_sf_grid_sweep'), 'cyan'),
-        # ('SF discrep', Path(ROOT_DIR, 'results', 'gd_sf_grid_sweep', f'{env_name}_ppo_gd_sf_grid_sweep_discrep'), 'yellow'),
+        # ('SF', Path(ROOT_DIR, 'results', 'gd_sf_grid_sweep_rew_concat', f'{env_name}_ppo_gd_sf_grid_sweep'), 'cyan'),
+        # ('SF discrep', Path(ROOT_DIR, 'results', 'gd_sf_grid_sweep_rew_concat', f'{env_name}_ppo_gd_sf_grid_sweep_discrep'), 'yellow'),
 
         # ('SF raw hs', Path(ROOT_DIR, 'results', 'gd_sf_hs', f'{env_name}_ppo_gd_sf_hs'), 'cyan'),
         # ('SF raw hs discrep', Path(ROOT_DIR, 'results', 'gd_sf_hs', f'{env_name}_ppo_gd_sf_hs_discrep'), 'yellow'),
@@ -274,7 +274,7 @@ if __name__ == "__main__":
         ('RNN', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo{best_str}'), 'purple'),
         ('LD', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_LD{best_str}'), 'blue'),
         ('Memoryless', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_memoryless{best_str}'), 'dark gray'),
-        # ('STATE', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_perfect_memory{best_str}'), 'green'),
+        ('STATE', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_perfect_memory{best_str}'), 'green'),
         # ('TRANFORMER', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_transformer'), 'cyan'),
     ]
 
