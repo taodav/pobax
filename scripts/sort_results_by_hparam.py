@@ -16,9 +16,9 @@ labels = {
 
 
 if __name__ == "__main__":
-    hparam = 'n_random_rewards'
-    parent_dir = Path(ROOT_DIR, 'results/sf_ppo_rr')
-    study_hparam_parent_dir = Path(ROOT_DIR, 'scripts/hyperparams/sf_ppo')
+    hparam = 'num_envs'
+    parent_dir = Path(ROOT_DIR, 'results/qr')
+    study_hparam_parent_dir = Path(ROOT_DIR, 'scripts/hyperparams/rocksample')
     study_hparam_parent_dir.mkdir(exist_ok=True)
 
     study_paths = [s for s in parent_dir.iterdir() if s.is_dir()]
