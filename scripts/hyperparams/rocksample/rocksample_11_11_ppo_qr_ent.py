@@ -24,7 +24,7 @@ hparams = {
             'ld_weight': ' '.join(map(str, ld_weights)),
             'quantile_entropy_coeff': ' '.join(map(str, quantile_entropy_coeffs)),
             'hidden_size': 256,
-            'num_envs': 16,
+            'num_envs': 32,
             'entropy_coeff': 0.05,
             'sweep_type': 'random',
             'n_random_hparams': 30,
