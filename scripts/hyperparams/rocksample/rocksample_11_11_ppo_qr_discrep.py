@@ -21,7 +21,7 @@ hparams = {
             'lambda1': ' '.join(map(str, lambda1s)),
             'ld_weight': ' '.join(map(str, ld_weights)),
             'hidden_size': 256,
-            'num_envs': 16,
+            'num_envs': 32,
             'entropy_coeff': 0.05,
             'sweep_type': 'random',
             'n_random_hparams': 30,
