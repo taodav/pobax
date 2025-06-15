@@ -2,12 +2,10 @@ from pathlib import Path
 
 exp_name = Path(__file__).stem
 
-lrs = [2.5e-3, 2.5e-4, 2.5e-5, 2.5e-6]  # Learning rates
-lambda0s = [0.1, 0.3, 0.5, 0.7, 0.9, 0.95]
+lrs = [2.5e-2, 2.5e-3, 2.5e-4, 2.5e-5, 2.5e-6]
+lambda0s = [0., 0.1, 0.3, 0.5, 0.7, 0.9, 0.95]
 lambda1s = [0.95]
-quantile_entropy_coeffs = [0.1, 0.25, 0.5, 0.75]
-ld_weights = [0.]
-vf_coeffs = [0.5]  # Value function coefficients
+ld_weights = [0]
 
 hparams = {
     'file_name':
@@ -15,14 +13,13 @@ hparams = {
     'entry': '-m pobax.algos.qr_ppo',
     'args': [
         {
-            'env': 'rocksample_11_11',
+            'env': 'rocksample_15_15',
             'double_critic': False,
             'action_concat': True,
             'lr': ' '.join(map(str, lrs)),
             'lambda0': ' '.join(map(str, lambda0s)),
             'lambda1': ' '.join(map(str, lambda1s)),
             'ld_weight': ' '.join(map(str, ld_weights)),
-            'quantile_entropy_coeff': ' '.join(map(str, quantile_entropy_coeffs)),
             'hidden_size': 512,
             'num_envs': 32,
             'entropy_coeff': 0.05,
