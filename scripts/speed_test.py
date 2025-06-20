@@ -31,7 +31,7 @@ def run_n_steps(rng, env, env_params, n_steps: int = int(1e6), n_envs: int = 1):
     init_obsv, init_env_state = env.reset(init_rng, env_params)
     step_rng, rng = jax.random.split(rng)
     init_runner_state = (init_env_state, step_rng)
-    starting_runner_state = jax.lax.scan(
+    return jax.lax.scan(
         env_step, init_runner_state, jnp.arange(n_steps), n_steps
     )
 
@@ -61,7 +61,7 @@ if __name__ == "__main__":
                               )
 
     t = time()
-    run_n_steps(key, env, env_params, n_steps=args.n_steps, n_envs=args.n_envs)
+    out = jax.block_until_ready(run_n_steps(key, env, env_params, n_steps=args.n_steps, n_envs=args.n_envs))
     new_t = time()
     total_runtime = new_t - t
     print(f'Total runtime for {args.env} environment with {args.n_envs} envs and {args.n_steps} steps:', total_runtime)
