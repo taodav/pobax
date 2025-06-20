@@ -43,6 +43,9 @@ class SampleHyperparams(Tap):
     seed: int = 2024
     platform: str = 'cpu'
 
+    def process_args(self) -> None:
+        self.n_steps = int(self.n_steps)
+
 
 if __name__ == "__main__":
     args = SampleHyperparams().parse_args()
