@@ -1,5 +1,6 @@
 from functools import partial
 from time import time
+from typing import Union
 
 import jax
 import jax.numpy as jnp
@@ -38,13 +39,15 @@ def run_n_steps(rng, env, env_params, n_steps: int = int(1e6), n_envs: int = 1):
 class SampleHyperparams(Tap):
     env: str = 'rocksample_11_11'
     n_envs: int = 1
-    n_steps: int = int(5e6)
+    n_steps: Union[int, str] = int(5e6)
 
     seed: int = 2024
     platform: str = 'cpu'
 
-    def process_args(self) -> None:
-        self.n_steps = int(self.n_steps)
+    def configure(self) -> None:
+        def to_int(s):
+            return int(float(s))
+        self.add_argument('--n_steps', type=to_int)
 
 
 if __name__ == "__main__":
