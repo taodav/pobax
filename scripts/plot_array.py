@@ -462,7 +462,7 @@ if __name__ == "__main__":
         all_study_settings = generate_gd_workshop_study_paths(all_gd_workshop_paths)
         row_mult, col_mult = 30, 3
         legend_loc = (0.78, 0.07)
-        smoothen_curve = False
+        smoothen_curve = True
     else:
         raise NotImplementedError
 

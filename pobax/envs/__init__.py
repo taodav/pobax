@@ -131,6 +131,7 @@ def get_env(env_name: str,
             perfect_memory: bool = False,
             action_concat: bool = False,
             reward_concat: bool = False,
+            log_stats: bool = True,
             trace_lambdas: jnp.ndarray = None
             ):
 
@@ -243,7 +244,8 @@ def get_env(env_name: str,
     if trace_lambdas is not None:
         env = TraceFeaturesWrapper(env, lambdas=trace_lambdas, trace_in_obs=True)
 
-    env = LogWrapper(env, gamma=gamma)
+    if log_stats:
+        env = LogWrapper(env, gamma=gamma)
 
     if mask_dims is not None:
         env = MaskObservationWrapper(env, mask_dims=mask_dims)
