@@ -8,6 +8,7 @@ from pobax.envs.gymnasium.rocksample import RockSample, GlobalStateObservationWr
 from pobax.envs.gymnasium.battleship import BattleshipEnvClass
 
 from tap import Tap
+from definitions import ROOT_DIR
 
 
 class SampleHyperparams(Tap):
@@ -29,7 +30,7 @@ if __name__ == "__main__":
 
     env = None
     if args.env == 'rocksample':
-        config_path = Path('/Users/ruoyutao/Documents/pobax/pobax/envs/configs/rocksample_11_11_config.json')
+        config_path = Path(ROOT_DIR, 'pobax/envs/configs/rocksample_11_11_config.json')
         env = RockSample(config_path, np.random.RandomState(args.seed))
         env = GlobalStateObservationWrapper(env)
     elif args.env == 'battleship':
