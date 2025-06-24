@@ -181,7 +181,6 @@ class PixelCraftaxVecEnvWrapper(GymnaxWrapper):
             ),
         )
 
-
 class PixelTMazeVecEnvWrapper(PixelBraxVecEnvWrapper):
     def __init__(self, env: VecEnv,
                  size: int = 128,

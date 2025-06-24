@@ -21,7 +21,7 @@ import orbax.checkpoint
 from pobax.config import PPOHyperparams
 from pobax.envs import get_env
 from pobax.envs.wrappers.gymnax import LogEnvState
-from pobax.models import get_gymnax_network_fn, ScannedRNN
+from pobax.models import get_gymnax_network_fn, ScannedRNN, get_general_network_fn
 from pobax.utils.file_system import get_results_path, numpyify
 from pobax.envs import brax_envs
 
@@ -34,7 +34,6 @@ class Transition(NamedTuple):
     log_prob: jnp.ndarray
     obs: jnp.ndarray
     info: jnp.ndarray = None
-
 
 class PPO:
     def __init__(self, network,
@@ -60,7 +59,7 @@ class PPO:
             obs: chex.Array, done: chex.Array):
 
         # SELECT ACTION
-        ac_in = (obs[np.newaxis, :], done[np.newaxis, :])
+        ac_in = (jax.tree_util.tree_map(lambda x: x[jnp.newaxis, ...], obs), done[np.newaxis, :])
         hstate, pi, value = self.network.apply(train_state.params, hidden_state, ac_in)
         action = pi.sample(seed=rng)
         log_prob = pi.log_prob(action)
@@ -76,6 +75,7 @@ class PPO:
         _, pi, value = self.network.apply(
             params, init_hstate[0], (traj_batch.obs, traj_batch.done)
         )
+        print(traj_batch.obs.obs.shape)
         log_prob = pi.log_prob(traj_batch.action)
 
         # CALCULATE VALUE LOSS
@@ -139,14 +139,14 @@ def env_step(runner_state, unused, agent: PPO, env, env_params):
 
 def calculate_gae(traj_batch, last_val, last_done, gae_lambda, gamma):
     def _get_advantages(carry, transition):
-        gae, next_value, gae_lambda = carry
+        gae, next_value, next_done, gae_lambda = carry
         done, value, reward = transition.done, transition.value, transition.reward
-        delta = reward + gamma * next_value * (1 - done) - value
-        gae = delta + gamma * gae_lambda * (1 - done) * gae
-        return (gae, value, gae_lambda), gae
+        delta = reward + gamma * next_value * (1 - next_done) - value
+        gae = delta + gamma * gae_lambda * (1 - next_done) * gae
+        return (gae, value, done, gae_lambda), gae
 
     _, advantages = jax.lax.scan(_get_advantages,
-                                 (jnp.zeros_like(last_val), last_val, gae_lambda),
+                                 (jnp.zeros_like(last_val), last_val, last_done, gae_lambda),
                                  traj_batch, reverse=True, unroll=16)
     target = advantages + traj_batch.value
     return advantages, target
@@ -191,11 +191,14 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
     double_critic = args.double_critic
     memoryless = args.memoryless
 
-    network_fn, action_size = get_gymnax_network_fn(env, env_params, memoryless=memoryless)
-
-    network = network_fn(action_size,
+    network_fn, action_size, is_image, is_discrete = get_general_network_fn(env, env_params)
+    network = network_fn(args.env,
+                         action_size,
                          double_critic=double_critic,
-                         hidden_size=args.hidden_size)
+                         hidden_size=args.hidden_size,
+                         memoryless=memoryless,
+                         is_discrete=is_discrete,
+                         is_image=is_image)
 
     steps_filter = partial(filter_period_first_dim, n=args.steps_log_freq)
     update_filter = partial(filter_period_first_dim, n=args.update_log_freq)
@@ -235,9 +238,7 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
         # INIT NETWORK
         rng, _rng = jax.random.split(rng)
         init_x = (
-            jnp.zeros(
-                (1, args.num_envs, *env.observation_space(env_params).shape)
-            ),
+            env.dummy_observation(args.num_envs, env_params),
             jnp.zeros((1, args.num_envs)),
         )
         init_hstate = ScannedRNN.initialize_carry(args.num_envs, args.hidden_size)
@@ -266,7 +267,7 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
         obsv, env_state = env.reset(reset_rng, env_params)
         init_hstate = ScannedRNN.initialize_carry(args.num_envs, args.hidden_size)
 
-        if not args.env.startswith("craftax"):
+        if not args.env.startswith("craftax"): # TODO: OOM error is env is craftax
             # We first need to populate our LogEnvState stats.
             rng, _rng = jax.random.split(rng)
             init_rng = jax.random.split(_rng, args.num_envs)
@@ -294,7 +295,6 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
 
             replace_field_names = ['returned_episode_returns', 'returned_discounted_episode_returns', 'returned_episode_lengths']
             env_state = recursive_replace(env_state, starting_runner_state[1], replace_field_names)
-            # jax.debug.print("Training starting: {}", time())
 
         # TRAIN LOOP
         def _update_step(runner_state, i):
@@ -306,7 +306,7 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
 
             # CALCULATE ADVANTAGE
             train_state, env_state, last_obs, last_done, hstate, rng = runner_state
-            ac_in = (last_obs[np.newaxis, :], last_done[np.newaxis, :])
+            ac_in = (jax.tree_util.tree_map(lambda x: x[jnp.newaxis, ...], last_obs), last_done[np.newaxis, :])
             _, _, last_val = network.apply(train_state.params, hstate, ac_in)
             last_val = last_val.squeeze(0)
 
@@ -388,7 +388,6 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
 
             rng = update_state[-1]
             if args.debug:
-
                 def callback(info):
                     timesteps = (
                             info["timestep"][info["returned_episode"]] * args.num_envs
@@ -432,10 +431,7 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
         # TODO: offline eval here.
         final_train_state = runner_state[0]
 
-        if not args.env.startswith("craftax"):
-            reset_rng = jax.random.split(_rng, args.num_envs)
-        else:
-            reset_rng, _rng = jax.random.split(_rng)
+        reset_rng = jax.random.split(_rng, args.num_envs)
         eval_obsv, eval_env_state = env.reset(reset_rng, env_params)
 
         eval_init_hstate = ScannedRNN.initialize_carry(args.num_envs, args.hidden_size)
