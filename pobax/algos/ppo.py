@@ -75,7 +75,6 @@ class PPO:
         _, pi, value = self.network.apply(
             params, init_hstate[0], (traj_batch.obs, traj_batch.done)
         )
-        print(traj_batch.obs.obs.shape)
         log_prob = pi.log_prob(traj_batch.action)
 
         # CALCULATE VALUE LOSS

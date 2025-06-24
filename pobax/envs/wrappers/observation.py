@@ -37,10 +37,10 @@ class GeneralObservationWrapper(GymnaxWrapper):
         return Observation(obs=jnp.zeros((1, num_env,) + obs_space.shape, dtype=obs_space.dtype))
 
 class BattleShipObservationWrapper(GeneralObservationWrapper):
-    def __init__(self, env):
+    def __init__(self, env, params=None):
         super().__init__(env)
         self._env = env
-        self.action_size = env.action_space.n
+        self.action_size = env.action_space(params).n
     
     def reset(self, key, params=None):
         obs, env_state = self._env.reset(key, params)
@@ -83,7 +83,7 @@ class BattleShipObservationWrapper(GeneralObservationWrapper):
         )
     
     def dummy_observation(self, num_env, params=None):
-        obs_space = self._env.observation_space(params)
+        obs_space = self.observation_space(params).spaces["obs"]
         action_mask_shape = (self.action_size,)
         return Observation(
             obs=jnp.zeros((1, num_env,) + obs_space.shape, dtype=obs_space.dtype),

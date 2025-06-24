@@ -1,5 +1,6 @@
 import distrax
 import flax.linen as nn
+import jax
 import jax.numpy as jnp
 from jax._src.nn.initializers import orthogonal, constant
 import numpy as np
@@ -24,7 +25,7 @@ class DiscreteActor(nn.Module):
         actor_mean = nn.Dense(
             self.action_dim, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
         )(actor_mean)
-        if action_mask:
+        if action_mask is not None:
             actor_mean = actor_mean * action_mask + (1 - action_mask) * (-1e6)
         pi = distrax.Categorical(logits=actor_mean)
         return pi

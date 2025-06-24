@@ -37,6 +37,10 @@ from pobax.envs.wrappers.gymnax import (
 from pobax.envs.wrappers.pixel import PixelBraxVecEnvWrapper, PixelTMazeVecEnvWrapper, PixelSimpleChainVecEnvWrapper, PixelCraftaxVecEnvWrapper, PixelMadronaVecEnvWrapper
 from pobax.envs.wrappers.gymnasium import GymnaxToGymWrapper
 from pobax.envs.wrappers.nx import NavixGymnaxWrapper, MazeFoVWrapper
+from pobax.envs.wrappers.observation import (
+    GeneralObservationWrapper,
+    BattleShipObservationWrapper,
+)
 
 masked_gymnax_env_map = {
     'Pendulum-F-v0': {'env_str': 'Pendulum-v1', 'mask_dims': [0, 1, 2]},
@@ -220,14 +224,21 @@ def get_env(env_name: str,
         print(f"Overwriting args gamma {gamma} with env gamma {env.gamma}.")
         gamma = env.gamma
 
-    if action_concat:
+    if action_concat and not env_name.startswith('craftax'):
+        # Action concat is not supported for craftax envs
         env = ActionConcatWrapper(env)
 
     env = LogWrapper(env, gamma=gamma)
 
     if mask_dims is not None:
         env = MaskObservationWrapper(env, mask_dims=mask_dims)
-
+    
+    # Make Observation Dict
+    if env_name.startswith('battleship'):
+        env = BattleShipObservationWrapper(env)
+    else:
+        env = GeneralObservationWrapper(env)
+    # TODO: Revise all the wrapppers below to make it compatible with Observation Dict
     # Vectorize our environment
     if env_name in brax_envs and env_name.endswith('pixels'):
         env = MadronaWrapper(env, num_worlds=num_envs)
@@ -237,7 +248,6 @@ def get_env(env_name: str,
         env = PixelCraftaxVecEnvWrapper(env, normalize=normalize_image)
     if env_name in brax_envs and env_name.endswith('pixels'):
         env = PixelMadronaVecEnvWrapper(env, num_worlds=num_envs, normalize=normalize_image, size=image_size)
-
     if normalize_env:
         env = NormalizeVecObservation(env)
         env = NormalizeVecReward(env, gamma)
