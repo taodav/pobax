@@ -17,7 +17,7 @@ from pobax.envs.jax.pocman import PocManStateWrapper as PMPerfectMemoryWrapper
 from pobax.envs.jax.rocksample import RockSample
 from pobax.envs.jax.rocksample import PerfectMemoryWrapper as RSPerfectMemoryWrapper
 from pobax.envs.jax.reacher_pomdp import ReacherPOMDP
-from pobax.envs.jax.simple_chain import SimpleChain
+from pobax.envs.jax.simple_chain import SimpleChain, FullyObservableSimpleChain
 from pobax.envs.jax.tmaze import TMaze
 import pobax.envs.jax.navix_mazes
 from pobax.envs.wrappers.gymnax import (
@@ -151,6 +151,12 @@ def get_env(env_name: str,
                     perfect_memory=perfect_memory)
         env_params = env.default_params
 
+    elif env_name == 'simple_chain':
+        if perfect_memory:
+            env = FullyObservableSimpleChain(n=10)
+        else:
+            env = SimpleChain(n=10)
+        env_params = env.default_params
     elif env_name in pomdp_files:
         env = load_pomdp(env_name, fully_observable=fo_pomdp)
         if hasattr(env, 'gamma'):
