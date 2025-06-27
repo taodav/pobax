@@ -229,8 +229,6 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
         )
         init_hstate = ScannedRNN.initialize_carry(args.num_envs, args.hidden_size)
         network_params = agent.network.init(_rng, init_hstate, init_x)
-        param_count = sum(x.size for x in jax.tree_leaves(network_params))
-        print('Network params number:', param_count)
         if args.anneal_lr:
             tx = optax.chain(
                 optax.clip_by_global_norm(args.max_grad_norm),

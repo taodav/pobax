@@ -248,8 +248,6 @@ def make_train(args: TransformerHyperparams, rand_key: jax.random.PRNGKey):
         init_memory=jnp.zeros((2,args.window_mem,args.num_layers,args.embed_size))
         init_mask=jnp.zeros((2,args.num_heads,1,args.window_mem+1),dtype=jnp.bool_)
         network_params = network.init(_rng, init_memory,init_obs,init_mask)
-        # param_count = sum(x.size for x in jax.tree_leaves(network_params))
-        # print('Network params number:', param_count)
 
         if args.anneal_lr:
             tx = optax.chain(
