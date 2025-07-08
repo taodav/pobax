@@ -1,7 +1,9 @@
+from pathlib import Path
 import matplotlib.pyplot as plt
 from matplotlib import rc
 
 from pobax.utils.plot import colors
+from definitions import ROOT_DIR
 
 rc('font', **{'family': 'serif', 'serif': ['cmr10'], 'size': 32})
 rc('axes', unicode_minus=False)
@@ -53,17 +55,26 @@ if __name__ == "__main__":
         ax.plot(gpu, n_envs, marker='o', linestyle='-', color=colors['blue'], label='gpu')
 
         # Vertical lines for CPU and Gym single-env timings
-        ax.axvline(cpu, color=colors['purple'], linestyle='--', label='cpu')
-        ax.axvline(gym, color=colors['orange'], linestyle='-.', label='gym')
+        ax.axvline(cpu, color=colors['purple'], linestyle='--', label='cpu (1 env)')
+        ax.axvline(gym, color=colors['orange'], linestyle='-.', label='gym (1 env)')
 
         # Labels and title
         ax.set_title(env_to_name[env])
-        ax.set_xlabel('Time for 10^7 steps (seconds)')
         ax.grid(True, which='both', axis='both', linestyle=':', linewidth=0.5)
         # ax.legend()
 
     # Common y-label
-    axes[0].set_ylabel('Number of environments')
+    axes[0].set_ylabel('Num. Environments')
 
-    plt.tight_layout()
+    # Customize legend to use square markers
+    legend = plt.legend(loc='upper left')
+
+    fig.supxlabel('Time for 10^7 steps (seconds)')
+
+    fig.tight_layout()
     plt.show()
+
+    save_plot_to = Path(ROOT_DIR, 'results', f'timings.pdf')
+
+    fig.savefig(save_plot_to, bbox_inches='tight', dpi=100)
+    print(f"Saved figure to {save_plot_to}")
