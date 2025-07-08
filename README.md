@@ -20,3 +20,12 @@ POBAX includes environments (as well as recommended hyperparameter settings) acr
 | [DMLab Minigrid](https://github.com/taodav/pobax/blob/main/pobax/envs/jax/navix_mazes.py)            |      | `Navix-DMLab-Maze-{01/02/03}-v0`          |        | `01/02/03` refer to the DMLab Minigrid mazes in ascending difficulty.                                                                                                       |
 | [Visual Continuous Control]() |      | `{env_name}-pixels`                       |        | **Requires the [Madrona_MJX](https://github.com/shacklettbp/madrona_mjx) package**. `env_name` can be `ant`, `halfcheetah`, `hopper`, or `walker2d`.                        |
 | [No-Inventory Crafter](https://github.com/taodav/pobax/blob/main/pobax/envs/__init__.py#L112)      |      | `craftax-pixels`                          |        | **Requires the [Craftax](https://github.com/MichaelTMatthews/Craftax) package**.                                                                                             |
+
+## Agents
+
+POBAX includes algorithms loosely based on the [PureJAXRL](https://github.com/luchris429/purejaxrl/tree/main/purejaxrl) framework, with algorithms based on [proximal policy optimization (PPO)](https://arxiv.org/abs/1707.06347). These include:
+* Recurrent PPO,
+* [λ-discrepancy](https://arxiv.org/abs/2407.07333),
+* [GTrXL](https://arxiv.org/abs/1910.06764).
+
+Memoryless versions of the recurrent PPO algorithm is also included with the `--memoryless` flag.
