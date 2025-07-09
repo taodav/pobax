@@ -1,16 +1,15 @@
-gymnasium
-jax[cpu]
+jax
 flax
+distrax
 optax
-matplotlib
--e .
+gymnax
+brax
+jumanji
 pandas
 tqdm
 typed-argument-parser
 numpy
-pytest
-brax
-gymnax
-distrax
-jumanji
 navix
+pytest
+matplotlib
+seaborn
