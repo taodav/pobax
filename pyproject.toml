@@ -3,7 +3,7 @@ requires = ["hatchling >= 1.26"]
 build-backend = "hatchling.build"
 
 [project]
-name = "pobax_taodav"
+name = "pobax"
 version = "0.0.1"
 description = "Reinforcement learning benchmark that tests all forms of partial observability in JAX."
 authors = [{ name = "Ruo Yu (David) Tao", email = "ruoyutao@gmail.com" }]
