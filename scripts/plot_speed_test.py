@@ -17,27 +17,26 @@ env_to_name = {
 data = [
   {
     "env": "rocksample_11_11",
-    "n_envs": [1, 5, 25, 125, 2000],
-    "gpu_timings": [393.9228, 405.1604, 406.4938, 497.4396, 500.7241],
+    "n_envs": [1, 5, 25, 125, 625, 2000],
+    "gpu_timings": [393.9228, 405.1604, 406.4938, 497.4396, 499.435, 500.7241],
     "cpu_timing_single_env": 393.3330,
     "gym_timing_single_env": 467.5841
   },
   {
     "env": "battleship_10",
-    "n_envs": [1, 5, 25, 125, 2000],
-    "gpu_timings": [704.5981, 764.3613, 846.0283, 846.7103, 1116.8773],
+    "n_envs": [1, 5, 25, 125, 625, 2000],
+    "gpu_timings": [704.5981, 764.3613, 846.0283, 846.7103, 912.0627, 1116.8773],
     "cpu_timing_single_env": 703.5469,
     "gym_timing_single_env": 103.7113
   },
   {
     "env": "Walker-V-v0",
-    "n_envs": [1, 5, 25, 125, 2000],
-    "gpu_timings": [8553.0134, 9003.7577, 9701.4790, 10267.092, 15228.2229],
+    "n_envs": [1, 5, 25, 125, 625, 2000],
+    "gpu_timings": [8553.0134, 9003.7577, 9701.4790, 10267.092, 11484.3651, 15228.2229],
     "cpu_timing_single_env": 8695.7786,
     "gym_timing_single_env": 4836.4002
   }
 ]
-
 
 
 if __name__ == "__main__":
@@ -71,7 +70,7 @@ if __name__ == "__main__":
 
     # Common y-label
     axes[0].set_ylabel('Num. Environments')
-    lines = [gpu_line, cpu_vline, gym_vline, gpu_single_vline]
+    lines = [gpu_line[0], cpu_vline, gym_vline, gpu_single_vline]
     labels = ['GPU', 'CPU (1 env)', 'Gym (1 env)', 'GPU (per env)']
 
     # Customize legend to use square markers
