@@ -19,6 +19,7 @@ from pobax.envs.jax.rocksample import PerfectMemoryWrapper as RSPerfectMemoryWra
 from pobax.envs.jax.reacher_pomdp import ReacherPOMDP
 from pobax.envs.jax.simple_chain import SimpleChain
 from pobax.envs.jax.tmaze import TMaze
+from pobax.envs.jax.lightbulbs import LightBulbs
 import pobax.envs.jax.navix_mazes
 from pobax.envs.wrappers.gymnax import (
     FlattenObservationWrapper,
@@ -147,6 +148,17 @@ def get_env(env_name: str,
         env = TMaze(hallway_length=hallway_length,
                     perfect_memory=perfect_memory)
         env_params = env.default_params
+
+    elif env_name.startswith('lightbulbs_'):
+        # Parse the size from the name
+        size = int(env_name.split('_')[-1])
+        
+        # Choose your CSV path. You could make this configurable too. lightbulbs_5_config.json
+        goal_csv_path = str(Path(ROOT_DIR) / 'pobax' / 'envs' / 'configs' / f'lightbulbs_{size}_config.json')
+
+        env = LightBulbs(size=size, config_path=goal_csv_path)
+        env_params = env.default_params
+
 
     elif env_name in pomdp_files:
         env = load_pomdp(env_name, fully_observable=fo_pomdp)
