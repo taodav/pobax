@@ -190,7 +190,7 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
     double_critic = args.double_critic
     memoryless = args.memoryless
 
-    network_fn, action_size, is_image, is_discrete = get_general_network_fn(env, env_params)
+    network_fn, action_size, is_image, is_discrete = get_network_fn(env, env_params)
     network = network_fn(args.env,
                          action_size,
                          double_critic=double_critic,

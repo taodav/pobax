@@ -9,7 +9,6 @@ from pobax.envs.jax.battleship import Battleship
 from .continuous import *
 from .discrete import *
 
-
 def get_gymnax_network_fn(env: environment.Environment, env_params: environment.EnvParams,
                           memoryless: bool = False):
     if isinstance(env, Battleship) or ((hasattr(env, '_unwrapped') and isinstance(env._unwrapped, Battleship))):
@@ -48,42 +47,6 @@ def get_gymnax_network_fn(env: environment.Environment, env_params: environment.
         raise NotImplementedError
     return network_fn, action_size
 
-
-def get_network_fn(env: gym.Env,
-                   memoryless: bool = False):
-    obs_space = env.observation_space
-    action_space = env.action_space
-
-    obs_shape = obs_space.shape
-    if isinstance(action_space, gym.spaces.Discrete):
-        if len(obs_shape) > 1:
-            network_fn = ImageDiscreteActorCriticRNN
-            if memoryless:
-                network_fn = ImageDiscreteActorCritic
-            action_size = action_space.n
-        else:
-            network_fn = DiscreteActorCriticRNN
-            if memoryless:
-                network_fn = DiscreteActorCritic
-            action_size = action_space.n
-    else:
-        action_shape = action_space.shape
-        action_size = action_shape[0]
-
-        # Check whether we use image observations
-        if len(obs_shape) > 1:
-            # image observations
-            network_fn = ImageContinuousActorCriticRNN
-            if memoryless:
-                network_fn = ImageContinuousActorCritic
-        else:
-            network_fn = ContinuousActorCriticRNN
-            if memoryless:
-                network_fn = ContinuousActorCritic
-
-    return network_fn, obs_shape, action_size
-
-
 def get_transformer_network_fn(env: environment.Environment, env_params: environment.EnvParams):
     if isinstance(env, Battleship) or ((hasattr(env, '_unwrapped') and isinstance(env._unwrapped, Battleship))):
         network_fn = BattleShipActorCriticTransformer
@@ -110,7 +73,7 @@ def get_transformer_network_fn(env: environment.Environment, env_params: environ
         raise NotImplementedError
     return network_fn, action_size
 
-def get_general_network_fn(env: environment.Environment, env_params: environment.EnvParams):
+def get_network_fn(env: environment.Environment, env_params: environment.EnvParams):
     network_fn = ActorCritic
     is_image = False
     observation_space = env.observation_space(env_params)

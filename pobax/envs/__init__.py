@@ -254,33 +254,3 @@ def get_env(env_name: str,
     elif 'rocksample' in env_name:
         env = NormalizeVecReward(env, gamma)
     return env, env_params
-
-
-def get_gym_env(env_name: str,
-                gamma: float = 0.99,
-                image_size: int = 64,
-                normalize_image: bool = True,
-                num_envs: int = None,
-                seed: int = 2024):
-    # For testing purposes
-    if env_name == 'tmaze':
-        env = TMaze(hallway_length=5)
-        env_params = env.default_params
-
-        env = LogWrapper(env, gamma=gamma)
-        env = VecEnv(env)
-        env = PixelTMazeVecEnvWrapper(env, size=image_size, normalize=normalize_image)
-    elif env_name == 'simple_chain':
-        env = SimpleChain()
-        env_params = env.default_params
-        env = LogWrapper(env, gamma=gamma)
-        env = VecEnv(env)
-        env = PixelSimpleChainVecEnvWrapper(env, size=image_size, normalize=normalize_image)
-    else:
-        env, env_params = load_craftax_env(env_name)
-        env = LogWrapper(env, gamma=gamma)
-        env = VecEnv(env)
-        if env_name.endswith('pixels'):
-            env = PixelCraftaxVecEnvWrapper(env, normalize=normalize_image)
-    env = GymnaxToGymWrapper(env, env_params, seed=seed, num_envs=num_envs)
-    return env
