@@ -1,5 +1,4 @@
 # POBAX: Partially Observable Benchmarks in JAX
-***
 POBAX is a reinforcement learning benchmark that tests all forms of partial observability. 
 
 POBAX has been accepted to RLC 2025. Check out our [paper](https://openreview.net/forum?id=HUTCbYOW5E)!
@@ -7,7 +6,6 @@ POBAX has been accepted to RLC 2025. Check out our [paper](https://openreview.ne
 The benchmark is entirely written in [JAX](https://github.com/jax-ml/jax), allowing for fast, GPU-scalable experimentation.
 
 ## Environments
-***
 POBAX includes environments (as well as recommended hyperparameter settings) across diverse forms of partial observability. We list our environments from smallest to largest (in terms of neural network size requirements for PPO RNN):
 
 | Environment | Category                                                  | IDs | Description                                                                                                                                                                                                        |
@@ -23,7 +21,7 @@ POBAX includes environments (as well as recommended hyperparameter settings) acr
 
 Experimental results on memory-based deep reinforcement learning algorithms are shown here and in [our work](https://openreview.net/forum?id=HUTCbYOW5E).
 
-<img src="https://github.com/taodav/pobax/tree/main/images/all_envs.pdf?raw=true" width="300" />
+<img src="https://github.com/taodav/pobax/blob/main/images/all_envs.png?raw=true" width="300" />
 
 ## Basic Usage
 ```python
