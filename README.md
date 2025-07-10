@@ -21,6 +21,10 @@ POBAX includes environments (as well as recommended hyperparameter settings) acr
 | [Visual Continuous Control]() | Visual occlusion and moment features                      | `{env_name}-pixels`                      | Pixel-based versions of Mujoco control. **Requires the [Madrona_MJX](https://github.com/shacklettbp/madrona_mjx) package**. `env_name` can be `ant`, `halfcheetah`, `hopper`, or `walker2d`.                       |
 | [No-Inventory Crafter](https://github.com/taodav/pobax/blob/main/pobax/envs/__init__.py#L112)    | Object uncertainty & tracking and spatial uncertainty     | `craftax-pixels`                         | Crafter without the inventory. **Requires the [Craftax](https://github.com/MichaelTMatthews/Craftax) package**.                                                                                                    |
 
+Experimental results on memory-based deep reinforcement learning algorithms are shown here and in [our work](https://openreview.net/forum?id=HUTCbYOW5E).
+
+![Experimental results](https://github.com/taodav/pobax/tree/main/images/all_envs.pdf "Title")
+
 ## Basic Usage
 ```python
 import jax
