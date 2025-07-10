@@ -21,8 +21,9 @@ import orbax.checkpoint
 from pobax.config import PPOHyperparams
 from pobax.envs import get_env
 from pobax.envs.wrappers.gymnax import LogEnvState
-from pobax.models import get_gymnax_network_fn, ScannedRNN
+from pobax.models import get_gymnax_network_fn, ScannedRNN, get_network_fn
 from pobax.utils.file_system import get_results_path, numpyify
+from pobax.envs import brax_envs
 
 
 class Transition(NamedTuple):
@@ -33,7 +34,6 @@ class Transition(NamedTuple):
     log_prob: jnp.ndarray
     obs: jnp.ndarray
     info: jnp.ndarray = None
-
 
 class PPO:
     def __init__(self, network,
@@ -59,7 +59,7 @@ class PPO:
             obs: chex.Array, done: chex.Array):
 
         # SELECT ACTION
-        ac_in = (obs[np.newaxis, :], done[np.newaxis, :])
+        ac_in = (jax.tree.map(lambda x: x[jnp.newaxis, ...], obs), done[np.newaxis, :])
         hstate, pi, value = self.network.apply(train_state.params, hidden_state, ac_in)
         action = pi.sample(seed=rng)
         log_prob = pi.log_prob(action)
@@ -138,14 +138,14 @@ def env_step(runner_state, unused, agent: PPO, env, env_params):
 
 def calculate_gae(traj_batch, last_val, last_done, gae_lambda, gamma):
     def _get_advantages(carry, transition):
-        gae, next_value, gae_lambda = carry
+        gae, next_value, next_done, gae_lambda = carry
         done, value, reward = transition.done, transition.value, transition.reward
-        delta = reward + gamma * next_value * (1 - done) - value
-        gae = delta + gamma * gae_lambda * (1 - done) * gae
-        return (gae, value, gae_lambda), gae
+        delta = reward + gamma * next_value * (1 - next_done) - value
+        gae = delta + gamma * gae_lambda * (1 - next_done) * gae
+        return (gae, value, done, gae_lambda), gae
 
     _, advantages = jax.lax.scan(_get_advantages,
-                                 (jnp.zeros_like(last_val), last_val, gae_lambda),
+                                 (jnp.zeros_like(last_val), last_val, last_done, gae_lambda),
                                  traj_batch, reverse=True, unroll=16)
     target = advantages + traj_batch.value
     return advantages, target
@@ -154,6 +154,16 @@ def calculate_gae(traj_batch, last_val, last_done, gae_lambda, gamma):
 def filter_period_first_dim(x, n: int):
     if isinstance(x, jnp.ndarray) or isinstance(x, np.ndarray):
         return x[::n]
+
+def madrona_sys():
+    def limit_jax_mem(limit):
+        os.environ['XLA_PYTHON_CLIENT_MEM_FRACTION'] = f'{limit:.2f}'
+    os.environ['MADRONA_DISABLE_CUDA_HEAP_SIZE'] = '1'
+    limit_jax_mem(0.1)
+    # Tell XLA to use Triton GEMM
+    xla_flags = os.environ.get('XLA_FLAGS', '')
+    xla_flags += ' --xla_gpu_triton_gemm_any=True'
+    os.environ['XLA_FLAGS'] = xla_flags
 
 
 def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
@@ -165,6 +175,8 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
     )
     env_key, rand_key = jax.random.split(rand_key)
     env, env_params = get_env(args.env, env_key,
+                                     num_envs=args.num_envs,
+                                     image_size=args.image_size,
                                      gamma=args.gamma,
                                      normalize_image=False,
                                      perfect_memory=args.perfect_memory,
@@ -178,11 +190,14 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
     double_critic = args.double_critic
     memoryless = args.memoryless
 
-    network_fn, action_size = get_gymnax_network_fn(env, env_params, memoryless=memoryless)
-
-    network = network_fn(action_size,
+    network_fn, action_size, is_image, is_discrete = get_network_fn(env, env_params)
+    network = network_fn(args.env,
+                         action_size,
                          double_critic=double_critic,
-                         hidden_size=args.hidden_size)
+                         hidden_size=args.hidden_size,
+                         memoryless=memoryless,
+                         is_discrete=is_discrete,
+                         is_image=is_image)
 
     steps_filter = partial(filter_period_first_dim, n=args.steps_log_freq)
     update_filter = partial(filter_period_first_dim, n=args.update_log_freq)
@@ -222,9 +237,7 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
         # INIT NETWORK
         rng, _rng = jax.random.split(rng)
         init_x = (
-            jnp.zeros(
-                (1, args.num_envs, *env.observation_space(env_params).shape)
-            ),
+            env.dummy_observation(args.num_envs, env_params),
             jnp.zeros((1, args.num_envs)),
         )
         init_hstate = ScannedRNN.initialize_carry(args.num_envs, args.hidden_size)
@@ -251,7 +264,7 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
         obsv, env_state = env.reset(reset_rng, env_params)
         init_hstate = ScannedRNN.initialize_carry(args.num_envs, args.hidden_size)
 
-        if not args.env.startswith("craftax"):
+        if args.env in ['craftax', 'craftax_pixels']:
             # We first need to populate our LogEnvState stats.
             rng, _rng = jax.random.split(rng)
             init_rng = jax.random.split(_rng, args.num_envs)
@@ -279,7 +292,6 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
 
             replace_field_names = ['returned_episode_returns', 'returned_discounted_episode_returns', 'returned_episode_lengths']
             env_state = recursive_replace(env_state, starting_runner_state[1], replace_field_names)
-            # jax.debug.print("Training starting: {}", time())
 
         # TRAIN LOOP
         def _update_step(runner_state, i):
@@ -291,7 +303,7 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
 
             # CALCULATE ADVANTAGE
             train_state, env_state, last_obs, last_done, hstate, rng = runner_state
-            ac_in = (last_obs[np.newaxis, :], last_done[np.newaxis, :])
+            ac_in = (jax.tree.map(lambda x: x[jnp.newaxis, ...], last_obs), last_done[np.newaxis, :])
             _, _, last_val = network.apply(train_state.params, hstate, ac_in)
             last_val = last_val.squeeze(0)
 
@@ -373,7 +385,6 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
 
             rng = update_state[-1]
             if args.debug:
-
                 def callback(info):
                     timesteps = (
                             info["timestep"][info["returned_episode"]] * args.num_envs
@@ -417,10 +428,7 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
         # TODO: offline eval here.
         final_train_state = runner_state[0]
 
-        if not args.env.startswith("craftax"):
-            reset_rng = jax.random.split(_rng, args.num_envs)
-        else:
-            reset_rng, _rng = jax.random.split(_rng)
+        reset_rng = jax.random.split(_rng, args.num_envs)
         eval_obsv, eval_env_state = env.reset(reset_rng, env_params)
 
         eval_init_hstate = ScannedRNN.initialize_carry(args.num_envs, args.hidden_size)
@@ -445,13 +453,7 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
 
     return train
 
-
-if __name__ == "__main__":
-    # jax.disable_jit(True)
-    # okay some weirdness here. NUM_ENVS needs to match with NUM_MINIBATCHES
-    args = PPOHyperparams().parse_args()
-    jax.config.update('jax_platform_name', args.platform)
-
+def main(args):
     rng = jax.random.PRNGKey(args.seed)
     make_train_rng, rng = jax.random.split(rng)
     rngs = jax.random.split(rng, args.n_seeds)
@@ -485,13 +487,6 @@ if __name__ == "__main__":
     final_eval = out['final_eval_metric']
     final_train_state = out['runner_state'][0]
 
-    # # the +1 at the end is to include the done step
-    # largest_episode = final_eval['returned_episode'].argmax(axis=-2).max() + 1
-
-    # def get_first_n_filter(x):
-    #     return x[..., :largest_episode, :]
-    # out['final_eval_metric'] = jax.tree.map(get_first_n_filter, final_eval)
-
     final_train_state = out['runner_state'][0]
     if not args.save_runner_state:
         del out['runner_state']
@@ -515,3 +510,86 @@ if __name__ == "__main__":
     print(f"Saving results to {results_path}")
     orbax_checkpointer.save(results_path, all_results, save_args=save_args)
     print("Done.")
+
+def madrona_main(args):
+    rng = jax.random.PRNGKey(args.seed)
+    make_train_rng, rng = jax.random.split(rng)
+    rngs = jax.random.split(rng, args.n_seeds)
+    train_fn = make_train(args, make_train_rng)
+
+    train_args = list(inspect.signature(train_fn).parameters.keys())
+
+    vmaps_train = train_fn
+    swept_args = deque()
+
+    # we need to go backwards, since JAX returns indices
+    # in the order in which they're vmapped.
+    for i, arg in reversed(list(enumerate(train_args))):
+        if arg == 'rng':
+            swept_args.appendleft(rng)
+        else:
+            assert hasattr(args, arg)
+            train_arg = getattr(args, arg)
+            swept_args.appendleft(train_arg[0])
+        
+    train_jit = jax.jit(vmaps_train)
+
+    t = time()
+    out = train_jit(*swept_args)
+    new_t = time()
+    total_runtime = new_t - t
+    print('Total runtime:', total_runtime)
+
+    # our final_eval_metric returns max_num_steps.
+    # we can filter that down by the max episode length amongst the runs.
+    # final_eval = out['final_eval_metric']
+
+    # the +1 at the end is to include the done step
+    # largest_episode = final_eval['returned_episode'].argmax(axis=-2).max() + 1
+
+    # def get_first_n_filter(x):
+    #     return x[..., :largest_episode, :]
+    # out['final_eval_metric'] = jax.tree.map(get_first_n_filter, final_eval)
+
+    final_train_state = out['runner_state'][0]
+    if not args.save_runner_state:
+        del out['runner_state']
+
+    results_path = get_results_path(args, return_npy=False)  # returns a results directory
+
+    all_results = {
+        'argument_order': train_args,
+        'out': out,
+        'args': args.as_dict(),
+        'total_runtime': total_runtime, 
+        'final_train_state': final_train_state
+    }
+
+    # Save all results with Orbax
+    orbax_checkpointer = orbax.checkpoint.PyTreeCheckpointer()
+    save_args = orbax_utils.save_args_from_target(all_results)
+
+    print(f"Saving results to {results_path}")
+    orbax_checkpointer.save(results_path, all_results, save_args=save_args)
+
+    print("Done.")
+
+if __name__ == "__main__":
+    # jax.disable_jit(True)
+    # okay some weirdness here. NUM_ENVS needs to match with NUM_MINIBATCHES
+    args = PPOHyperparams().parse_args()
+    jax.config.update('jax_platform_name', args.platform)
+
+    if args.env in brax_envs and args.env.endswith('pixels'):
+        def limit_jax_mem(limit):
+            os.environ['XLA_PYTHON_CLIENT_MEM_FRACTION'] = f'{limit:.2f}'
+        os.environ['MADRONA_DISABLE_CUDA_HEAP_SIZE'] = '1'
+        limit_jax_mem(0.1)
+        # Tell XLA to use Triton GEMM
+        xla_flags = os.environ.get('XLA_FLAGS', '')
+        xla_flags += ' --xla_gpu_triton_gemm_any=True'
+        os.environ['XLA_FLAGS'] = xla_flags
+
+        madrona_main(args)
+    else:
+        main(args)

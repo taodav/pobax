@@ -1,76 +1,9 @@
-import functools
-
 import flax.linen as nn
-import jax
-import jax.numpy as jnp
 from jax._src.nn.initializers import orthogonal, constant
-import numpy as np
 
-
-class ScannedRNN(nn.Module):
+class CNN(nn.Module):
     hidden_size: int
-
-    @functools.partial(
-        nn.scan,
-        variable_broadcast="params",
-        in_axes=0,
-        out_axes=0,
-        split_rngs={"params": False},
-    )
-    @nn.compact
-    def __call__(self, carry, x):
-        """Applies the module."""
-        rnn_state = carry
-        ins, resets = x
-        rnn_state = jnp.where(
-            resets[:, np.newaxis],
-            self.initialize_carry(ins.shape[0], ins.shape[1]),
-            rnn_state,
-        )
-        new_rnn_state, y = nn.GRUCell(features=self.hidden_size)(rnn_state, ins)
-        return new_rnn_state, y
-
-    @staticmethod
-    def initialize_carry(batch_size, hidden_size):
-        return nn.GRUCell(features=hidden_size).initialize_carry(
-            jax.random.PRNGKey(0), (batch_size, hidden_size)
-        )
-
-
-class FixedHorizonPlanningRNN(ScannedRNN):
-    horizon: int = 3
-
-    @functools.partial(
-        nn.scan,
-        variable_broadcast="params",
-        in_axes=0,
-        out_axes=0,
-        split_rngs={"params": False},
-    )
-    @nn.compact
-    def __call__(self, carry, x):
-        """Applies the module."""
-        rnn_state = carry
-        ins, resets = x
-        rnn_state = jnp.where(
-            resets[:, np.newaxis],
-            self.initialize_carry(ins.shape[0], ins.shape[1]),
-            rnn_state,
-        )
-
-        def apply_n_times(rnn_state):
-            rnn_state, y = nn.GRUCell(features=self.hidden_size)(rnn_state, ins)
-            return rnn_state, y
-
-        outs, all_outs = jax.lax.scan(
-            apply_n_times, rnn_state, None, self.horizon
-        )
-        new_rnn_state, y = outs
-        return new_rnn_state, y
-
-
-class SmallImageCNN(nn.Module):
-    hidden_size: int
+    num_channels: int = 32
 
     @nn.compact
     def __call__(self, x):
@@ -126,22 +59,24 @@ class SmallImageCNN(nn.Module):
             out1 = nn.relu(out1)
             conv_out = nn.Conv(features=128, kernel_size=(2, 2), strides=1, padding=0)(out1)
 
-        elif x.shape[-2] >= 14:
+        elif x.shape[-2] >= 14 and x.shape[-2] <= 64:
             out1 = nn.Conv(features=64, kernel_size=(6, 6), strides=1, padding=0)(x)
             out1 = nn.relu(out1)
             out2 = nn.Conv(features=64, kernel_size=(5, 5), strides=1, padding=0)(out1)
             out2 = nn.relu(out2)
 
             final_out = out2
-            # if x.shape[-2] >= 20:
-            #     out3 = nn.Conv(features=64, kernel_size=(3, 3), strides=1, padding=0)(out2)
-            #     out3 = nn.relu(out3)
-            #     final_out = out3
             conv_out = nn.Conv(features=64, kernel_size=(2, 2), strides=1, padding=0)(final_out)
 
         else:
-            raise NotImplementedError
-
+            out1 = nn.Conv(features=self.num_channels, kernel_size=(7, 7), strides=4)(x)
+            out1 = nn.relu(out1)
+            out2 = nn.Conv(features=self.num_channels, kernel_size=(5, 5), strides=2)(out1)
+            out2 = nn.relu(out2)
+            out3 = nn.Conv(features=self.num_channels, kernel_size=(3, 3), strides=2)(out2)
+            out3 = nn.relu(out3)
+            conv_out = nn.Conv(features=self.num_channels, kernel_size=(3, 3), strides=2)(out3)
+            
         conv_out = nn.relu(conv_out)
         # Convolutions "flatten" the last num_dims dimensions.
         flat_out = conv_out.reshape((*conv_out.shape[:-num_dims], -1))  # Flatten
@@ -171,29 +106,22 @@ class SimpleNN(nn.Module):
         )(out)
         return out
 
-
-class FullImageCNN(nn.Module):
-    hidden_size: int
-    num_channels: int = 32
+class BattleshipEmbedding(nn.Module):
+    hidden_size: int = 128
 
     @nn.compact
-    def __call__(self, x):
-        if len(x.shape) == 4:
-            num_dims = 3
-        else:
-            num_dims = len(x.shape) - 2  # b x num_envs
-        out1 = nn.Conv(features=self.num_channels, kernel_size=(7, 7), strides=4)(x)
-        out1 = nn.relu(out1)
-        out2 = nn.Conv(features=self.num_channels, kernel_size=(5, 5), strides=2)(out1)
-        out2 = nn.relu(out2)
-        out3 = nn.Conv(features=self.num_channels, kernel_size=(3, 3), strides=2)(out2)
-        out3 = nn.relu(out3)
-        out4 = nn.Conv(features=self.num_channels, kernel_size=(3, 3), strides=2)(out3)
-        flat_out = out4.reshape((*out4.shape[:-num_dims], -1))  # Flatten
-        flat_out = nn.relu(flat_out)
+    def __call__(self, obs):
+        hit = obs[..., 0:1]
+        obs = jnp.concatenate([hit, obs[..., self.action_dim + 1:]], axis=-1)
 
-        dense_out = nn.Dense(features=self.hidden_size)(flat_out)
-        dense_out = nn.relu(dense_out)
+        embedding = nn.Dense(
+            2 * self.hidden_size, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
+        )(obs)
+        embedding = nn.relu(embedding)
 
-        final_out = nn.Dense(features=self.hidden_size)(dense_out)
-        return final_out
+        embedding = jnp.concatenate((hit, embedding), axis=-1)
+        embedding = nn.Dense(
+            self.hidden_size, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
+        )(embedding)
+        embedding = nn.relu(embedding)
+        return embedding

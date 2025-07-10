@@ -1,5 +1,5 @@
 # taken from https://github.com/luchris429/purejaxrl/blob/main/purejaxrl/wrappers.py
-from typing import Optional, Tuple, Union
+from typing import Optional, Tuple, Union, Callable
 
 from brax import envs
 from brax.envs.wrappers.training import EpisodeWrapper, AutoResetWrapper
@@ -11,6 +11,9 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 from sympy.physics.units import action
+from brax.base import System
+from brax.envs.base import Env
+from brax.envs.base import State
 
 
 class GymnaxWrapper(object):
@@ -529,6 +532,7 @@ class ActionConcatWrapper(GymnaxWrapper):
             action_vec = action_vec[None, None, ...]
             h, w, c = obs_shape
             action_img = action_vec.repeat(h, axis=0).repeat(w, axis=1)
+            
             obs = jnp.concatenate([obs, action_img], axis=-1)
         else:
             raise NotImplementedError
@@ -602,3 +606,61 @@ class OptimisticResetVecEnvWrapper(GymnaxWrapper):
 
         return obs, state, reward, done, info
 
+def _identity_randomization_fn(
+    sys: System, num_worlds: int
+) -> Tuple[System, System]:
+  """Tile the necessary axes for the Madrona BatchRenderer."""
+  in_axes = jax.tree_util.tree_map(lambda x: 0, sys)
+  sys = jax.tree_util.tree_map(lambda x: jnp.repeat(jnp.expand_dims(x, 0), num_worlds, axis=0), sys)
+  return sys, in_axes
+
+# Inspired from https://github.com/shacklettbp/madrona_mjx/blob/main/src/madrona_mjx/wrapper.py
+class MadronaWrapper(GymnaxWrapper):
+  """Wrapper to Vmap an environment that uses the Madrona BatchRenderer.
+
+  Madrona expects certain MjModel axes to be batched so that the buffers can
+  be copied to the GPU. Therefore we need to dummy batch the model to create
+  the correct sized buffers for those not using randomization functions,
+  and for those using randomization we ensure the correct axes are batched.
+
+  Use this instead of the Brax VmapWrapper and DomainRandimzationWrapper."""
+
+  def __init__(
+      self,
+      env: Env,
+      num_worlds,
+      randomization_fn: Optional[
+          Callable[[System], Tuple[System, System]]
+      ] = None,
+  ):
+    super().__init__(env)
+    self.num_worlds = num_worlds
+    if not randomization_fn:
+      randomization_fn = functools.partial(
+          _identity_randomization_fn, num_worlds=num_worlds
+      )
+    self.sys = self._unwrapped._env.sys
+    self._sys_v, self._in_axes = randomization_fn(self.sys)
+
+  def _env_fn(self, sys: System) -> Env:
+    env = self._env
+    env._unwrapped._env.sys = sys
+    return env
+
+  def reset(self, rng: jax.Array, params: Optional[environment.EnvParams]=None) -> State:
+    def reset(sys, rng, params):
+      env = self._env_fn(sys=sys)
+      return env.reset(rng, params)
+
+    obs, state = jax.vmap(reset, in_axes=[self._in_axes, 0, None])(self._sys_v, rng, params)
+    return obs, state
+
+  def step(self, key, state: State, action: jax.Array, params: Optional[environment.EnvParams]=None) -> State:
+    def step(sys, key, s, a, params):
+      env = self._env_fn(sys=sys)
+      return env.step(key, s, a, params)
+
+    res = jax.vmap(step, in_axes=[self._in_axes, 0, 0, 0, None])(
+        self._sys_v, key, state, action, params
+    )
+    return res

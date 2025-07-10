@@ -9,7 +9,7 @@ from definitions import ROOT_DIR
 
 from pobax.envs.jax.battleship import Battleship
 from pobax.envs.jax.battleship import PerfectMemoryWrapper as BSPerfectMemoryWrapper
-from pobax.envs.classic import load_pomdp, load_pomdp
+from pobax.envs.classic import load_pomdp
 from pobax.envs.jax.compass_world import CompassWorld
 from pobax.envs.jax.fishing import Fishing
 from pobax.envs.jax.pocman import PocMan
@@ -25,18 +25,22 @@ from pobax.envs.wrappers.gymnax import (
     LogWrapper,
     MaskObservationWrapper,
     BraxGymnaxWrapper,
-    LogWrapper,
     ClipAction,
     VecEnv,
     NormalizeVecReward,
     NormalizeVecObservation,
     ActionConcatWrapper,
     AutoResetEnvWrapper,
-    OptimisticResetVecEnvWrapper
+    OptimisticResetVecEnvWrapper,
+    MadronaWrapper
 )
-from pobax.envs.wrappers.pixel import PixelBraxVecEnvWrapper, PixelTMazeVecEnvWrapper, PixelSimpleChainVecEnvWrapper, PixelCraftaxVecEnvWrapper
+from pobax.envs.wrappers.pixel import PixelBraxVecEnvWrapper, PixelTMazeVecEnvWrapper, PixelSimpleChainVecEnvWrapper, PixelCraftaxVecEnvWrapper, PixelMadronaVecEnvWrapper
 from pobax.envs.wrappers.gymnasium import GymnaxToGymWrapper
 from pobax.envs.wrappers.nx import NavixGymnaxWrapper, MazeFoVWrapper
+from pobax.envs.wrappers.observation import (
+    GeneralObservationWrapper,
+    BattleShipObservationWrapper,
+)
 
 masked_gymnax_env_map = {
     'Pendulum-F-v0': {'env_str': 'Pendulum-v1', 'mask_dims': [0, 1, 2]},
@@ -67,8 +71,6 @@ masked_gymnax_env_map = {
 
 brax_envs = ['ant', 'walker2d', 'halfcheetah', 'hopper', 'ant_pixels', 'walker2d_pixels', 'halfcheetah_pixels', 'hopper_pixels']
 
-# craftax_envs = ['Craftax-Symbolic-v1', 'Craftax-Pixels-v1', 'Craftax-Classic-Symbolic-v1', 'Craftax-Classic-Pixels-v1']
-# craftax_envs = ['craftax', 'craftax_pixels']
 craftax_envs = {'craftax': 'Craftax-Symbolic-v1', 'craftax_pixels': 'Craftax-Pixels-v1', 'craftax_classic': 'Craftax-Classic-Symbolic-v1', 'craftax_classic_pixels': 'Craftax-Classic-Pixels-v1'}
 
 def is_jax_env(env_name: str):
@@ -98,8 +100,7 @@ def is_jax_env(env_name: str):
 def load_brax_env(env_str: str,
                   gamma: float = 0.99):
     from gymnax import EnvParams
-    from pobax.envs.wrappers.gymnax import BraxGymnaxWrapper, LogWrapper, ClipAction, VecEnv
-    from pobax.envs.wrappers.gymnax import NormalizeVecReward, NormalizeVecObservation
+    from pobax.envs.wrappers.gymnax import BraxGymnaxWrapper, ClipAction
     if env_str.endswith('pixels'):
         env_str = env_str.split('_')[0]
     env = BraxGymnaxWrapper(env_str)
@@ -122,6 +123,8 @@ def load_craftax_env(env_str: str,
 
 def get_env(env_name: str,
             rand_key: random.PRNGKey,
+            num_envs: int,
+            image_size: int = 64,
             normalize_env: bool = False,
             normalize_image: bool = True,
             gamma: float = 0.99,
@@ -221,59 +224,33 @@ def get_env(env_name: str,
         print(f"Overwriting args gamma {gamma} with env gamma {env.gamma}.")
         gamma = env.gamma
 
-    if action_concat:
+    if action_concat and not env_name.startswith('craftax'):
+        # Action concat is not supported for craftax envs
         env = ActionConcatWrapper(env)
 
     env = LogWrapper(env, gamma=gamma)
 
     if mask_dims is not None:
         env = MaskObservationWrapper(env, mask_dims=mask_dims)
-
+    
+    # Make Observation Dict
+    if env_name.startswith('battleship'):
+        env = BattleShipObservationWrapper(env)
+    else:
+        env = GeneralObservationWrapper(env)
+    # TODO: Revise all the wrapppers below to make it compatible with Observation Dict
     # Vectorize our environment
-    env = VecEnv(env)
+    if env_name in brax_envs and env_name.endswith('pixels'):
+        env = MadronaWrapper(env, num_worlds=num_envs)
+    else:
+        env = VecEnv(env)
     if env_name.endswith('pixels') and env_name in craftax_envs.keys():
         env = PixelCraftaxVecEnvWrapper(env, normalize=normalize_image)
-
+    if env_name in brax_envs and env_name.endswith('pixels'):
+        env = PixelMadronaVecEnvWrapper(env, num_worlds=num_envs, normalize=normalize_image, size=image_size)
     if normalize_env:
         env = NormalizeVecObservation(env)
         env = NormalizeVecReward(env, gamma)
     elif 'rocksample' in env_name:
         env = NormalizeVecReward(env, gamma)
     return env, env_params
-
-
-def get_gym_env(env_name: str,
-                gamma: float = 0.99,
-                image_size: int = 64,
-                normalize_image: bool = True,
-                num_envs: int = None,
-                seed: int = 2024):
-    # For testing purposes
-    if env_name == 'tmaze':
-        # hallway_length = int(env_name.split('_')[-1])
-        env = TMaze(hallway_length=5)
-        env_params = env.default_params
-
-        env = LogWrapper(env, gamma=gamma)
-        env = VecEnv(env)
-        env = PixelTMazeVecEnvWrapper(env, size=image_size, normalize=normalize_image)
-    elif env_name == 'simple_chain':
-        env = SimpleChain()
-        env_params = env.default_params
-        env = LogWrapper(env, gamma=gamma)
-        env = VecEnv(env)
-        env = PixelSimpleChainVecEnvWrapper(env, size=image_size, normalize=normalize_image)
-    elif env_name in brax_envs:
-        env, env_params = load_brax_env(env_name)
-        env = LogWrapper(env, gamma=gamma)
-        env = VecEnv(env)
-        if env_name.endswith('pixels'):
-            env = PixelBraxVecEnvWrapper(env, size=image_size, normalize=normalize_image)
-    else:
-        env, env_params = load_craftax_env(env_name)
-        env = LogWrapper(env, gamma=gamma)
-        env = VecEnv(env)
-        if env_name.endswith('pixels'):
-            env = PixelCraftaxVecEnvWrapper(env, normalize=normalize_image)
-    env = GymnaxToGymWrapper(env, env_params, seed=seed, num_envs=num_envs)
-    return env

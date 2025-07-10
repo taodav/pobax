@@ -4,6 +4,7 @@ from typing import Optional, Tuple, Union, Callable
 
 import chex
 import jax
+from flax import struct
 import mujoco
 from brax import base
 from gymnax.environments import spaces, environment
@@ -11,13 +12,10 @@ from jax import numpy as jnp
 
 from pobax.envs import VecEnv
 from pobax.envs.jax.tmaze import TMazeState
-from pobax.envs.wrappers.gymnax import GymnaxWrapper
+from pobax.envs.wrappers.gymnax import GymnaxWrapper, MadronaWrapper, LogEnvState
 
-from brax.base import System
-from brax.envs.base import Env
 from brax.envs.base import State
-from brax.envs.base import Wrapper
-from etils import epath
+from mujoco import mjx
 
 def unwrap_env_state(s):
     if hasattr(s, 'env_state'):
@@ -183,7 +181,6 @@ class PixelCraftaxVecEnvWrapper(GymnaxWrapper):
             ),
         )
 
-
 class PixelTMazeVecEnvWrapper(PixelBraxVecEnvWrapper):
     def __init__(self, env: VecEnv,
                  size: int = 128,
@@ -243,3 +240,101 @@ class PixelSimpleChainVecEnvWrapper(PixelBraxVecEnvWrapper):
 
     def render(self, states, mode='rgb_array'):
         return jnp.ones((self.size, self.size, 2))
+
+@struct.dataclass
+class MadronaEnvState:
+    env_state: LogEnvState
+    data: mujoco.mjx._src.types.Data
+
+class PixelMadronaVecEnvWrapper(GymnaxWrapper):
+    def __init__(self, env: MadronaWrapper,
+                 num_worlds: int = 4,
+                 size: int = 128,
+                 normalize: bool = False,
+                 zoom_factor: float = 1.):
+        import madrona_mjx
+        from madrona_mjx.renderer import BatchRenderer
+        super().__init__(env)
+        self._env.reset = jax.jit(self._env.reset)
+        self._env.step = jax.jit(self._env.step)
+
+        self.renderer = None
+        self.num_worlds = num_worlds
+        self.normalize = normalize
+        self.size = size
+        self.zoom_factor = zoom_factor
+
+        self.enabled_cameras = np.array([0])
+        self.enabled_geom_groups = np.arange(len(self.sys.geom_group))
+        self.renderer = BatchRenderer(
+            self.sys,
+            0,
+            self.num_worlds,
+            self.size,
+            self.size,
+            enabled_cameras = self.enabled_cameras,
+            )
+        self.init_data, self.render_token, self.init_image_obs, _ = self.init(self._sys_v)
+
+    def observation_space(self, params):
+        low, high = 0, 255
+        if self.normalize:
+            high = 1
+        return spaces.Box(
+            low=low,
+            high=high,
+            shape=(self.size, self.size, 3),
+        )
+
+    def init(self, model):
+        def init_(model):
+            data = mjx.make_data(model)
+            # env_state = unwrap_env_state(env_state)
+            # data = data.replace(qpos=env_state.pipeline_state.q, qvel=env_state.pipeline_state.qd)  
+            data = mjx.forward(model, data)
+            render_token, rgb, depth = self.renderer.init(data, model)
+            return data, render_token, rgb, depth
+
+        return jax.vmap(init_, in_axes=[self._in_axes])(model)
+    
+    def reset(
+            self, key: chex.PRNGKey, params: Optional[environment.EnvParams] = None
+    ) -> Tuple[chex.Array, environment.EnvState]:
+        _, env_state = self._env.reset(key, params)
+        render = jax.vmap(self.render, in_axes=(self._in_axes, 0, 0))
+        new_data, image_obs, depth = render(self._sys_v, env_state, self.init_data)
+        env_state = MadronaEnvState(env_state=env_state, data=new_data)
+        image_obs = image_obs.squeeze(1)
+        if image_obs.shape[-1] == 4:
+            image_obs = image_obs[..., :3]
+        if self.normalize:
+            image_obs /= 255.
+        return image_obs, env_state
+
+    def step(
+            self,
+            key: chex.PRNGKey,
+            state: MadronaEnvState,
+            action: Union[int, float],
+            params: Optional[environment.EnvParams] = None,
+    ) -> Tuple[chex.Array, environment.EnvState, float, bool, dict]:
+        _, env_state, reward, done, info = self._env.step(
+            key, state.env_state, action, params
+        )
+        render = jax.vmap(self.render, in_axes=(self._in_axes, 0, 0))
+        data = state.data
+        new_data, image_obs, depth = render(self._sys_v, env_state, data)
+        image_obs = image_obs.squeeze(1)
+        states = MadronaEnvState(env_state=env_state, data=new_data)
+        if image_obs.shape[-1] == 4:
+            image_obs = image_obs[..., :3]
+        if self.normalize:
+            image_obs /= 255.
+        return image_obs, states, reward, done, info
+
+    def render(self, model, env_state, data, mode='rgb_array'):
+        env_state = unwrap_env_state(env_state)
+        data = data.replace(qpos=env_state.pipeline_state.q, qvel=env_state.pipeline_state.qd)
+        new_data = mjx.forward(model, data)
+        _, images, depth = self.renderer.render(self.render_token, new_data)
+        return new_data, images, depth
