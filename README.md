@@ -23,7 +23,7 @@ POBAX includes environments (as well as recommended hyperparameter settings) acr
 
 Experimental results on memory-based deep reinforcement learning algorithms are shown here and in [our work](https://openreview.net/forum?id=HUTCbYOW5E).
 
-![Experimental results](https://github.com/taodav/pobax/tree/main/images/all_envs.pdf "Title")
+![Experimental results](https://github.com/taodav/pobax/tree/main/images/all_envs.pdf?raw=true)
 
 ## Basic Usage
 ```python
