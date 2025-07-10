@@ -19,6 +19,8 @@ POBAX includes environments (as well as recommended hyperparameter settings) acr
 | [Visual Continuous Control]() | Visual occlusion and moment features                      | `{env_name}-pixels`                      | Pixel-based versions of Mujoco control. **Requires the [Madrona_MJX](https://github.com/shacklettbp/madrona_mjx) package**. `env_name` can be `ant`, `halfcheetah`, `hopper`, or `walker2d`.                       |
 | [No-Inventory Crafter](https://github.com/taodav/pobax/blob/main/pobax/envs/__init__.py#L112)    | Object uncertainty & tracking and spatial uncertainty     | `craftax-pixels`                         | Crafter without the inventory. **Requires the [Craftax](https://github.com/MichaelTMatthews/Craftax) package**.                                                                                                    |
 
+<br>
+
 Experimental results on memory-based deep reinforcement learning algorithms are shown here and in [our work](https://openreview.net/forum?id=HUTCbYOW5E).
 
 ![POBAX experimental results](https://github.com/taodav/pobax/blob/main/images/all_envs.png?raw=true)
@@ -82,6 +84,7 @@ python -m pobax.algos.ppo --env tmaze_5 --debug
 @article{tao2025pobax,
   author = {Tao, Ruo Yu and Guo, Kaicheng and Allen, Cameron and Konidaris, George},
   title = {Benchmarking Partial Observability in Reinforcement Learning with a Suite of Memory-Improvable Domains},
+  booktitle = {Proceedings of the Second Reinforcement Learning Conference},
   journal = {The Reinforcement Learning Journal}
   url = {http://github.com/taodav/pobax},
   year = {2025},
