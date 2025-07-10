@@ -1,0 +1,58 @@
+[build-system]
+requires = ["hatchling >= 1.26"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pobax"
+version = "0.0.1"
+description = "Reinforcement learning benchmark that tests all forms of partial observability in JAX."
+authors = [{ name = "Ruo Yu (David) Tao", email = "ruoyutao@gmail.com" }]
+readme = "README.md"
+license = {text = "Apache-2.0"}
+requires-python = ">=3.10"
+dependencies = [
+    "jax",
+    "flax",
+    "distrax",
+    "optax",
+    "gymnax",
+    "brax",
+    "navix",
+    "jumanji",
+    "pandas",
+    "tqdm",
+    "typed-argument-parser",
+    "numpy",
+    "matplotlib",
+    "seaborn",
+]
+classifiers = [
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+]
+test = [
+    "chex",
+    "flax",
+    "brax",
+    "minatar",
+]
+
+[project.urls]
+Homepage = "https://github.com/taodav/pobax"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["pobax*"]
+
+[tool.setuptools]
+license-files = []
