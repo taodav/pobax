@@ -10,6 +10,7 @@ from .network import ScannedRNN, SmallImageCNN
 from .value import Critic
 from pobax.models.transformerXL import Transformer
 from .embedding import CNN, BattleshipEmbedding, SimpleNN
+from .continuous import ContinuousActor
 
 
 class DiscreteActor(nn.Module):
