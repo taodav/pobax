@@ -614,7 +614,7 @@ def _identity_randomization_fn(
   sys = jax.tree_util.tree_map(lambda x: jnp.repeat(jnp.expand_dims(x, 0), num_worlds, axis=0), sys)
   return sys, in_axes
 
-
+# Inspired from https://github.com/shacklettbp/madrona_mjx/blob/main/src/madrona_mjx/wrapper.py
 class MadronaWrapper(GymnaxWrapper):
   """Wrapper to Vmap an environment that uses the Madrona BatchRenderer.
 
@@ -640,7 +640,6 @@ class MadronaWrapper(GymnaxWrapper):
           _identity_randomization_fn, num_worlds=num_worlds
       )
     self.sys = self._unwrapped._env.sys
-    print(f'geom_groups: {self.sys.geom_group}')
     self._sys_v, self._in_axes = randomization_fn(self.sys)
 
   def _env_fn(self, sys: System) -> Env:

@@ -59,7 +59,7 @@ class PPO:
             obs: chex.Array, done: chex.Array):
 
         # SELECT ACTION
-        ac_in = (jax.tree_util.tree_map(lambda x: x[jnp.newaxis, ...], obs), done[np.newaxis, :])
+        ac_in = (jax.tree.map(lambda x: x[jnp.newaxis, ...], obs), done[np.newaxis, :])
         hstate, pi, value = self.network.apply(train_state.params, hidden_state, ac_in)
         action = pi.sample(seed=rng)
         log_prob = pi.log_prob(action)
@@ -266,7 +266,7 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
         obsv, env_state = env.reset(reset_rng, env_params)
         init_hstate = ScannedRNN.initialize_carry(args.num_envs, args.hidden_size)
 
-        if not args.env.startswith("craftax"): # TODO: OOM error is env is craftax
+        if args.env in ['craftax', 'craftax_pixels']:
             # We first need to populate our LogEnvState stats.
             rng, _rng = jax.random.split(rng)
             init_rng = jax.random.split(_rng, args.num_envs)
@@ -305,7 +305,7 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
 
             # CALCULATE ADVANTAGE
             train_state, env_state, last_obs, last_done, hstate, rng = runner_state
-            ac_in = (jax.tree_util.tree_map(lambda x: x[jnp.newaxis, ...], last_obs), last_done[np.newaxis, :])
+            ac_in = (jax.tree.map(lambda x: x[jnp.newaxis, ...], last_obs), last_done[np.newaxis, :])
             _, _, last_val = network.apply(train_state.params, hstate, ac_in)
             last_val = last_val.squeeze(0)
 
@@ -488,13 +488,6 @@ def main(args):
     # we can filter that down by the max episode length amongst the runs.
     final_eval = out['final_eval_metric']
     final_train_state = out['runner_state'][0]
-
-    # # the +1 at the end is to include the done step
-    # largest_episode = final_eval['returned_episode'].argmax(axis=-2).max() + 1
-
-    # def get_first_n_filter(x):
-    #     return x[..., :largest_episode, :]
-    # out['final_eval_metric'] = jax.tree.map(get_first_n_filter, final_eval)
 
     final_train_state = out['runner_state'][0]
     if not args.save_runner_state:
