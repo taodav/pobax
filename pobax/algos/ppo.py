@@ -21,7 +21,7 @@ import orbax.checkpoint
 from pobax.config import PPOHyperparams
 from pobax.envs import get_env
 from pobax.envs.wrappers.gymnax import LogEnvState
-from pobax.models import get_gymnax_network_fn, ScannedRNN, get_general_network_fn
+from pobax.models import get_gymnax_network_fn, ScannedRNN, get_network_fn
 from pobax.utils.file_system import get_results_path, numpyify
 from pobax.envs import brax_envs
 
