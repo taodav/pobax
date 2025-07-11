@@ -3,7 +3,7 @@ from pathlib import Path
 exp_name = Path(__file__).stem
 
 lrs = [2.5e-3, 2.5e-4, 2.5e-5, 2.5e-6]
-lambda0s = [0.1, 0.3, 0.5, 0.7, 0.9, 0.95]
+lambda0s = [0.95]
 lambda1s = [0.95]
 alphas = [1]
 ld_weights = [0]
@@ -17,10 +17,9 @@ hparams = {
             'CartPole-P-v0', 'Pendulum-P-v0', 'Hopper-P-v0', 'Walker-P-v0', 'Ant-P-v0', 'HalfCheetah-P-v0',
             'CartPole-V-v0', 'Pendulum-V-v0', 'Hopper-V-v0', 'Walker-V-v0', 'Ant-V-v0', 'HalfCheetah-V-v0',
         ],
-        'action_concat': True,
         'double_critic': False,
         'lr': ' '.join(map(str, lrs)),
-        'lambda0': lambda0s,
+        'lambda0': ' '.join(map(str, lambda0s)),
         'lambda1': ' '.join(map(str, lambda1s)),
         'alpha': ' '.join(map(str, alphas)),
         'hidden_size': 256,

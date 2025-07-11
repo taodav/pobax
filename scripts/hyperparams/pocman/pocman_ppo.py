@@ -18,7 +18,7 @@ hparams = {
             'double_critic': False,
             'action_concat': True,
             'lr': lrs,
-            'lambda0': ' '.join(map(str, lambda0s)),
+            'lambda0': lambda0s,
             'lambda1': ' '.join(map(str, lambda1s)),
             'alpha': ' '.join(map(str, alphas)),
             'ld_weight': ' '.join(map(str, ld_weights)),
@@ -28,8 +28,10 @@ hparams = {
             'steps_log_freq': 8,
             'update_log_freq': 10,
             'total_steps': int(1e7),
-            'seed': 2025,
-            'n_seeds': 5,
+            'seed': [2024 + i for i in range(5)],
+            'n_seeds': 1,
+            'debug': True,
+            'show_discounted': True,
             'platform': 'gpu',
             'study_name': exp_name
         }
