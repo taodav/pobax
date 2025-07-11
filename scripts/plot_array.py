@@ -376,7 +376,7 @@ def plot_array(all_res: dict, row_mult: int = 10, col_mult: int = 5,
 
 
 if __name__ == "__main__":
-    to_plot = 'ablation_walker_hsize'
+    to_plot = 'all_envs'
 
     if to_plot == 'all_envs':
         all_study_settings = generate_study_paths(all_paths)
