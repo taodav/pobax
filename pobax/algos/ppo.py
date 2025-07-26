@@ -1,11 +1,11 @@
-from typing import NamedTuple
 
 from collections import deque
 from dataclasses import replace
 from functools import partial
 import inspect
+import os
 from time import time
-# import os
+from typing import NamedTuple
 # os.environ["CRAFTAX_RELOAD_TEXTURES"] = "True"
 
 import chex
@@ -21,7 +21,7 @@ import orbax.checkpoint
 from pobax.config import PPOHyperparams
 from pobax.envs import get_env
 from pobax.envs.wrappers.gymnax import LogEnvState
-from pobax.models import get_gymnax_network_fn, ScannedRNN, get_network_fn
+from pobax.models import ScannedRNN, get_network_fn
 from pobax.utils.file_system import get_results_path, numpyify
 from pobax.envs import brax_envs
 
@@ -175,12 +175,11 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
     )
     env_key, rand_key = jax.random.split(rand_key)
     env, env_params = get_env(args.env, env_key,
-                                     num_envs=args.num_envs,
-                                     image_size=args.image_size,
-                                     gamma=args.gamma,
-                                     normalize_image=False,
-                                     perfect_memory=args.perfect_memory,
-                                     action_concat=args.action_concat)
+                              num_envs=args.num_envs,
+                              image_size=args.image_size,
+                              gamma=args.gamma,
+                              perfect_memory=args.perfect_memory,
+                              action_concat=args.action_concat)
 
     if hasattr(env, 'gamma'):
         args.gamma = env.gamma

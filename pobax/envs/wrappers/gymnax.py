@@ -418,7 +418,7 @@ class NormalizeVecReward(GymnaxWrapper):
 
     def reset(self, key, params=None):
         obs, state = self._env.reset(key, params)
-        batch_count = obs.shape[0]
+        batch_count = obs.obs.shape[0]
         state = NormalizeVecRewEnvState(
             mean=0.0,
             var=1.0,
@@ -436,7 +436,7 @@ class NormalizeVecReward(GymnaxWrapper):
 
         batch_mean = jnp.mean(return_val, axis=0)
         batch_var = jnp.var(return_val, axis=0)
-        batch_count = obs.shape[0]
+        batch_count = obs.obs.shape[0]
 
         delta = batch_mean - state.mean
         tot_count = state.count + batch_count

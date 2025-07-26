@@ -123,10 +123,10 @@ def load_craftax_env(env_str: str,
 
 def get_env(env_name: str,
             rand_key: random.PRNGKey,
-            num_envs: int,
+            num_envs: int = None,  # Only for Madrona envs
             image_size: int = 64,
             normalize_env: bool = False,
-            normalize_image: bool = True,
+            normalize_image: bool = False,
             gamma: float = 0.99,
             perfect_memory: bool = False,
             action_concat: bool = False):
@@ -247,12 +247,16 @@ def get_env(env_name: str,
     # TODO: Revise all the wrapppers below to make it compatible with Observation Dict
     # Vectorize our environment
     if env_name in brax_envs and env_name.endswith('pixels'):
+        if num_envs is None:
+            num_envs = 1
         env = MadronaWrapper(env, num_worlds=num_envs)
     else:
         env = VecEnv(env)
     if env_name.endswith('pixels') and env_name in craftax_envs.keys():
         env = PixelCraftaxVecEnvWrapper(env, normalize=normalize_image)
     if env_name in brax_envs and env_name.endswith('pixels'):
+        if num_envs is None:
+            num_envs = 1
         env = PixelMadronaVecEnvWrapper(env, num_worlds=num_envs, normalize=normalize_image, size=image_size)
     if normalize_env:
         env = NormalizeVecObservation(env)
