@@ -11,7 +11,7 @@ import optax
 import orbax.checkpoint
 from PIL import Image
 
-from pobax.algos.ppo import PPO, Transition
+from pobax.algos.ppo_rnn import PPO, Transition
 from pobax.envs import get_env
 from pobax.config import PPOHyperparams
 from pobax.models import get_gymnax_network_fn, ScannedRNN

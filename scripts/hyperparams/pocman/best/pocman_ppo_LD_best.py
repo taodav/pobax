@@ -12,7 +12,7 @@ vf_coeffs = [0.5]  # Value function coefficients
 hparams = {
     'file_name':
         f'runs_{exp_name}.txt',
-    'entry': '-m pobax.algos.ppo',
+    'entry': '-m pobax.algos.ppo_rnn',
     'args': [
         {
             'env': 'pocman',

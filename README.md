@@ -76,7 +76,7 @@ Memoryless versions of the recurrent PPO algorithm is also included with the `--
 
 Here's an example script of how to run a recurrent PPO agent on T-Maze:
 ```shell
-python -m pobax.algos.ppo --env tmaze_5 --debug
+python -m pobax.algos.ppo_rnn_rnn --env tmaze_5 --debug
 ```
 
 ## Citation

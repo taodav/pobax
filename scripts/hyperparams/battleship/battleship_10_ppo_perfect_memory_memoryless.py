@@ -8,7 +8,7 @@ lambda0s = [0.1, 0.3, 0.5, 0.7, 0.9, 0.95]
 hparams = {
     'file_name':
         f'runs_{exp_name}.txt',
-    'entry': '-m pobax.algos.ppo',
+    'entry': '-m pobax.algos.ppo_rnn',
     'args': [
         {
             'env': 'battleship_10',

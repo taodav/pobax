@@ -8,7 +8,7 @@ lambda0s = [0.5]
 hparams = {
     'file_name':
         f'runs_{exp_name}.txt',
-    'entry': '-m pobax.algos.ppo',
+    'entry': '-m pobax.algos.ppo_rnn',
     'args': [
         {
             'env': 'rocksample_11_11',

@@ -104,7 +104,7 @@ def get_fn_from_module(entry: str, fn_name: str = 'make_train'):
     """
     Gets a function based off of an entry string, and a function name.
     :param entry: string (without the python call) of the entrypoint. So for example, 'batch_run_ppo.py' for a call to
-                  python batch_run_ppo.py, or '-m pobax.algos.ppo' for python -m pobax.algos.ppo
+                  python batch_run_ppo.py, or '-m pobax.algos.ppo_rnn' for python -m pobax.algos.ppo_rnn
     :param fn_name: name of the function we want to load in the module
     :return: the function in the module.
     """
