@@ -52,13 +52,6 @@ actions = jax.vmap(env.action_space(env_params).sample)(action_keys)
 obs, env_state, reward, done, info = env.step(step_keys, env_state, actions, env_params)
 ```
 
-To train a recurrent PPO agent in RockSample(11, 11):
-```shell
-python -m algos.ppo --env rocksample_11_11 --num_envs 5 --entropy_coeff 0.2 --total_steps 5000000 --seed 2024 --platform cpu --lr 0.00025 --n_seeds 5 --debug
-```
-This is over 5 seeds over 5M steps on CPU with `entropy coefficient = 0.2` and `learning rate = 2.5e-4`.
-Hyperparameters and their descriptions can be found in `pobax/config.py`.
-
 ## Installation
 
 The latest `pobax` version can be installed via PyPI:
@@ -85,6 +78,14 @@ Here's an example script of how to run a recurrent PPO agent on T-Maze:
 ```shell
 python -m pobax.algos.ppo --env tmaze_5 --debug
 ```
+
+To train a recurrent PPO agent in RockSample(11, 11):
+
+```shell
+python -m pobax.algos.ppo --env rocksample_11_11 --num_envs 4 --entropy_coeff 0.2 --total_steps 5000000 --seed 2024 --platform cpu --lr 0.00025 --n_seeds 5 --debug
+```
+This is over 5 seeds over 5M steps on CPU with `entropy coefficient = 0.2`, `learning rate = 2.5e-4`, and 4 parallel environments.
+Hyperparameters and their descriptions can be found in `pobax/config.py`.
 
 ## Citation
 ```
