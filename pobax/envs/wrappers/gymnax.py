@@ -14,8 +14,6 @@ from brax.base import System
 from brax.envs.base import Env
 from brax.envs.base import State
 
-from pobax.envs.wrappers.observation import Observation
-
 
 class GymnaxWrapper(object):
     """Base class for Gymnax wrappers."""
@@ -368,7 +366,7 @@ class NormalizeVecObservation(GymnaxWrapper):
         )
         new_obs = (obs.obs - state.mean) / jnp.sqrt(state.var + 1e-8)
 
-        return Observation(obs=new_obs, action_mask=obs.action_mask), state
+        return obs._replace(obs=new_obs), state
 
     def step(self, key, state, action, params=None):
         obs, env_state, reward, done, info = self._env.step(
@@ -398,7 +396,7 @@ class NormalizeVecObservation(GymnaxWrapper):
         new_obs = (obs.obs - state.mean) / jnp.sqrt(state.var + 1e-8)
 
         return (
-            Observation(obs=new_obs, action_mask=obs.action_mask),
+            obs._replace(obs=new_obs),
             state,
             reward,
             done,

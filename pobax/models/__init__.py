@@ -73,16 +73,20 @@ def get_transformer_network_fn(env: environment.Environment, env_params: environ
 
 
 class DiscreteActorCriticRNN(nn.Module):
+    env: str
     action_dim: int
     hidden_size: int = 128
     double_critic: bool = False
+    memoryless: bool = False
+    is_discrete: bool = True
+    is_image: bool = False
 
     @nn.compact
     def __call__(self, hidden, x):
         obs, dones = x
         embedding = nn.Dense(
             self.hidden_size, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
-        )(obs)
+        )(obs.obs)
         embedding = nn.relu(embedding)
 
         rnn_in = (embedding, dones)
