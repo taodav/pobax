@@ -1,10 +1,8 @@
-from typing import Union
-
-import gymnasium as gym
 from gymnax.environments import environment, spaces
 import navix as nx
 
 from pobax.envs.jax.battleship import Battleship
+from .actor_critic import ActorCritic
 
 from .continuous import *
 from .discrete import *
@@ -88,4 +86,3 @@ def get_network_fn(env: environment.Environment, env_params: environment.EnvPara
             is_image = True
             break
     return network_fn, action_size, is_image, is_discrete
-    
