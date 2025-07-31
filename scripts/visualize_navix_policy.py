@@ -14,7 +14,7 @@ from PIL import Image
 from pobax.algos.ppo import PPO, Transition
 from pobax.envs import get_env
 from pobax.config import PPOHyperparams
-from pobax.models import get_gymnax_network_fn, ScannedRNN
+from pobax.models import get_network_fn, ScannedRNN
 from pobax.utils.video import navix_overlay_obs_on_rgb
 
 from definitions import ROOT_DIR
@@ -36,11 +36,12 @@ def load_train_state(fpath: Path, key: chex.PRNGKey):
     double_critic = args.double_critic
     memoryless = args.memoryless
 
-    network_fn, action_size = get_gymnax_network_fn(env, env_params, memoryless=memoryless)
+    network_fn, action_size, _, _ = get_network_fn(env, env_params)
 
     network = network_fn(action_size,
                          double_critic=double_critic,
-                         hidden_size=args.hidden_size)
+                         hidden_size=args.hidden_size,
+                         memoryless=memoryless)
 
     agent = PPO(network,
                 double_critic=double_critic,

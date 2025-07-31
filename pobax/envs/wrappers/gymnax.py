@@ -10,10 +10,11 @@ from gymnax.environments import environment, spaces
 import jax
 import jax.numpy as jnp
 import numpy as np
-from sympy.physics.units import action
 from brax.base import System
 from brax.envs.base import Env
 from brax.envs.base import State
+
+from pobax.envs.wrappers.observation import Observation
 
 
 class GymnaxWrapper(object):
@@ -340,14 +341,14 @@ class NormalizeVecObservation(GymnaxWrapper):
     def reset(self, key, params=None):
         obs, state = self._env.reset(key, params)
         state = NormalizeVecObsEnvState(
-            mean=jnp.zeros_like(obs),
-            var=jnp.ones_like(obs),
+            mean=jnp.zeros_like(obs.obs),
+            var=jnp.ones_like(obs.obs),
             count=1e-4,
             env_state=state,
         )
-        batch_mean = jnp.mean(obs, axis=0)
-        batch_var = jnp.var(obs, axis=0)
-        batch_count = obs.shape[0]
+        batch_mean = jnp.mean(obs.obs, axis=0)
+        batch_var = jnp.var(obs.obs, axis=0)
+        batch_count = obs.obs.shape[0]
 
         delta = batch_mean - state.mean
         tot_count = state.count + batch_count
@@ -365,17 +366,18 @@ class NormalizeVecObservation(GymnaxWrapper):
             count=new_count,
             env_state=state.env_state,
         )
+        new_obs = (obs.obs - state.mean) / jnp.sqrt(state.var + 1e-8)
 
-        return (obs - state.mean) / jnp.sqrt(state.var + 1e-8), state
+        return Observation(obs=new_obs, action_mask=obs.action_mask), state
 
     def step(self, key, state, action, params=None):
         obs, env_state, reward, done, info = self._env.step(
             key, state.env_state, action, params
         )
 
-        batch_mean = jnp.mean(obs, axis=0)
-        batch_var = jnp.var(obs, axis=0)
-        batch_count = obs.shape[0]
+        batch_mean = jnp.mean(obs.obs, axis=0)
+        batch_var = jnp.var(obs.obs, axis=0)
+        batch_count = obs.obs.shape[0]
 
         delta = batch_mean - state.mean
         tot_count = state.count + batch_count
@@ -393,8 +395,10 @@ class NormalizeVecObservation(GymnaxWrapper):
             count=new_count,
             env_state=env_state,
         )
+        new_obs = (obs.obs - state.mean) / jnp.sqrt(state.var + 1e-8)
+
         return (
-            (obs - state.mean) / jnp.sqrt(state.var + 1e-8),
+            Observation(obs=new_obs, action_mask=obs.action_mask),
             state,
             reward,
             done,

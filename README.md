@@ -82,10 +82,10 @@ python -m pobax.algos.ppo --env tmaze_5 --debug
 To train a recurrent PPO agent in RockSample(11, 11):
 
 ```shell
-python -m pobax.algos.ppo --env rocksample_11_11 --num_envs 4 --entropy_coeff 0.2 --total_steps 5000000 --seed 2024 --platform cpu --lr 0.00025 --n_seeds 5 --debug
+python -m pobax.algos.ppo --env rocksample_11_11 --num_envs 8 --entropy_coeff 0.2 --lambda0 0.5 --lr 0.00025 --total_steps 5000000 --seed 2024 --platform cpu --n_seeds 5 --debug
 ```
 This is over 5 seeds over 5M steps on CPU with `entropy coefficient = 0.2`, `learning rate = 2.5e-4`, and 4 parallel environments.
-Hyperparameters and their descriptions can be found in `pobax/config.py`.
+These hyperparameters are the best selected from our sweep. Hyperparameters and their descriptions can be found in `pobax/config.py`.
 
 ## Citation
 ```
