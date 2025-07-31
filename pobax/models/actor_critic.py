@@ -2,8 +2,11 @@ from flax import linen as nn
 from jax import numpy as jnp
 from jax._src.nn.initializers import orthogonal, constant
 
-from pobax.models import SimpleNN, ScannedRNN, DiscreteActor, ContinuousActor, Critic
-from .embedding import CNN, BattleshipEmbedding
+from pobax.models.discrete import DiscreteActor
+from pobax.models.continuous import ContinuousActor
+from pobax.models.value import Critic
+from pobax.models.network import SimpleNN, ScannedRNN
+from pobax.models.embedding import CNN, BattleshipEmbedding
 
 
 class ActorCritic(nn.Module):
