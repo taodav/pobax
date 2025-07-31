@@ -119,11 +119,11 @@ class PPO:
         return total_loss, (value_loss, loss_actor, entropy)
 
 def env_step(runner_state, unused, env, network, env_params, args: TransformerHyperparams):
-    train_state, env_state,memories,memories_mask,memories_mask_idx, last_obs,done,step_env_currentloop, rng = runner_state
+    train_state, env_state, memories, memories_mask, memories_mask_idx, last_obs, last_done, step_env_currentloop, rng = runner_state
                 
     # reset memories mask and mask idx in cask of done otherwise mask will consider one more stepif not filled (if filled= 
-    memories_mask_idx=jnp.where(done,args.window_mem ,jnp.clip(memories_mask_idx-1,0,args.window_mem))
-    memories_mask=jnp.where(done[:,None,None,None],jnp.zeros((args.num_envs,args.num_heads,1,args.window_mem+1),dtype=jnp.bool_),memories_mask)
+    memories_mask_idx=jnp.where(last_done, args.window_mem ,jnp.clip(memories_mask_idx-1,0,args.window_mem))
+    memories_mask=jnp.where(last_done[:,None,None,None],jnp.zeros((args.num_envs,args.num_heads,1,args.window_mem+1),dtype=jnp.bool_),memories_mask)
                 
     #Update memories mask with the potential additional step taken into account at this step
     memories_mask_idx_ohot=jax.nn.one_hot(memories_mask_idx,args.window_mem+1)
@@ -142,7 +142,7 @@ def env_step(runner_state, unused, env, network, env_params, args: TransformerHy
     # STEP ENV
     rng, _rng = jax.random.split(rng)
     rng_step = jax.random.split(_rng, args.num_envs)
-    obsv, env_state, reward, done, info =env.step(
+    obsv, env_state, reward, done, info = env.step(
         rng_step, env_state, action, env_params
     )
                              
@@ -152,7 +152,7 @@ def env_step(runner_state, unused, env, network, env_params, args: TransformerHy
     memory_indices=jnp.arange(0,args.window_mem)[None,:]+step_env_currentloop*jnp.ones((args.num_envs,1),dtype=jnp.int32)
                 
     transition = Transition(
-        done, action, value, reward, log_prob, memories_mask.squeeze(),memory_indices, last_obs, info
+        last_done, action, value, reward, log_prob, memories_mask.squeeze(), memory_indices, last_obs, info
     )
     runner_state = (train_state, env_state,memories, memories_mask, memories_mask_idx, obsv, done, step_env_currentloop+1, rng)
     return runner_state, (transition,memories_out)
