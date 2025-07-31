@@ -25,7 +25,7 @@ hparams = {
             'hidden_size': 512,
             'embed_size': 220,
             'entropy_coeff': 0.1,
-            'num_envs': 16,
+            'num_envs': 32,
             'steps_log_freq': 8,
             'update_log_freq': 10,
             'total_steps': int(1e7),
