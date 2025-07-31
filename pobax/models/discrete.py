@@ -4,8 +4,7 @@ import jax.numpy as jnp
 from jax._src.nn.initializers import orthogonal, constant
 import numpy as np
 
-from . import FullImageCNN
-from .network import SmallImageCNN
+from .network import SmallImageCNN, FullImageCNN
 from .value import Critic
 from pobax.models.transformerXL import Transformer
 
