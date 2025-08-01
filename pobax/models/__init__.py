@@ -33,51 +33,11 @@ def get_transformer_network_fn(env: environment.Environment, env_params: environ
         raise NotImplementedError
     return network_fn, action_size
 
-
-class DiscreteActorCriticRNN(nn.Module):
-    env: str
-    action_dim: int
-    hidden_size: int = 128
-    double_critic: bool = False
-    memoryless: bool = False
-    is_discrete: bool = True
-    is_image: bool = False
-
-    @nn.compact
-    def __call__(self, hidden, x):
-        obs, dones = x
-        embedding = nn.Dense(
-            self.hidden_size, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
-        )(obs.obs)
-        embedding = nn.relu(embedding)
-
-        rnn_in = (embedding, dones)
-        hidden, embedding = ScannedRNN(hidden_size=self.hidden_size)(hidden, rnn_in)
-
-        actor = DiscreteActor(self.action_dim, hidden_size=self.hidden_size)
-        pi = actor(embedding)
-
-        critic = Critic(hidden_size=self.hidden_size)
-
-        if self.double_critic:
-            critic = nn.vmap(Critic,
-                             variable_axes={'params': 0},
-                             split_rngs={'params': True},
-                             in_axes=None,
-                             out_axes=2,
-                             axis_size=2)(hidden_size=self.hidden_size)
-
-        v = critic(embedding)
-
-        return hidden, pi, jnp.squeeze(v, axis=-1)
-
 def get_network_fn(env: environment.Environment, env_params: environment.EnvParams):
     network_fn = ActorCritic
     is_image = False
     observation_space = env.observation_space(env_params)
     if isinstance(env.action_space(env_params), spaces.Discrete):
-        from pobax.models.discrete import DiscreteActor
-        network_fn = DiscreteActorCriticRNN
         action_size = env.action_space(env_params).n
         is_discrete = True
     elif isinstance(env.action_space(env_params), spaces.Box):

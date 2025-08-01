@@ -155,17 +155,6 @@ def filter_period_first_dim(x, n: int):
     if isinstance(x, jnp.ndarray) or isinstance(x, np.ndarray):
         return x[::n]
 
-def madrona_sys():
-    def limit_jax_mem(limit):
-        os.environ['XLA_PYTHON_CLIENT_MEM_FRACTION'] = f'{limit:.2f}'
-    os.environ['MADRONA_DISABLE_CUDA_HEAP_SIZE'] = '1'
-    limit_jax_mem(0.1)
-    # Tell XLA to use Triton GEMM
-    xla_flags = os.environ.get('XLA_FLAGS', '')
-    xla_flags += ' --xla_gpu_triton_gemm_any=True'
-    os.environ['XLA_FLAGS'] = xla_flags
-
-
 def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
     num_updates = (
             args.total_steps // args.num_steps // args.num_envs
