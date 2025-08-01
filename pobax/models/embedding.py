@@ -1,5 +1,7 @@
 import flax.linen as nn
 from jax._src.nn.initializers import orthogonal, constant
+import jax.numpy as jnp
+import numpy as np
 
 class CNN(nn.Module):
     hidden_size: int
@@ -108,6 +110,7 @@ class SimpleNN(nn.Module):
 
 class BattleshipEmbedding(nn.Module):
     hidden_size: int = 128
+    action_dim: int = 10
 
     @nn.compact
     def __call__(self, obs):

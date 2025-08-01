@@ -21,8 +21,8 @@ class ActorCritic(nn.Module):
     def setup(self):
         if self.is_image:
             self.embedding = CNN(hidden_size=self.hidden_size)
-        elif self.env_name == 'battleship':
-            self.embedding = BattleshipEmbedding(hidden_size=self.hidden_size)
+        elif 'battleship' in self.env_name:
+            self.embedding = BattleshipEmbedding(hidden_size=self.hidden_size, action_dim=self.action_dim)
         elif not self.memoryless:
             self.embedding = nn.Sequential([
                 nn.Dense(self.hidden_size, kernel_init=orthogonal(jnp.sqrt(2)), bias_init=constant(0.0)),
