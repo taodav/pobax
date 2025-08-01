@@ -19,10 +19,11 @@ import optax
 import orbax.checkpoint
 
 from pobax.config import TransformerHyperparams
-from pobax.envs import get_env
+from pobax.envs import get_transformer_env
 from pobax.envs.wrappers.gymnax import LogEnvState
 from pobax.models import get_transformer_network_fn
 from pobax.utils.file_system import get_results_path
+from pobax.envs import brax_envs
 
 class Transition(NamedTuple):
     done: jnp.ndarray
@@ -189,8 +190,9 @@ def make_train(args: TransformerHyperparams, rand_key: jax.random.PRNGKey):
             args.num_envs * args.num_steps // args.num_minibatches
     )
     env_key, rand_key = jax.random.split(rand_key)
-    env, env_params = get_env(args.env, env_key,
+    env, env_params = get_transformer_env(args.env, env_key, args.num_envs,
                                      gamma=args.gamma,
+                                     image_size=args.image_size,
                                      normalize_image=False,
                                      action_concat=args.action_concat)
     if hasattr(env, 'gamma'):
@@ -362,10 +364,16 @@ def make_train(args: TransformerHyperparams, rand_key: jax.random.PRNGKey):
                     timesteps = (
                             info["timestep"][info["returned_episode"]] * args.num_envs
                     )
-                    avg_return_values = jnp.mean(info["returned_episode_returns"][info["returned_episode"]])
+                    if args.show_discounted:
+                        show_str = "avg discounted return"
+                        avg_return_values = jnp.mean(info["returned_discounted_episode_returns"][info["returned_episode"]])
+                    else:
+                        show_str = "avg episodic return"
+                        avg_return_values = jnp.mean(info["returned_episode_returns"][info["returned_episode"]])
+
                     if len(timesteps) > 0:
                         print(
-                            f"timesteps={timesteps[0]} - {timesteps[-1]}, avg episodic return={avg_return_values:.2f}"
+                            f"timesteps={timesteps[0]} - {timesteps[-1]}, {show_str}={avg_return_values:.2f}"
                         )
 
                 jax.debug.callback(callback, metric)
@@ -393,12 +401,76 @@ def make_train(args: TransformerHyperparams, rand_key: jax.random.PRNGKey):
     
     return train
 
+def madrona_main(args: TransformerHyperparams):
+    print(f'{args.env} is using madrona')
+    def limit_jax_mem(limit):
+        os.environ['XLA_PYTHON_CLIENT_MEM_FRACTION'] = f'{limit:.2f}'
+    os.environ['MADRONA_DISABLE_CUDA_HEAP_SIZE'] = '1'
+    limit_jax_mem(0.1)
+    # Tell XLA to use Triton GEMM
+    xla_flags = os.environ.get('XLA_FLAGS', '')
+    xla_flags += ' --xla_gpu_triton_gemm_any=True'
+    os.environ['XLA_FLAGS'] = xla_flags
 
-if __name__ == "__main__":
-    # jax.disable_jit(True)
-    args = TransformerHyperparams().parse_args()
-    jax.config.update('jax_platform_name', args.platform)
+    rng = jax.random.PRNGKey(args.seed)
+    make_train_rng, rng = jax.random.split(rng)
+    rngs = jax.random.split(rng, args.n_seeds)
+    train_fn = make_train(args, make_train_rng)
+    train_args = list(inspect.signature(train_fn).parameters.keys())
 
+    vmaps_train = train_fn
+    swept_args = deque()
+
+    if args.env not in brax_envs:
+        for i, arg in reversed(list(enumerate(train_args))):
+            dims = [None] * len(train_args)
+            dims[i] = 0
+            vmaps_train = jax.vmap(vmaps_train, in_axes=dims)
+            if arg == 'rng':
+                swept_args.appendleft(rngs)
+            else:
+                assert hasattr(args, arg)
+                swept_args.appendleft(getattr(args, arg))
+    else:
+        for i, arg in reversed(list(enumerate(train_args))):
+            if arg == 'rng':
+                swept_args.appendleft(rng)
+            else:
+                assert hasattr(args, arg)
+                train_arg = getattr(args, arg)
+                swept_args.appendleft(train_arg[0])
+
+    train_jit = jax.jit(vmaps_train)
+    t = time()
+    out = train_jit(*swept_args)
+    new_t = time()
+    total_runtime = new_t - t
+    print('Total runtime:', total_runtime)
+
+    final_train_state = out['runner_state'][0]
+    if not args.save_runner_state:
+        del out['runner_state']
+
+    results_path = get_results_path(args, return_npy=False)  # returns a results directory
+
+    all_results = {
+        'argument_order': train_args,
+        'out': out,
+        'args': args.as_dict(),
+        'total_runtime': total_runtime, 
+        'final_train_state': final_train_state
+    }
+
+    # Save all results with Orbax
+    orbax_checkpointer = orbax.checkpoint.PyTreeCheckpointer()
+    save_args = orbax_utils.save_args_from_target(all_results)
+
+    print(f"Saving results to {results_path}")
+    # numpyify_and_save(results_path, all_results)
+    orbax_checkpointer.save(results_path, all_results, save_args=save_args)
+    print("Done.")
+
+def main(args: TransformerHyperparams):
     rng = jax.random.PRNGKey(args.seed)
     make_train_rng, rng = jax.random.split(rng)
     rngs = jax.random.split(rng, args.n_seeds)
@@ -448,3 +520,14 @@ if __name__ == "__main__":
     print(f"Saving results to {results_path}")
     orbax_checkpointer.save(results_path, all_results, save_args=save_args)
     print("Done.")
+
+
+if __name__ == "__main__":
+    # jax.disable_jit(True)
+    args = TransformerHyperparams().parse_args()
+    jax.config.update('jax_platform_name', args.platform)
+
+    if args.env in brax_envs and args.env.endswith('pixels'):
+        madrona_main(args)
+    else:
+        main(args)
