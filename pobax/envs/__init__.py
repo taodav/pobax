@@ -16,6 +16,7 @@ from pobax.envs.jax.pocman import PocMan
 from pobax.envs.jax.pocman import PocManStateWrapper as PMPerfectMemoryWrapper
 from pobax.envs.jax.rocksample import RockSample
 from pobax.envs.jax.rocksample import PerfectMemoryWrapper as RSPerfectMemoryWrapper
+from pobax.envs.jax.rocksample import FullyObservableWrapper
 from pobax.envs.jax.reacher_pomdp import ReacherPOMDP
 from pobax.envs.jax.simple_chain import SimpleChain, FullyObservableSimpleChain
 from pobax.envs.jax.tmaze import TMaze
@@ -209,7 +210,8 @@ def get_env(env_name: str,
             env = RockSample(rand_key)
         env_params = env.default_params
         if perfect_memory:
-            env = RSPerfectMemoryWrapper(env)
+            # env = RSPerfectMemoryWrapper(env)
+            env = FullyObservableWrapper(env)
 
     elif env_name.startswith('Navix-DMLab'):
         nx_env = nx.make(env_name)
