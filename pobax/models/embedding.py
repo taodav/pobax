@@ -2,6 +2,7 @@ import flax.linen as nn
 from jax._src.nn.initializers import orthogonal, constant
 import jax.numpy as jnp
 import numpy as np
+from .network import SmallImageCNN
 
 class CNN(nn.Module):
     hidden_size: int
@@ -114,17 +115,20 @@ class BattleshipEmbedding(nn.Module):
 
     @nn.compact
     def __call__(self, obs):
-        hit = obs[..., 0:1]
-        obs = jnp.concatenate([hit, obs[..., self.action_dim + 1:]], axis=-1)
+        if len(obs.shape) == 4:
+            embedding = SmallImageCNN(hidden_size=self.hidden_size)(obs)
+            embedding = nn.relu(embedding)
+        else:
+            hit = obs[..., 0:1]
+            obs = jnp.concatenate([hit, obs[..., self.action_dim + 1:]], axis=-1)
+            embedding = nn.Dense(
+                2 * self.hidden_size, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
+            )(obs)
+            embedding = nn.relu(embedding)
 
-        embedding = nn.Dense(
-            2 * self.hidden_size, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
-        )(obs)
-        embedding = nn.relu(embedding)
-
-        embedding = jnp.concatenate((hit, embedding), axis=-1)
-        embedding = nn.Dense(
-            self.hidden_size, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
-        )(embedding)
-        embedding = nn.relu(embedding)
+            embedding = jnp.concatenate((hit, embedding), axis=-1)
+            embedding = nn.Dense(
+                self.hidden_size, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
+            )(embedding)
+            embedding = nn.relu(embedding)
         return embedding
