@@ -2,7 +2,7 @@ import jax
 import jax.numpy as jnp
 from jax import random
 
-from porl.envs.battleship import Battleship, BattleShipState, place_ship_randomly
+from pobax.envs.jax.battleship import Battleship, BattleShipState, place_ship_randomly
 
 
 if __name__ == "__main__":
@@ -79,16 +79,24 @@ if __name__ == "__main__":
     def ravel_idx(y: int, x: int):
         return y * env.rows + x
 
+    reset_key, key = random.split(key)
+    obs, state = env.reset(reset_key, env_params)
+    assert jnp.all(obs.action_mask == 1)
+
     state = BattleShipState(hits_misses=jnp.zeros_like(board),
-                            board=board,
-                            last_action=jnp.zeros(env.action_space(env_params).n, dtype=int))
+                            board=board)
     # Test miss
     a = (4, 3)
     step_key, key = random.split(key)
     obs, state, rew, term, info = env.step(step_key, state, ravel_idx(*a), env_params)
 
     assert state.hits_misses[a] == 1
-    assert obs[0] == 0
+    assert obs.obs[0] == 0
+    action_idx = a[0] * env.rows + a[1]
+
+    # check action mask is correct
+    assert obs.action_mask[action_idx] == 0
+    assert jnp.all(obs.action_mask[:action_idx] == 1) and jnp.all(obs.action_mask[action_idx + 1:] == 1)
 
     # Test hit
     a = (2, 8)
@@ -96,7 +104,11 @@ if __name__ == "__main__":
     obs, state, rew, term, info = env.step(step_key, state, ravel_idx(*a), env_params)
 
     assert state.hits_misses[a] == 2
-    assert obs[0] == 1
+    assert obs.obs[0] == 1
+
+    # check action mask is correct
+    assert obs.action_mask[a[0] * env.rows + a[1]] == 0
+    assert obs.action_mask.sum() == (env.rows * env.cols - 2)
 
     a = (6, 1)
     almost_all_hit = board * 2

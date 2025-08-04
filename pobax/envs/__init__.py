@@ -38,10 +38,8 @@ from pobax.envs.wrappers.gymnax import (
 from pobax.envs.wrappers.pixel import PixelBraxVecEnvWrapper, PixelTMazeVecEnvWrapper, PixelSimpleChainVecEnvWrapper, PixelCraftaxVecEnvWrapper, PixelMadronaVecEnvWrapper
 from pobax.envs.wrappers.gymnasium import GymnaxToGymWrapper
 from pobax.envs.wrappers.nx import NavixGymnaxWrapper, MazeFoVWrapper
-from pobax.envs.wrappers.observation import (
-    GeneralObservationWrapper,
-    BattleShipObservationWrapper,
-)
+from pobax.envs.wrappers.observation import NamedObservationWrapper
+
 
 masked_gymnax_env_map = {
     'Pendulum-F-v0': {'env_str': 'Pendulum-v1', 'mask_dims': [0, 1, 2]},
@@ -242,10 +240,9 @@ def get_env(env_name: str,
         env = MaskObservationWrapper(env, mask_dims=mask_dims)
     
     # Make Observation Dict
-    if env_name.startswith('battleship'):
-        env = BattleShipObservationWrapper(env)
-    else:
-        env = GeneralObservationWrapper(env)
+    if not env_name.startswith('battleship'):
+        env = NamedObservationWrapper(env)
+
     # TODO: Revise all the wrapppers below to make it compatible with Observation Dict
     # Vectorize our environment
     if env_name in brax_envs and env_name.endswith('pixels'):
