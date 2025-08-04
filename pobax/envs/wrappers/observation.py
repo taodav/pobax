@@ -44,43 +44,47 @@ class BattleShipObservationWrapper(GeneralObservationWrapper):
     
     def reset(self, key, params=None):
         obs, env_state = self._env.reset(key, params)
-        hit = obs[..., 0:1]
-        if len(obs.shape) == 4:
+        if len(obs.shape) == 2:
             valid_action_mask = (obs == 0).reshape(*obs.shape[:-2], -1)
         else:
-            valid_action_mask = obs[..., 1:self.action_size + 1]
-        obs = jnp.concatenate([hit, obs[..., self.action_size + 1:]], axis=-1)
+            valid_action_mask = obs[1:self.action_size + 1]
         obs = Observation(obs=obs, action_mask=valid_action_mask)
         return obs, env_state
 
     def step(self, key, state, action, params=None):
         obs, state, reward, done, info = self._env.step(key, state, action, params)
-        hit = obs[..., 0:1]
-        if len(obs.shape) == 4:
+        if len(obs.shape) == 2:
             valid_action_mask = (obs == 0).reshape(*obs.shape[:-2], -1)
         else:
-            valid_action_mask = obs[..., 1:self.action_size + 1]
-        obs = jnp.concatenate([hit, obs[..., self.action_size + 1:]], axis=-1)
+            valid_action_mask = obs[1:self.action_size + 1]
         obs = Observation(obs=obs, action_mask=valid_action_mask)
         return obs, state, reward, done, info
 
     def observation_space(self, params=None):
-        return spaces.Dict(
-            {
-                "obs": spaces.Box(
-                    low=self._env.observation_space(params).low,
-                    high=self._env.observation_space(params).high,
-                    shape=self._env.observation_space(params).shape[:-1] + (self._env.observation_space(params).shape[-1] - self.action_size,),
-                    dtype=np.float32,
-                ),
-                "action_mask": spaces.Box(
-                    low=0.0,
-                    high=1.0,
-                    shape=(self.action_size,),
-                    dtype=np.float32,
-                ),
-            }
-        )
+        if len(self._env.observation_space(params).shape) == 2:
+            return spaces.Dict(
+                {
+                    "obs": self._env.observation_space(params),
+                    "action_mask": spaces.Box(
+                        low=0.0,
+                        high=1.0,
+                        shape=(self.action_size,),
+                        dtype=np.float32,
+                    ),
+                }
+            )
+        else:
+            return spaces.Dict(
+                {
+                    "obs": self._env.observation_space(params),
+                    "action_mask": spaces.Box(
+                        low=0.0,
+                        high=1.0,
+                        shape=(self.action_size,),
+                        dtype=np.float32,
+                    ),
+                }
+            )
     
     def dummy_observation(self, num_env, params=None):
         obs_space = self.observation_space(params).spaces["obs"]
