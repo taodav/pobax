@@ -16,6 +16,7 @@ from pobax.envs.jax.pocman import PocMan
 from pobax.envs.jax.pocman import PocManStateWrapper as PMPerfectMemoryWrapper
 from pobax.envs.jax.rocksample import RockSample
 from pobax.envs.jax.rocksample import PerfectMemoryWrapper as RSPerfectMemoryWrapper
+from pobax.envs.jax.rocksample import FullyObservableWrapper as RSFullyObservableWrapper
 from pobax.envs.jax.reacher_pomdp import ReacherPOMDP
 from pobax.envs.jax.simple_chain import SimpleChain, FullyObservableSimpleChain
 from pobax.envs.jax.tmaze import TMaze
@@ -37,10 +38,8 @@ from pobax.envs.wrappers.gymnax import (
 from pobax.envs.wrappers.pixel import PixelBraxVecEnvWrapper, PixelTMazeVecEnvWrapper, PixelSimpleChainVecEnvWrapper, PixelCraftaxVecEnvWrapper, PixelMadronaVecEnvWrapper
 from pobax.envs.wrappers.gymnasium import GymnaxToGymWrapper
 from pobax.envs.wrappers.nx import NavixGymnaxWrapper, MazeFoVWrapper
-from pobax.envs.wrappers.observation import (
-    GeneralObservationWrapper,
-    BattleShipObservationWrapper,
-)
+from pobax.envs.wrappers.observation import NamedObservationWrapper
+
 
 masked_gymnax_env_map = {
     'Pendulum-F-v0': {'env_str': 'Pendulum-v1', 'mask_dims': [0, 1, 2]},
@@ -209,7 +208,8 @@ def get_env(env_name: str,
             env = RockSample(rand_key)
         env_params = env.default_params
         if perfect_memory:
-            env = RSPerfectMemoryWrapper(env)
+            # env = RSPerfectMemoryWrapper(env)
+            env = RSFullyObservableWrapper(env)
 
     elif env_name.startswith('Navix-DMLab'):
         nx_env = nx.make(env_name)
@@ -240,10 +240,9 @@ def get_env(env_name: str,
         env = MaskObservationWrapper(env, mask_dims=mask_dims)
     
     # Make Observation Dict
-    if env_name.startswith('battleship'):
-        env = BattleShipObservationWrapper(env)
-    else:
-        env = GeneralObservationWrapper(env)
+    if not env_name.startswith('battleship'):
+        env = NamedObservationWrapper(env)
+
     # TODO: Revise all the wrapppers below to make it compatible with Observation Dict
     # Vectorize our environment
     if env_name in brax_envs and env_name.endswith('pixels'):
@@ -258,6 +257,134 @@ def get_env(env_name: str,
         if num_envs is None:
             num_envs = 1
         env = PixelMadronaVecEnvWrapper(env, num_worlds=num_envs, normalize=normalize_image, size=image_size)
+    if normalize_env:
+        env = NormalizeVecObservation(env)
+        env = NormalizeVecReward(env, gamma)
+    elif 'rocksample' in env_name:
+        env = NormalizeVecReward(env, gamma)
+    return env, env_params
+
+
+def get_transformer_env(env_name: str,
+            rand_key: random.PRNGKey,
+            num_envs: int,
+            image_size: int = 64,
+            normalize_env: bool = False,
+            normalize_image: bool = True,
+            gamma: float = 0.99,
+            perfect_memory: bool = False,
+            action_concat: bool = False):
+
+    mask_dims = None
+    if env_name in masked_gymnax_env_map:
+        spec = masked_gymnax_env_map[env_name]
+        env_name = spec['env_str']
+        mask_dims = spec['mask_dims']
+    envs_dir = Path(ROOT_DIR) / 'pobax' / 'envs'
+
+    pomdp_dir = envs_dir / 'classic' / 'POMDP'
+    pomdp_files = [pd.stem for pd in pomdp_dir.iterdir()]
+
+    fo_pomdp = 'fully_observable' in env_name
+    if fo_pomdp:
+        env_name = env_name.split('_')[-1]
+
+    if env_name.startswith('tmaze_'):
+        hallway_length = int(env_name.split('_')[-1])
+        env = TMaze(hallway_length=hallway_length)
+        env_params = env.default_params
+
+    elif env_name in pomdp_files:
+        env = load_pomdp(env_name, fully_observable=fo_pomdp)
+        if hasattr(env, 'gamma'):
+            gamma = env.gamma
+        env_params = env.default_params
+    elif env_name.startswith('battleship'):
+        rows = cols = 10
+        ship_lengths = (5, 4, 3, 2)
+        if env_name == 'battleship_5':
+            rows = cols = 5
+            ship_lengths = (3, 2)
+        elif env_name == 'battleship_3':
+            rows = cols = 3
+            ship_lengths = (2, )
+
+        env = Battleship(rows=rows, cols=cols, ship_lengths=ship_lengths)
+        env_params = env.default_params
+
+        if perfect_memory:
+            env = BSPerfectMemoryWrapper(env)
+
+    elif env_name == 'pocman':
+        env = PocMan()
+        env_params = env.default_params
+
+        if perfect_memory:
+            env = PMPerfectMemoryWrapper(env)
+
+    elif env_name == 'ReacherPOMDP':
+        env = ReacherPOMDP()
+        env_params = env.default_params
+
+    elif 'fishing' in env_name:
+        config_path = envs_dir / 'configs' / 'ocean_nav' / f'{env_name}_config.json'
+        env = Fishing(config_path=config_path)
+        env_params = env.default_params
+
+    elif env_name in brax_envs:
+        env, env_params = load_brax_env(env_name, gamma=gamma)
+    
+    elif env_name in craftax_envs:
+        env, env_params = load_craftax_env(env_name, gamma=gamma)
+
+    elif 'rocksample' in env_name:  # [rocksample, rocksample_15_15]
+
+        if len(env_name.split('_')) > 1:
+            config_path = Path(ROOT_DIR, 'pobax', 'envs', 'configs', f'{env_name}_config.json')
+            env = RockSample(rand_key, config_path=config_path)
+        else:
+            env = RockSample(rand_key)
+        env_params = env.default_params
+        if perfect_memory:
+            env = RSPerfectMemoryWrapper(env)
+
+    elif env_name.startswith('Navix-DMLab'):
+        nx_env = nx.make(env_name)
+        env = NavixGymnaxWrapper(nx_env)
+        env_params = env.default_params
+        if 'RGB' in env_name:
+            print("FoV masking is not implemented yet for RGB features.")
+        elif '-F-' not in env_name:
+            env = MazeFoVWrapper(env)
+            # env = FlattenObservationWrapper(env)
+        # else:
+
+    else:
+        env, env_params = gymnax.make(env_name)
+        env = FlattenObservationWrapper(env)
+
+    if hasattr(env, 'gamma'):
+        print(f"Overwriting args gamma {gamma} with env gamma {env.gamma}.")
+        gamma = env.gamma
+
+    if action_concat:
+        env = ActionConcatWrapper(env)
+
+    env = LogWrapper(env, gamma=gamma)
+
+    if mask_dims is not None:
+        env = MaskObservationWrapper(env, mask_dims=mask_dims)
+
+    # Vectorize our environment
+    if env_name in brax_envs and env_name.endswith('pixels'):
+        env = MadronaWrapper(env, num_worlds=num_envs)
+    else:
+        env = VecEnv(env)
+    if env_name.endswith('pixels') and env_name in craftax_envs.keys():
+        env = PixelCraftaxVecEnvWrapper(env, normalize=normalize_image)
+    if env_name in brax_envs and env_name.endswith('pixels'):
+        env = PixelMadronaVecEnvWrapper(env, num_worlds=num_envs, normalize=normalize_image, size=image_size)
+
     if normalize_env:
         env = NormalizeVecObservation(env)
         env = NormalizeVecReward(env, gamma)

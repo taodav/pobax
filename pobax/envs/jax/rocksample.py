@@ -90,6 +90,39 @@ class PerfectMemoryWrapper(GymnaxWrapper):
         )
         return mem_obs, next_state, reward, done, info
 
+class FullyObservableWrapper(GymnaxWrapper):
+    def __init__(self, env):
+        self._env = env
+
+    def _make_full_obs(self, state: RockSampleState) -> jnp.ndarray:
+        # position one-hot
+        size = self._env.size
+        position = state.position.astype(int)
+        position_obs_y = jnp.zeros(size)
+        position_obs_x = jnp.zeros(size)
+        position_obs_y = position_obs_y.at[position[0]].set(1)
+        position_obs_x = position_obs_x.at[position[1]].set(1)
+        # true rock morality (fully observable)
+        rock_obs = state.rock_morality.astype(float)
+        return jnp.concatenate([position_obs_y, position_obs_x, rock_obs])
+
+    @partial(jax.jit, static_argnums=(0,))
+    def reset(self, key: chex.PRNGKey, params: Optional[environment.EnvParams] = None):
+        obs, env_state = self._env.reset(key, params)
+        full_obs = self._make_full_obs(env_state)
+        return full_obs, env_state
+
+    @partial(jax.jit, static_argnums=(0,))
+    def step(self,
+             key: chex.PRNGKey,
+             state: RockSampleState,
+             action: Union[int, float, jnp.ndarray],
+             params: Optional[environment.EnvParams] = None):
+        obs, next_state, reward, done, info = self._env.step(
+            key, state, action, params
+        )
+        full_obs = self._make_full_obs(next_state)
+        return full_obs, next_state, reward, done, info
 
 class RockSample(Environment):
     direction_mapping = jnp.array([[-1, 0], [0, 1], [1, 0], [0, -1]], dtype=int)

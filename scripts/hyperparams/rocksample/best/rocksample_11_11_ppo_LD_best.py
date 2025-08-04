@@ -3,8 +3,8 @@ from pathlib import Path
 exp_name = Path(__file__).stem
 
 lrs = [2.5e-3]  # Learning rates
-lambda0s = [0.1]
-lambda1s = [0.95]
+lambda0s = [0.5]
+lambda1s = [0.5]
 alphas = [1]
 ld_weights = [0.25]
 vf_coeffs = [0.5]  # Value function coefficients

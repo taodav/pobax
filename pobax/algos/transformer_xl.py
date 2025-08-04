@@ -19,10 +19,11 @@ import optax
 import orbax.checkpoint
 
 from pobax.config import TransformerHyperparams
-from pobax.envs import get_env
+from pobax.envs import get_transformer_env
 from pobax.envs.wrappers.gymnax import LogEnvState
 from pobax.models import get_transformer_network_fn
 from pobax.utils.file_system import get_results_path
+from pobax.envs import brax_envs
 
 class Transition(NamedTuple):
     done: jnp.ndarray
@@ -119,11 +120,11 @@ class PPO:
         return total_loss, (value_loss, loss_actor, entropy)
 
 def env_step(runner_state, unused, env, network, env_params, args: TransformerHyperparams):
-    train_state, env_state,memories,memories_mask,memories_mask_idx, last_obs,done,step_env_currentloop, rng = runner_state
+    train_state, env_state, memories, memories_mask, memories_mask_idx, last_obs, last_done, step_env_currentloop, rng = runner_state
                 
     # reset memories mask and mask idx in cask of done otherwise mask will consider one more stepif not filled (if filled= 
-    memories_mask_idx=jnp.where(done,args.window_mem ,jnp.clip(memories_mask_idx-1,0,args.window_mem))
-    memories_mask=jnp.where(done[:,None,None,None],jnp.zeros((args.num_envs,args.num_heads,1,args.window_mem+1),dtype=jnp.bool_),memories_mask)
+    memories_mask_idx=jnp.where(last_done, args.window_mem ,jnp.clip(memories_mask_idx-1,0,args.window_mem))
+    memories_mask=jnp.where(last_done[:,None,None,None],jnp.zeros((args.num_envs,args.num_heads,1,args.window_mem+1),dtype=jnp.bool_),memories_mask)
                 
     #Update memories mask with the potential additional step taken into account at this step
     memories_mask_idx_ohot=jax.nn.one_hot(memories_mask_idx,args.window_mem+1)
@@ -142,7 +143,7 @@ def env_step(runner_state, unused, env, network, env_params, args: TransformerHy
     # STEP ENV
     rng, _rng = jax.random.split(rng)
     rng_step = jax.random.split(_rng, args.num_envs)
-    obsv, env_state, reward, done, info =env.step(
+    obsv, env_state, reward, done, info = env.step(
         rng_step, env_state, action, env_params
     )
                              
@@ -152,7 +153,7 @@ def env_step(runner_state, unused, env, network, env_params, args: TransformerHy
     memory_indices=jnp.arange(0,args.window_mem)[None,:]+step_env_currentloop*jnp.ones((args.num_envs,1),dtype=jnp.int32)
                 
     transition = Transition(
-        done, action, value, reward, log_prob, memories_mask.squeeze(),memory_indices, last_obs, info
+        last_done, action, value, reward, log_prob, memories_mask.squeeze(), memory_indices, last_obs, info
     )
     runner_state = (train_state, env_state,memories, memories_mask, memories_mask_idx, obsv, done, step_env_currentloop+1, rng)
     return runner_state, (transition,memories_out)
@@ -189,8 +190,9 @@ def make_train(args: TransformerHyperparams, rand_key: jax.random.PRNGKey):
             args.num_envs * args.num_steps // args.num_minibatches
     )
     env_key, rand_key = jax.random.split(rand_key)
-    env, env_params = get_env(args.env, env_key,
+    env, env_params = get_transformer_env(args.env, env_key, args.num_envs,
                                      gamma=args.gamma,
+                                     image_size=args.image_size,
                                      normalize_image=False,
                                      action_concat=args.action_concat)
     if hasattr(env, 'gamma'):
@@ -362,10 +364,16 @@ def make_train(args: TransformerHyperparams, rand_key: jax.random.PRNGKey):
                     timesteps = (
                             info["timestep"][info["returned_episode"]] * args.num_envs
                     )
-                    avg_return_values = jnp.mean(info["returned_episode_returns"][info["returned_episode"]])
+                    if args.show_discounted:
+                        show_str = "avg discounted return"
+                        avg_return_values = jnp.mean(info["returned_discounted_episode_returns"][info["returned_episode"]])
+                    else:
+                        show_str = "avg episodic return"
+                        avg_return_values = jnp.mean(info["returned_episode_returns"][info["returned_episode"]])
+
                     if len(timesteps) > 0:
                         print(
-                            f"timesteps={timesteps[0]} - {timesteps[-1]}, avg episodic return={avg_return_values:.2f}"
+                            f"timesteps={timesteps[0]} - {timesteps[-1]}, {show_str}={avg_return_values:.2f}"
                         )
 
                 jax.debug.callback(callback, metric)
@@ -393,12 +401,76 @@ def make_train(args: TransformerHyperparams, rand_key: jax.random.PRNGKey):
     
     return train
 
+def madrona_main(args: TransformerHyperparams):
+    print(f'{args.env} is using madrona')
+    def limit_jax_mem(limit):
+        os.environ['XLA_PYTHON_CLIENT_MEM_FRACTION'] = f'{limit:.2f}'
+    os.environ['MADRONA_DISABLE_CUDA_HEAP_SIZE'] = '1'
+    limit_jax_mem(0.1)
+    # Tell XLA to use Triton GEMM
+    xla_flags = os.environ.get('XLA_FLAGS', '')
+    xla_flags += ' --xla_gpu_triton_gemm_any=True'
+    os.environ['XLA_FLAGS'] = xla_flags
 
-if __name__ == "__main__":
-    # jax.disable_jit(True)
-    args = TransformerHyperparams().parse_args()
-    jax.config.update('jax_platform_name', args.platform)
+    rng = jax.random.PRNGKey(args.seed)
+    make_train_rng, rng = jax.random.split(rng)
+    rngs = jax.random.split(rng, args.n_seeds)
+    train_fn = make_train(args, make_train_rng)
+    train_args = list(inspect.signature(train_fn).parameters.keys())
 
+    vmaps_train = train_fn
+    swept_args = deque()
+
+    if args.env not in brax_envs:
+        for i, arg in reversed(list(enumerate(train_args))):
+            dims = [None] * len(train_args)
+            dims[i] = 0
+            vmaps_train = jax.vmap(vmaps_train, in_axes=dims)
+            if arg == 'rng':
+                swept_args.appendleft(rngs)
+            else:
+                assert hasattr(args, arg)
+                swept_args.appendleft(getattr(args, arg))
+    else:
+        for i, arg in reversed(list(enumerate(train_args))):
+            if arg == 'rng':
+                swept_args.appendleft(rng)
+            else:
+                assert hasattr(args, arg)
+                train_arg = getattr(args, arg)
+                swept_args.appendleft(train_arg[0])
+
+    train_jit = jax.jit(vmaps_train)
+    t = time()
+    out = train_jit(*swept_args)
+    new_t = time()
+    total_runtime = new_t - t
+    print('Total runtime:', total_runtime)
+
+    final_train_state = out['runner_state'][0]
+    if not args.save_runner_state:
+        del out['runner_state']
+
+    results_path = get_results_path(args, return_npy=False)  # returns a results directory
+
+    all_results = {
+        'argument_order': train_args,
+        'out': out,
+        'args': args.as_dict(),
+        'total_runtime': total_runtime, 
+        'final_train_state': final_train_state
+    }
+
+    # Save all results with Orbax
+    orbax_checkpointer = orbax.checkpoint.PyTreeCheckpointer()
+    save_args = orbax_utils.save_args_from_target(all_results)
+
+    print(f"Saving results to {results_path}")
+    # numpyify_and_save(results_path, all_results)
+    orbax_checkpointer.save(results_path, all_results, save_args=save_args)
+    print("Done.")
+
+def main(args: TransformerHyperparams):
     rng = jax.random.PRNGKey(args.seed)
     make_train_rng, rng = jax.random.split(rng)
     rngs = jax.random.split(rng, args.n_seeds)
@@ -448,3 +520,14 @@ if __name__ == "__main__":
     print(f"Saving results to {results_path}")
     orbax_checkpointer.save(results_path, all_results, save_args=save_args)
     print("Done.")
+
+
+if __name__ == "__main__":
+    # jax.disable_jit(True)
+    args = TransformerHyperparams().parse_args()
+    jax.config.update('jax_platform_name', args.platform)
+
+    if args.env in brax_envs and args.env.endswith('pixels'):
+        madrona_main(args)
+    else:
+        main(args)

@@ -1,15 +1,15 @@
 from functools import partial
-from typing import Tuple, Union, Optional
+from typing import Tuple, Union, Optional, Any
 
 import chex
 import jax
 import jax.numpy as jnp
 from jax import random, lax
 import gymnax
-from gymnax.environments.environment import Environment, EnvParams
+from gymnax.environments.environment import Environment, EnvParams, TEnvState, TEnvParams
 from gymnax.environments import environment, spaces
 
-from pobax.envs.wrappers.gymnax import GymnaxWrapper
+from pobax.envs.wrappers.gymnax import GymnaxWrapper, Observation
 
 
 @chex.dataclass
@@ -155,7 +155,11 @@ class Battleship(Environment):
         Obs space is whether or not you hit a ship +
         action_mask for illegal actions.
         """
-        return gymnax.environments.spaces.Box(0, 1, (1 + self.action_space(params).n,))
+        space = gymnax.environments.spaces.Dict({
+            'obs': gymnax.environments.spaces.Box(0, 1, (1,)),
+            'action_mask': gymnax.environments.spaces.Box(0, 1, (self.rows * self.cols,))
+        })
+        return space
 
     @property
     def default_params(self) -> EnvParams:
@@ -186,11 +190,11 @@ class Battleship(Environment):
         prev_state: BattleShipState,
         state: BattleShipState,
         params: EnvParams,
-    ) -> chex.Array:
+    ) -> Observation:
         valid_actions = state.hits_misses == 0
-        valid_actions = valid_actions.flatten()
+        action_mask = valid_actions.flatten().astype(float)
         hit = (prev_state.hits_misses == 2).sum() < (state.hits_misses == 2).sum()
-        return jnp.concatenate((jnp.array([hit], dtype=float), valid_actions), axis=-1)
+        return Observation(obs=jnp.array([hit], dtype=float), action_mask=action_mask)
 
     @partial(jax.jit, static_argnums=(0,))
     def step_env(
@@ -216,7 +220,7 @@ class Battleship(Environment):
         )
         if self.dense_reward:
             # 0th index obs is hit or not
-            reward = new_obs[0]
+            reward = new_obs.obs[0]
         else:
             # reward = (self.rows * self.cols) * done - (1 - done)
             reward = (self.rows * self.cols) * done - (1 - done)
@@ -229,8 +233,45 @@ class Battleship(Environment):
             {}
         )
 
+    # We have to rewrite our own `step` b/c of the lax.cond on Observation.
+    @partial(jax.jit, static_argnames=("self",))
+    def step(
+        self,
+        key: jax.Array,
+        state: TEnvState,
+        action: int | float | jax.Array,
+        params: TEnvParams | None = None,
+    ) -> tuple[jax.Array, TEnvState, jax.Array, jax.Array, dict[Any, Any]]:
+        """Performs step transitions in the environment."""
+        if params is None:
+            params = self.default_params
 
-# class HitsMissBattleship(BattleShip)
+        # Step
+        key_step, key_reset = jax.random.split(key)
+        obs_st, state_st, reward, done, info = self.step_env(
+            key_step, state, action, params
+        )
+        obs_re, state_re = self.reset_env(key_reset, params)
 
+        # Auto-reset environment based on termination
+        state = jax.tree.map(
+            lambda x, y: jax.lax.select(done, x, y), state_re, state_st
+        )
+        # action_mask here should not be None
+        fdone = done.astype(float)
+        obs = jax.tree.map(
+            lambda re, st: fdone * re + (1 - fdone) * st,
+            obs_re, obs_st
+        )
+        return obs, state, reward, done, info
+
+    def dummy_observation(self, num_env, params=None):
+        obs_space = self.observation_space(params)
+        obs_only_space = obs_space.spaces["obs"]
+        action_mask_space = obs_space.spaces["action_mask"]
+        return Observation(
+            obs=jnp.zeros((1, num_env,) + obs_only_space.shape, dtype=obs_only_space.dtype),
+            action_mask=jnp.ones((1, num_env) + action_mask_space.shape, dtype=jnp.float32)
+        )
 
 

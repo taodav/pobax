@@ -1,5 +1,5 @@
 # taken from https://github.com/luchris429/purejaxrl/blob/main/purejaxrl/wrappers.py
-from typing import Optional, Tuple, Union, Callable
+from typing import Optional, Tuple, Union, Callable, NamedTuple
 
 from brax import envs
 from brax.envs.wrappers.training import EpisodeWrapper, AutoResetWrapper
@@ -10,10 +10,10 @@ from gymnax.environments import environment, spaces
 import jax
 import jax.numpy as jnp
 import numpy as np
-from sympy.physics.units import action
 from brax.base import System
 from brax.envs.base import Env
 from brax.envs.base import State
+from jax import numpy as jnp
 
 
 class GymnaxWrapper(object):
@@ -340,14 +340,14 @@ class NormalizeVecObservation(GymnaxWrapper):
     def reset(self, key, params=None):
         obs, state = self._env.reset(key, params)
         state = NormalizeVecObsEnvState(
-            mean=jnp.zeros_like(obs),
-            var=jnp.ones_like(obs),
+            mean=jnp.zeros_like(obs.obs),
+            var=jnp.ones_like(obs.obs),
             count=1e-4,
             env_state=state,
         )
-        batch_mean = jnp.mean(obs, axis=0)
-        batch_var = jnp.var(obs, axis=0)
-        batch_count = obs.shape[0]
+        batch_mean = jnp.mean(obs.obs, axis=0)
+        batch_var = jnp.var(obs.obs, axis=0)
+        batch_count = obs.obs.shape[0]
 
         delta = batch_mean - state.mean
         tot_count = state.count + batch_count
@@ -365,17 +365,18 @@ class NormalizeVecObservation(GymnaxWrapper):
             count=new_count,
             env_state=state.env_state,
         )
+        new_obs = (obs.obs - state.mean) / jnp.sqrt(state.var + 1e-8)
 
-        return (obs - state.mean) / jnp.sqrt(state.var + 1e-8), state
+        return obs._replace(obs=new_obs), state
 
     def step(self, key, state, action, params=None):
         obs, env_state, reward, done, info = self._env.step(
             key, state.env_state, action, params
         )
 
-        batch_mean = jnp.mean(obs, axis=0)
-        batch_var = jnp.var(obs, axis=0)
-        batch_count = obs.shape[0]
+        batch_mean = jnp.mean(obs.obs, axis=0)
+        batch_var = jnp.var(obs.obs, axis=0)
+        batch_count = obs.obs.shape[0]
 
         delta = batch_mean - state.mean
         tot_count = state.count + batch_count
@@ -393,8 +394,10 @@ class NormalizeVecObservation(GymnaxWrapper):
             count=new_count,
             env_state=env_state,
         )
+        new_obs = (obs.obs - state.mean) / jnp.sqrt(state.var + 1e-8)
+
         return (
-            (obs - state.mean) / jnp.sqrt(state.var + 1e-8),
+            obs._replace(obs=new_obs),
             state,
             reward,
             done,
@@ -418,7 +421,10 @@ class NormalizeVecReward(GymnaxWrapper):
 
     def reset(self, key, params=None):
         obs, state = self._env.reset(key, params)
-        batch_count = obs.obs.shape[0]
+        if hasattr(obs, 'obs'):
+            batch_count = obs.obs.shape[0]
+        else:
+            batch_count = obs.shape[0]
         state = NormalizeVecRewEnvState(
             mean=0.0,
             var=1.0,
@@ -436,7 +442,10 @@ class NormalizeVecReward(GymnaxWrapper):
 
         batch_mean = jnp.mean(return_val, axis=0)
         batch_var = jnp.var(return_val, axis=0)
-        batch_count = obs.obs.shape[0]
+        if hasattr(obs, 'obs'):
+            batch_count = obs.obs.shape[0]
+        else:
+            batch_count = obs.shape[0]
 
         delta = batch_mean - state.mean
         tot_count = state.count + batch_count
@@ -471,7 +480,13 @@ class ActionConcatWrapper(GymnaxWrapper):
         return action_size
 
     def observation_space(self, params) -> spaces.Box:
-        og_obs_space_shape = self._env.observation_space(params).shape
+        og_space = self._env.observation_space(params)
+        if isinstance(og_space, spaces.Dict):
+            og_obs_space = og_space.spaces['obs']
+        else:
+            og_obs_space = og_space
+
+        og_obs_space_shape = og_obs_space.shape
 
         if len(og_obs_space_shape) == 1:
             shape = (og_obs_space_shape[0] + self.action_size(params),)
@@ -481,12 +496,23 @@ class ActionConcatWrapper(GymnaxWrapper):
         else:
             raise NotImplementedError
 
-        return spaces.Box(
-            low=self._env.observation_space(params).low,
-            high=self._env.observation_space(params).high,
-            shape=shape,
-            dtype=self._env.observation_space(params).dtype,
-        )
+        if isinstance(og_space, spaces.Dict):
+            return spaces.Dict({
+                'obs': spaces.Box(
+                    low=og_obs_space.low,
+                    high=og_obs_space.high,
+                    shape=shape,
+                    dtype=og_obs_space.dtype
+                ),
+                'action_mask': og_space.spaces['action_mask']
+            })
+        else:
+            return spaces.Box(
+                low=self._env.observation_space(params).low,
+                high=self._env.observation_space(params).high,
+                shape=shape,
+                dtype=self._env.observation_space(params).dtype,
+            )
 
     @partial(jax.jit, static_argnums=(0,-1))
     def reset(
@@ -494,7 +520,15 @@ class ActionConcatWrapper(GymnaxWrapper):
     ) -> Tuple[chex.Array, environment.EnvState]:
         action_vec = jnp.zeros(self.action_size(params))
         obs, state = self._env.reset(key, params)
-        obs_shape = self.observation_space(params).shape
+
+        obs_space = self.observation_space(params)
+        maybe_obs_dict = obs
+        if isinstance(maybe_obs_dict, Observation):
+            obs_shape = obs_space.spaces['obs'].shape
+            obs = obs.obs
+        else:
+            obs_shape = obs_space.shape
+
         if len(obs_shape) == 1:
             obs = jnp.concatenate([obs, action_vec])
 
@@ -505,6 +539,9 @@ class ActionConcatWrapper(GymnaxWrapper):
             obs = jnp.concatenate([obs, action_img], axis=-1)
         else:
             raise NotImplementedError
+
+        if isinstance(maybe_obs_dict, Observation):
+            obs = maybe_obs_dict._replace(obs=obs)
 
         return obs, state
 
@@ -524,7 +561,14 @@ class ActionConcatWrapper(GymnaxWrapper):
         if isinstance(action_space, spaces.Discrete):
             action_vec = jnp.eye(action_space.n)[action]
 
-        obs_shape = self.observation_space(params).shape
+        obs_space = self.observation_space(params)
+        maybe_obs_dict = obs
+        if isinstance(maybe_obs_dict, Observation):
+            obs_shape = obs_space.spaces['obs'].shape
+            obs = obs.obs
+        else:
+            obs_shape = obs_space.shape
+
         if len(obs_shape) == 1:
             obs = jnp.concatenate([obs, action_vec])
 
@@ -536,7 +580,39 @@ class ActionConcatWrapper(GymnaxWrapper):
             obs = jnp.concatenate([obs, action_img], axis=-1)
         else:
             raise NotImplementedError
+
+        if isinstance(maybe_obs_dict, Observation):
+            obs = maybe_obs_dict._replace(obs=obs)
+
         return obs, state, reward, done, info
+
+    def dummy_observation(self, num_env, params=None):
+        og_space = self._env.observation_space(params)
+        if isinstance(og_space, spaces.Dict):
+            og_obs_space = og_space.spaces['obs']
+        else:
+            og_obs_space = og_space
+        action_vec = jnp.zeros(self.action_size(params))
+        obs = jnp.zeros(og_obs_space.shape, dtype=og_obs_space.dtype)
+        if len(og_obs_space.shape) == 1:
+            obs = jnp.concatenate([obs, action_vec])
+
+        elif len(og_obs_space.shape) == 3:
+            action_vec = action_vec[None, None, ...]
+            h, w, c = obs_shape
+            action_img = action_vec.repeat(h, axis=0).repeat(w, axis=1)
+            obs = jnp.concatenate([obs, action_img], axis=-1)
+        else:
+            raise NotImplementedError
+        # add our batch and num_envs dimensions
+        obs = obs[None, ...].repeat(num_env, axis=0)[None, ...]
+
+        action_mask = None
+        if 'action_mask' in og_space.spaces:
+            action_mask_space = og_space.spaces['action_mask']
+            action_mask = jnp.ones((1, num_env) + action_mask_space.shape, dtype=jnp.float32)
+
+        return Observation(obs=obs, action_mask=action_mask)
 
 
 class OptimisticResetVecEnvWrapper(GymnaxWrapper):
@@ -664,3 +740,8 @@ class MadronaWrapper(GymnaxWrapper):
         self._sys_v, key, state, action, params
     )
     return res
+
+
+class Observation(NamedTuple):
+    obs: jnp.ndarray
+    action_mask: jnp.ndarray = None
