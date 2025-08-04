@@ -3,7 +3,7 @@ from pathlib import Path
 exp_name = Path(__file__).stem
 
 lrs = [2.5e-4]
-lambda0s = [0.5]
+lambda0s = [0.9]
 
 hparams = {
     'file_name':
