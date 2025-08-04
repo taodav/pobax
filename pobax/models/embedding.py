@@ -2,7 +2,6 @@ import flax.linen as nn
 from jax._src.nn.initializers import orthogonal, constant
 import jax.numpy as jnp
 import numpy as np
-from .network import SmallImageCNN
 
 class CNN(nn.Module):
     hidden_size: int
@@ -116,7 +115,7 @@ class BattleshipEmbedding(nn.Module):
     @nn.compact
     def __call__(self, obs):
         if len(obs.shape) == 4:
-            embedding = SmallImageCNN(hidden_size=self.hidden_size)(obs)
+            embedding = BattleshipImageCNN(hidden_size=self.hidden_size)(obs)
             embedding = nn.relu(embedding)
         else:
             hit = obs[..., 0:1]
@@ -132,3 +131,79 @@ class BattleshipEmbedding(nn.Module):
             )(embedding)
             embedding = nn.relu(embedding)
         return embedding
+
+class BattleshipImageCNN(nn.Module):
+    hidden_size: int
+
+    @nn.compact
+    def __call__(self, x):
+        num_dims = len(x.shape) - 2
+        # 10x10 2 dimensions
+        if num_dims == 2 and x.shape[-2] == x.shape[-1] and x.shape[-2] == 10:
+            out1 = nn.Conv(features=self.hidden_size, kernel_size=5, strides=1, padding=0)(x)
+            out1 = nn.relu(out1)
+            out2 = nn.Conv(features=self.hidden_size, kernel_size=4, strides=1, padding=0)(out1)
+            out2 = nn.relu(out2)
+            conv_out = nn.Conv(features=self.hidden_size, kernel_size=3, strides=1, padding=0)(out2)
+
+        # 5x5
+        elif x.shape[-3] == x.shape[-2] and x.shape[-3] == 5:
+            out1 = nn.Conv(features=self.hidden_size, kernel_size=(4, 4), strides=1, padding=1)(x)
+            out1 = nn.relu(out1)
+            out2 = nn.Conv(features=self.hidden_size, kernel_size=(3, 3), strides=1, padding=0)(out1)
+            out2 = nn.relu(out2)
+            conv_out = nn.Conv(features=self.hidden_size, kernel_size=(2, 2), strides=1, padding=0)(out2)
+
+        # 3x3
+        elif x.shape[-3] == x.shape[-2] and x.shape[-3] == 3:
+            out1 = nn.Conv(features=self.hidden_size, kernel_size=(2, 2), strides=1, padding=0)(x)
+            out1 = nn.relu(out1)
+            conv_out = nn.Conv(features=self.hidden_size, kernel_size=(2, 2), strides=1, padding=0)(out1)
+
+        # 10x10
+        elif x.shape[-3] == x.shape[-2] and x.shape[-3] == 10:
+            out1 = nn.Conv(features=self.hidden_size, kernel_size=(5, 5), strides=1, padding=0)(x)
+            out1 = nn.relu(out1)
+            out2 = nn.Conv(features=self.hidden_size, kernel_size=(4, 4), strides=1, padding=0)(out1)
+            out2 = nn.relu(out2)
+            conv_out = nn.Conv(features=self.hidden_size, kernel_size=(3, 3), strides=1, padding=0)(out2)
+
+        elif x.shape[-2] == 7 and x.shape[-3] == 4:
+            out1 = nn.Conv(features=64, kernel_size=(2, 4), strides=1, padding=0)(x)
+            out1 = nn.relu(out1)
+            out2 = nn.Conv(features=128, kernel_size=(2, 3), strides=1, padding=0)(out1)
+            out2 = nn.relu(out2)
+            conv_out = nn.Conv(features=self.hidden_size, kernel_size=(2, 2), strides=1, padding=0)(out2)
+        elif x.shape[-2] == 5 and x.shape[-3] == 3:
+            out1 = nn.Conv(features=64, kernel_size=(2, 3), strides=1, padding=0)(x)
+            out1 = nn.relu(out1)
+            conv_out = nn.Conv(features=128, kernel_size=(2, 2), strides=1, padding=0)(out1)
+            # out2 = nn.relu(out2)
+            # conv_out = nn.Conv(features=self.hidden_size, kernel_size=(2, 2), strides=1, padding=0)(out2)
+
+        elif x.shape[-2] == 3 and x.shape[-3] == 2:
+            out1 = nn.Conv(features=64, kernel_size=(1, 1), strides=1, padding=0)(x)
+            out1 = nn.relu(out1)
+            conv_out = nn.Conv(features=128, kernel_size=(2, 2), strides=1, padding=0)(out1)
+
+        elif x.shape[-2] >= 14:
+            out1 = nn.Conv(features=64, kernel_size=(6, 6), strides=1, padding=0)(x)
+            out1 = nn.relu(out1)
+            out2 = nn.Conv(features=64, kernel_size=(5, 5), strides=1, padding=0)(out1)
+            out2 = nn.relu(out2)
+
+            final_out = out2
+            # if x.shape[-2] >= 20:
+            #     out3 = nn.Conv(features=64, kernel_size=(3, 3), strides=1, padding=0)(out2)
+            #     out3 = nn.relu(out3)
+            #     final_out = out3
+            conv_out = nn.Conv(features=64, kernel_size=(2, 2), strides=1, padding=0)(final_out)
+
+        else:
+            raise NotImplementedError
+
+        conv_out = nn.relu(conv_out)
+        # Convolutions "flatten" the last num_dims dimensions.
+        flat_out = conv_out.reshape((*conv_out.shape[:-num_dims], -1))  # Flatten
+        final_out = nn.Dense(features=self.hidden_size)(flat_out)
+        return final_out

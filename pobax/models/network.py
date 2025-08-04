@@ -74,7 +74,10 @@ class SmallImageCNN(nn.Module):
 
     @nn.compact
     def __call__(self, x):
-        num_dims = len(x.shape) - 2
+        if len(x.shape) == 4:
+            num_dims = 3
+        else:
+            num_dims = len(x.shape) - 2  # b x num_envs
         # 10x10 2 dimensions
         if num_dims == 2 and x.shape[-2] == x.shape[-1] and x.shape[-2] == 10:
             out1 = nn.Conv(features=self.hidden_size, kernel_size=5, strides=1, padding=0)(x)
