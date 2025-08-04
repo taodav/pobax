@@ -195,8 +195,8 @@ if __name__ == "__main__":
     discounted = False
     hyperparam_type = 'per_env'  # (all_env | per_env)
 
-    env_name = 'rocksample_11_11'
-    super_dir = 'rocksample_11_11'
+    env_name = 'battleship_10'
+    super_dir = 'battleship_10'
     ylims = None
 
     plot_name = f'{env_name}_{hyperparam_type}'
@@ -206,7 +206,7 @@ if __name__ == "__main__":
         ('RNN', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo'), 'purple'),
         ('RNN + LD', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_LD'), 'blue'),
         ('Memoryless', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_memoryless'), 'dark gray'),
-        ('STATE', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_perfect_memory_memoryless'), 'green'),
+        # ('STATE', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_perfect_memory_memoryless'), 'green'),
         # ('TRANFORMER', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_transformer'), 'cyan'),
     ]
 
