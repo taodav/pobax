@@ -8,7 +8,7 @@ import numpy as np
 
 from pobax.utils.plot import mean_confidence_interval, colors, smoothen
 
-from definitions import ROOT_DIR
+from pobax.definitions import ROOT_DIR
 
 rc('font', **{'family': 'serif', 'serif': ['cmr10'], 'size': 32})
 rc('axes', unicode_minus=False)

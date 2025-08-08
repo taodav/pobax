@@ -9,7 +9,7 @@ from jax_tqdm import scan_tqdm
 from pobax.envs import get_env
 from pobax.utils.video import navix_overlay_obs_on_rgb
 
-from definitions import ROOT_DIR
+from pobax.definitions import ROOT_DIR
 
 
 def random_policy_gif():

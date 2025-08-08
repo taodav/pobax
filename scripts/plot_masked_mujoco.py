@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 
 from pobax.utils.plot import mean_confidence_interval
 
-from definitions import ROOT_DIR
+from pobax.definitions import ROOT_DIR
 
 rc('font', **{'family': 'serif', 'serif': ['cmr10']})
 rc('axes', unicode_minus=False)

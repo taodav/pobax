@@ -12,7 +12,7 @@ import orbax.checkpoint
 import numpy as np
 from tqdm import tqdm
 
-from definitions import ROOT_DIR
+from pobax.definitions import ROOT_DIR
 from pobax.utils.file_system import load_info
 
 def combine_seeds_and_envs(x: jnp.ndarray):

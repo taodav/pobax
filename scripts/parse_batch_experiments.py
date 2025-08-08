@@ -27,7 +27,7 @@ from tqdm import tqdm
 from pobax.config import PPOHyperparams
 from pobax.utils.file_system import get_fn_from_module, get_inner_fn_arguments
 
-from definitions import ROOT_DIR
+from pobax.definitions import ROOT_DIR
 
 def combine_seeds_and_envs(x: jnp.ndarray):
     # Here, dim=-1 is the NUM_ENVS parameter. We take the mean over this.

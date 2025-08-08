@@ -11,7 +11,7 @@ import jax
 import jax.numpy as jnp
 from jax import random, lax
 
-from definitions import ROOT_DIR
+from pobax.definitions import ROOT_DIR
 
 from pobax.envs.wrappers.gymnax import GymnaxWrapper
 

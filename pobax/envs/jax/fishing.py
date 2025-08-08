@@ -9,7 +9,7 @@ import jax
 from jax import random, lax
 import jax.numpy as jnp
 
-from definitions import ROOT_DIR
+from pobax.definitions import ROOT_DIR
 
 
 def positional_choice(key, a, p):
