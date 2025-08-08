@@ -2,50 +2,48 @@ from functools import partial
 from pathlib import Path
 
 import gymnax
-from jax import random
 import navix as nx
+from jax import random
 
+import pobax.envs.jax.navix_mazes
 from pobax.definitions import ROOT_DIR
-
+from pobax.envs.classic import load_pomdp
 from pobax.envs.jax.battleship import Battleship
 from pobax.envs.jax.battleship import PerfectMemoryWrapper as BSPerfectMemoryWrapper
-from pobax.envs.classic import load_pomdp
 from pobax.envs.jax.compass_world import CompassWorld
 from pobax.envs.jax.fishing import Fishing
 from pobax.envs.jax.pocman import PocMan
 from pobax.envs.jax.pocman import PocManStateWrapper as PMPerfectMemoryWrapper
-from pobax.envs.jax.rocksample import RockSample
-from pobax.envs.jax.rocksample import PerfectMemoryWrapper as RSPerfectMemoryWrapper
-from pobax.envs.jax.rocksample import FullyObservableWrapper as RSFullyObservableWrapper
 from pobax.envs.jax.reacher_pomdp import ReacherPOMDP
-from pobax.envs.jax.simple_chain import SimpleChain, FullyObservableSimpleChain
+from pobax.envs.jax.rocksample import FullyObservableWrapper as RSFullyObservableWrapper
+from pobax.envs.jax.rocksample import PerfectMemoryWrapper as RSPerfectMemoryWrapper
+from pobax.envs.jax.rocksample import RockSample
+from pobax.envs.jax.simple_chain import FullyObservableSimpleChain, SimpleChain
 from pobax.envs.jax.tmaze import TMaze
-import pobax.envs.jax.navix_mazes
+from pobax.envs.wrappers.gymnasium import GymnaxToGymWrapper
 from pobax.envs.wrappers.gymnax import (
-    FlattenObservationWrapper,
-    LogWrapper,
-    MaskObservationWrapper,
-    BraxGymnaxWrapper,
-    ClipAction,
-    VecEnv,
-    NormalizeVecReward,
-    NormalizeVecObservation,
     ActionConcatWrapper,
     AutoResetEnvWrapper,
-    OptimisticResetVecEnvWrapper,
+    BraxGymnaxWrapper,
+    ClipAction,
+    FlattenObservationWrapper,
+    LogWrapper,
     MadronaWrapper,
+    MaskObservationWrapper,
+    NormalizeVecObservation,
+    NormalizeVecReward,
+    OptimisticResetVecEnvWrapper,
+    VecEnv,
 )
+from pobax.envs.wrappers.nx import MazeFoVWrapper, NavixGymnaxWrapper
+from pobax.envs.wrappers.observation import NamedObservationWrapper
 from pobax.envs.wrappers.pixel import (
     PixelBraxVecEnvWrapper,
-    PixelTMazeVecEnvWrapper,
-    PixelSimpleChainVecEnvWrapper,
     PixelCraftaxVecEnvWrapper,
     PixelMadronaVecEnvWrapper,
+    PixelSimpleChainVecEnvWrapper,
+    PixelTMazeVecEnvWrapper,
 )
-from pobax.envs.wrappers.gymnasium import GymnaxToGymWrapper
-from pobax.envs.wrappers.nx import NavixGymnaxWrapper, MazeFoVWrapper
-from pobax.envs.wrappers.observation import NamedObservationWrapper
-
 
 masked_gymnax_env_map = {
     "Pendulum-F-v0": {"env_str": "Pendulum-v1", "mask_dims": [0, 1, 2]},
@@ -112,7 +110,7 @@ def is_jax_env(env_name: str):
     is_masked_gymnax_env = env_name in masked_gymnax_env_map
     is_brax_env = env_name in brax_envs
 
-    envs_dir = Path(ROOT_DIR) / "pobax" / "envs"
+    envs_dir = Path(ROOT_DIR) / "envs"
     pomdp_dir = envs_dir / "classic" / "POMDP"
     pomdp_files = [pd.stem for pd in pomdp_dir.iterdir()]
     is_pomdp_env = env_name in pomdp_files
@@ -144,6 +142,7 @@ def is_jax_env(env_name: str):
 
 def load_brax_env(env_str: str, gamma: float = 0.99):
     from gymnax import EnvParams
+
     from pobax.envs.wrappers.gymnax import BraxGymnaxWrapper, ClipAction
 
     if env_str.endswith("pixels"):
@@ -158,6 +157,7 @@ def load_brax_env(env_str: str, gamma: float = 0.99):
 
 def load_craftax_env(env_str: str, gamma: float = 0.99):
     from gymnax import EnvParams
+
     from pobax.envs.wrappers.gymnax import CraftaxGymnaxWrapper
 
     env_str = craftax_envs[env_str]
@@ -184,7 +184,7 @@ def get_env(
         spec = masked_gymnax_env_map[env_name]
         env_name = spec["env_str"]
         mask_dims = spec["mask_dims"]
-    envs_dir = Path(ROOT_DIR) / "pobax" / "envs"
+    envs_dir = Path(ROOT_DIR) / "envs"
 
     pomdp_dir = envs_dir / "classic" / "POMDP"
     pomdp_files = [pd.stem for pd in pomdp_dir.iterdir()]
