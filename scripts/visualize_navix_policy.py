@@ -17,7 +17,7 @@ from pobax.config import PPOHyperparams
 from pobax.models import get_network_fn, ScannedRNN
 from pobax.utils.video import navix_overlay_obs_on_rgb
 
-from definitions import ROOT_DIR
+from pobax.definitions import ROOT_DIR
 
 
 def load_train_state(fpath: Path, key: chex.PRNGKey):

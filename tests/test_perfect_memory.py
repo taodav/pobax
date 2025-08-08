@@ -7,7 +7,7 @@ from pobax.envs.battleship import Battleship, BattleShipState
 from pobax.envs.battleship import PerfectMemoryWrapper as BSPerfectMemoryWrapper
 from pobax.envs.jax.rocksample import RockSample
 from pobax.envs.jax.rocksample import PerfectMemoryWrapper as RSPerfectMemoryWrapper
-from definitions import ROOT_DIR
+from pobax.definitions import ROOT_DIR
 
 
 def test_battleship():

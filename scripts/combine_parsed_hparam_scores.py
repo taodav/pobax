@@ -3,7 +3,7 @@ import pickle
 
 import numpy as np
 
-from definitions import ROOT_DIR
+from pobax.definitions import ROOT_DIR
 
 
 if __name__ == "__main__":

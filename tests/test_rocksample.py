@@ -3,7 +3,7 @@ from pathlib import Path
 import jax
 
 from pobax.envs.jax.rocksample import RockSample
-from definitions import ROOT_DIR
+from pobax.definitions import ROOT_DIR
 
 def test_rocksample():
     seed = 2020

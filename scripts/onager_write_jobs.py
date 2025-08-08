@@ -10,7 +10,7 @@ from pathlib import Path
 
 from pobax.utils.file_system import import_module_to_var
 
-from definitions import ROOT_DIR
+from pobax.definitions import ROOT_DIR
 
 
 def generate_onager_runs(run_dicts: List[dict],

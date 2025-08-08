@@ -19,7 +19,7 @@ from pobax.envs import get_env
 from pobax.models import get_network_fn
 from pobax.config import Hyperparams
 
-from definitions import ROOT_DIR
+from pobax.definitions import ROOT_DIR
 
 
 def get_results_path(args: Hyperparams, return_npy: bool = True):

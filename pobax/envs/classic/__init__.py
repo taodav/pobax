@@ -6,7 +6,7 @@ from gymnasium import spaces
 from jax.tree_util import register_pytree_node_class
 import numpy as np
 
-from definitions import ROOT_DIR
+from pobax.definitions import ROOT_DIR
 
 
 class POMDPFile:
