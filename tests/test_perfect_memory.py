@@ -3,8 +3,8 @@ from pathlib import Path
 import jax
 import jax.numpy as jnp
 
-from pobax.envs.battleship import Battleship, BattleShipState
-from pobax.envs.battleship import PerfectMemoryWrapper as BSPerfectMemoryWrapper
+from pobax.envs.jax.battleship import Battleship, BattleShipState
+from pobax.envs.jax.battleship import PerfectMemoryWrapper as BSPerfectMemoryWrapper
 from pobax.envs.jax.rocksample import RockSample
 from pobax.envs.jax.rocksample import PerfectMemoryWrapper as RSPerfectMemoryWrapper
 from pobax.definitions import ROOT_DIR
@@ -75,7 +75,7 @@ def test_rocksample():
     key = jax.random.PRNGKey(seed)
     reset_key, env_key, key = jax.random.split(key, 3)
 
-    config_path = Path(ROOT_DIR, 'pobax', 'envs', 'configs', f'{env_name}_config.json')
+    config_path = Path(ROOT_DIR, 'envs', 'configs', f'{env_name}_config.json')
     env = RockSample(env_key, config_path=config_path)
     env_params = env.default_params
     env = RSPerfectMemoryWrapper(env)

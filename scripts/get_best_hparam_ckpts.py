@@ -5,10 +5,10 @@ import numpy as np
 import orbax.checkpoint
 from tqdm import tqdm
 
-from pobax.definitions import ROOT_DIR
+from pobax.definitions import PROJECT_ROOT_DIR
 
 if __name__ == "__main__":
-    ckpt_path = Path(ROOT_DIR, 'results/pendulum/pendulum_v_ppo/best_hyperparam_per_env_res.pkl')
+    ckpt_path = Path(PROJECT_ROOT_DIR) / 'results/pendulum/pendulum_v_ppo/best_hyperparam_per_env_res.pkl'
 
     parent_dir = ckpt_path.parent
     with open(ckpt_path, "rb") as f:

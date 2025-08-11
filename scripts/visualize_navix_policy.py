@@ -17,7 +17,7 @@ from pobax.config import PPOHyperparams
 from pobax.models import get_network_fn, ScannedRNN
 from pobax.utils.video import navix_overlay_obs_on_rgb
 
-from pobax.definitions import ROOT_DIR
+from pobax.definitions import PROJECT_ROOT_DIR
 
 
 def load_train_state(fpath: Path, key: chex.PRNGKey):
@@ -132,7 +132,7 @@ if __name__ == "__main__":
     # concat_obs = jnp.concatenate((obs[:, 0], obs[:, 1]), axis=1)
     #
     imgs = [Image.fromarray(img) for img in np_images]
-    vod_path = Path(ROOT_DIR, 'results', "navix_maze.gif")
+    vod_path = Path(PROJECT_ROOT_DIR, 'results', "navix_maze.gif")
     imgs[0].save(vod_path, save_all=True, append_images=imgs[1:], duration=100, loop=0)
 
     print(f"saved to {vod_path}")

@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from scipy.stats import sem
 
 
-from pobax.definitions import ROOT_DIR
+from pobax.definitions import PROJECT_ROOT_DIR
 
 rc('font', **{'family': 'serif', 'serif': ['cmr10']})
 rc('axes', unicode_minus=False)
@@ -203,11 +203,11 @@ if __name__ == "__main__":
 
     # normal
     study_paths = [
-        ('RNN', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo'), 'purple'),
-        ('RNN + LD', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_LD'), 'blue'),
-        ('Memoryless', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_memoryless'), 'dark gray'),
-        ('STATE', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_perfect_memory_memoryless'), 'green'),
-        # ('TRANFORMER', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_transformer'), 'cyan'),
+        ('RNN', Path(PROJECT_ROOT_DIR, 'results', super_dir, f'{env_name}_ppo'), 'purple'),
+        ('RNN + LD', Path(PROJECT_ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_LD'), 'blue'),
+        ('Memoryless', Path(PROJECT_ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_memoryless'), 'dark gray'),
+        ('STATE', Path(PROJECT_ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_perfect_memory_memoryless'), 'green'),
+        # ('TRANFORMER', Path(PROJECT_ROOT_DIR, 'results', super_dir, f'{env_name}_transformer'), 'cyan'),
     ]
 
     # env_name = 'rocksample_11_11'
@@ -221,18 +221,18 @@ if __name__ == "__main__":
     # plot_name = f'{env_name}_{hyperparam_type}_{sweep_var}_{nenvs}'
     #
     # study_paths = [
-    #     ('RNN', Path(ROOT_DIR, 'results', f'{env_name}_{sweep_var}_sweep/{env_name}_ppo_{sweep_var}_sweep', f'{env_name}_ppo_{sweep_var}_sweep_{sweep_var}_{nenvs}'), 'purple'),
-    #     # ('RNN + LD', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_LD'), 'blue'),
-    #     ('Memoryless', Path(ROOT_DIR, 'results', f'{env_name}_{sweep_var}_sweep/{env_name}_ppo_memoryless_{sweep_var}_sweep', f'{env_name}_ppo_memoryless_{sweep_var}_sweep_{sweep_var}_{nenvs}'), 'dark gray'),
-    #     ('STATE', Path(ROOT_DIR, 'results', f'{env_name}_{sweep_var}_sweep/{env_name}_ppo_perfect_memory_{sweep_var}_sweep', f'{env_name}_ppo_perfect_memory_{sweep_var}_sweep_{sweep_var}_{nenvs}'), 'green'),
-    #     # ('TRANFORMER', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_transformer'), 'cyan'),
+    #     ('RNN', Path(PROJECT_ROOT_DIR, 'results', f'{env_name}_{sweep_var}_sweep/{env_name}_ppo_{sweep_var}_sweep', f'{env_name}_ppo_{sweep_var}_sweep_{sweep_var}_{nenvs}'), 'purple'),
+    #     # ('RNN + LD', Path(PROJECT_ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_LD'), 'blue'),
+    #     ('Memoryless', Path(PROJECT_ROOT_DIR, 'results', f'{env_name}_{sweep_var}_sweep/{env_name}_ppo_memoryless_{sweep_var}_sweep', f'{env_name}_ppo_memoryless_{sweep_var}_sweep_{sweep_var}_{nenvs}'), 'dark gray'),
+    #     ('STATE', Path(PROJECT_ROOT_DIR, 'results', f'{env_name}_{sweep_var}_sweep/{env_name}_ppo_perfect_memory_{sweep_var}_sweep', f'{env_name}_ppo_perfect_memory_{sweep_var}_sweep_{sweep_var}_{nenvs}'), 'green'),
+    #     # ('TRANFORMER', Path(PROJECT_ROOT_DIR, 'results', super_dir, f'{env_name}_transformer'), 'cyan'),
     # ]
 
     # best
     # study_paths = [
-    #     ('PPO + RNN + LD', Path(ROOT_DIR, 'results', f'{env_name}_LD_ppo_best'), 'green'),
-    #     ('PPO + RNN', Path(ROOT_DIR, 'results', f'{env_name}_ppo_best'), 'blue'),
-    #     # ('Memoryless PPO', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_ppo_best'), 'dark gray'),
+    #     ('PPO + RNN + LD', Path(PROJECT_ROOT_DIR, 'results', f'{env_name}_LD_ppo_best'), 'green'),
+    #     ('PPO + RNN', Path(PROJECT_ROOT_DIR, 'results', f'{env_name}_ppo_best'), 'blue'),
+    #     # ('Memoryless PPO', Path(PROJECT_ROOT_DIR, 'results', f'{env_name}_memoryless_ppo_best'), 'dark gray'),
     # ]
 
 
@@ -291,7 +291,7 @@ if __name__ == "__main__":
                            discounted=discounted, ylims=ylims)
 
     discount_str = '_discounted' if discounted else ''
-    save_plot_to = Path(ROOT_DIR, 'results', f'{plot_name}{discount_str}.pdf')
+    save_plot_to = Path(PROJECT_ROOT_DIR, 'results', f'{plot_name}{discount_str}.pdf')
 
     fig.savefig(save_plot_to, bbox_inches='tight')
     print(f"Saved figure to {save_plot_to}")

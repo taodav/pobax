@@ -3,13 +3,13 @@ import pickle
 
 import numpy as np
 
-from pobax.definitions import ROOT_DIR
+from pobax.definitions import PROJECT_ROOT_DIR
 
 
 if __name__ == "__main__":
     paths = [
-        Path(ROOT_DIR, 'results', f'masked_mujoco_ppo', 'parsed_hparam_scores.pkl'),
-        Path(ROOT_DIR, 'results', f'masked_mujoco_ppo2', 'parsed_hparam_scores.pkl'),
+        Path(PROJECT_ROOT_DIR, 'results', f'masked_mujoco_ppo', 'parsed_hparam_scores.pkl'),
+        Path(PROJECT_ROOT_DIR, 'results', f'masked_mujoco_ppo2', 'parsed_hparam_scores.pkl'),
     ]
 
     all_scores = []
