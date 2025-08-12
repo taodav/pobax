@@ -19,6 +19,13 @@ def get_grid_hparams(args: Tap):
             arg_values.append(val)
 
     product_arg_values = jnp.array(list(product(*arg_values)))
+    if hasattr(args, 'n_run_bins') and args.n_run_bins is not None:
+        n_runs = product_arg_values.shape[0]
+        assert args.n_run_bins < n_runs
+
+
+        split_args = product_arg_values.reshape((args.n_run_bins, -1) + product_arg_values.shape[1:])
+        product_arg_values = split_args[args.run_bin_idx]
 
     hyperparams = {}
     for arg_key, hyperparam_vals in zip(arg_keys, product_arg_values.T):

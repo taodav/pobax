@@ -457,6 +457,7 @@ def main(args):
     make_train_rng, rng = jax.random.split(rng)
     train_fn = make_train(args, make_train_rng)
 
+    # TODO: change both fns below to include n_run_bins and run_bin_idx
     if args.sweep_type == 'grid':
         hparams, _ = get_grid_hparams(args)
     elif args.sweep_type == 'random':
@@ -467,7 +468,7 @@ def main(args):
 
     vmap_and_train(args, train_fn, hparams, rng)
 
-def madrona_main(args):
+def madrona_main(args: PPOHyperparams):
     from collections import deque
 
     rng = jax.random.PRNGKey(args.seed)

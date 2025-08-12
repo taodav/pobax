@@ -66,7 +66,9 @@ class PPOHyperparams(Tap):
     save_checkpoints: bool = False  # Do we save train_state along with our per timestep outputs?
     save_runner_state: bool = False  # Do we save the checkpoint in the end?
     sweep_type: str = 'grid'  # grid (sweeps all listed hyperparams) | random (randomly rejection samples sets of hyperparams)
-    n_random_hparams: int = 1
+    n_random_hparams: int = 1  # [sweep_type = random] How many randomly sampled hyperparams do we use?
+    n_run_bins: int = None  # How many bins do we split our runs into? Requires run_bin_idx to be not None
+    run_bin_idx: int = None  # After splitting our runs into n_run_bins bins, which index do we run?
     seed: int = 2020
     n_seeds: int = 5  # How many seeds to run in our experiment?
     platform: Literal['cpu', 'gpu'] = 'cpu'  # use CPU or GPU?
@@ -74,6 +76,14 @@ class PPOHyperparams(Tap):
     show_discounted: bool = False  # For debug plotting, do we show undisc returns or disc returns?
 
     study_name: str = 'batch_ppo_test'  # Save checkpoints and run statistics into results/{study_name}.
+
+    def process_args(self):
+        # Validate n_run_bins and run_bin_idx
+        if self.n_run_bins is not None:
+            assert self.run_bin_idx is not None
+
+        if self.run_bin_idx is not None:
+            assert self.n_run_bins is not None
 
 
 class GDPPOHyperparams(PPOHyperparams):
