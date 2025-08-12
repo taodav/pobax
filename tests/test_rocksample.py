@@ -13,7 +13,7 @@ def test_rocksample():
     key = jax.random.PRNGKey(seed)
     reset_key, env_key, key = jax.random.split(key, 3)
 
-    config_path = Path(ROOT_DIR, 'pobax', 'envs', 'configs', f'{env_name}_config.json')
+    config_path = Path(ROOT_DIR, 'envs', 'configs', f'{env_name}_config.json')
     env = RockSample(env_key, config_path=config_path)
 
     env_params = env.default_params

@@ -129,7 +129,7 @@ class RockSample(Environment):
 
     def __init__(self,
                  key: chex.PRNGKey,
-                 config_path: Path = Path(ROOT_DIR, 'pobax', 'envs',
+                 config_path: Path = Path(ROOT_DIR, 'envs',
                                           '../configs', 'rocksample_7_8_config.json')):
         """
         RockSample environment in Gymnax.

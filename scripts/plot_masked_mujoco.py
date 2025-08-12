@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 
 from pobax.utils.plot import mean_confidence_interval
 
-from pobax.definitions import ROOT_DIR
+from pobax.definitions import PROJECT_ROOT_DIR
 
 rc('font', **{'family': 'serif', 'serif': ['cmr10']})
 rc('axes', unicode_minus=False)
@@ -153,10 +153,10 @@ if __name__ == "__main__":
 
 
     study_paths = [
-        ('RNN', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo'), 'purple'),
-        # ('RNN + LD', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_LD'), 'blue'),
-        ('OBSERVATION', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_memoryless'), 'dark gray'),
-        ('FULL STATE', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_perfect_memory_memoryless'), 'green'),
+        ('RNN', Path(PROJECT_ROOT_DIR, 'results', super_dir, f'{env_name}_ppo'), 'purple'),
+        # ('RNN + LD', Path(PROJECT_ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_LD'), 'blue'),
+        ('OBSERVATION', Path(PROJECT_ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_memoryless'), 'dark gray'),
+        ('FULL STATE', Path(PROJECT_ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_perfect_memory_memoryless'), 'green'),
     ]
     plot_name = study_paths[0][1].stem
 
@@ -185,7 +185,7 @@ if __name__ == "__main__":
                          discounted=discounted)
 
     discount_str = '_discounted' if discounted else ''
-    save_plot_to = Path(ROOT_DIR, 'results', f'{plot_name}{discount_str}.pdf')
+    save_plot_to = Path(PROJECT_ROOT_DIR, 'results', f'{plot_name}{discount_str}.pdf')
 
     fig.savefig(save_plot_to, bbox_inches='tight')
     print(f"Saved figure to {save_plot_to}")

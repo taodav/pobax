@@ -251,7 +251,7 @@ def get_env(
 
         if len(env_name.split("_")) > 1:
             config_path = Path(
-                ROOT_DIR, "pobax", "envs", "configs", f"{env_name}_config.json"
+                ROOT_DIR, "envs", "configs", f"{env_name}_config.json"
             )
             env = RockSample(rand_key, config_path=config_path)
         else:
@@ -334,7 +334,7 @@ def get_transformer_env(
         spec = masked_gymnax_env_map[env_name]
         env_name = spec["env_str"]
         mask_dims = spec["mask_dims"]
-    envs_dir = Path(ROOT_DIR) / "pobax" / "envs"
+    envs_dir = Path(ROOT_DIR) / "envs"
 
     pomdp_dir = envs_dir / "classic" / "POMDP"
     pomdp_files = [pd.stem for pd in pomdp_dir.iterdir()]
@@ -395,7 +395,7 @@ def get_transformer_env(
 
         if len(env_name.split("_")) > 1:
             config_path = Path(
-                ROOT_DIR, "pobax", "envs", "configs", f"{env_name}_config.json"
+                ROOT_DIR, "envs", "configs", f"{env_name}_config.json"
             )
             env = RockSample(rand_key, config_path=config_path)
         else:
