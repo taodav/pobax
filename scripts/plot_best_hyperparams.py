@@ -212,7 +212,7 @@ if __name__ == "__main__":
 
     discounted = False
     env_name = 'rocksample_11_11'
-    super_dir = 'rocksample_11_11'
+    super_dir = 'rocksample_11_11_qr'
     best = False
 
     # discounted = True
@@ -269,11 +269,11 @@ if __name__ == "__main__":
         # ('SF encoded obs', Path(ROOT_DIR, 'results', 'gd_sf_enc_obs', f'{env_name}_ppo_gd_sf_enc_obs'), 'cyan'),
         # ('SF encoded obs discrep', Path(ROOT_DIR, 'results', 'gd_sf_enc_obs', f'{env_name}_ppo_gd_sf_enc_obs_discrep'), 'yellow'),
 
-        ('RNN', Path(ROOT_DIR, 'results', 'qr_ppo', super_dir, f'{env_name}_ppo_qr'), 'purple'),
-        ('LD', Path(ROOT_DIR, 'results', 'qr_ppo', super_dir, f'{env_name}_ppo_qr_discrep'), 'blue'),
-        ('Ent', Path(ROOT_DIR, 'results', 'qr_ppo', super_dir, f'{env_name}_ppo_qr_ent'), 'yellow'),
-        # ('Memoryless', Path(ROOT_DIR, 'results', 'qr_ppo', env_name, f'{env_name}_ppo_qr_memoryless{best_str}'), 'dark gray'),
-        # ('STATE', Path(ROOT_DIR, 'results', 'qr_ppo', env_name, f'{env_name}_ppo_qr_perfect_memory_memoryless{best_str}'), 'green'),
+        ('RNN', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_qr'), 'purple'),
+        ('LD', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_qr_discrep'), 'blue'),
+        ('Ent', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_qr_ent'), 'yellow'),
+        ('Memoryless', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_qr_memoryless{best_str}'), 'dark gray'),
+        ('STATE', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_qr_perfect_memory_memoryless{best_str}'), 'green'),
 
         # ('RNN', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo{best_str}'), 'purple'),
         # ('LD', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_LD{best_str}'), 'blue'),
