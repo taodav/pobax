@@ -1,23 +1,20 @@
 from functools import partial
 from dataclasses import replace
-from time import time
 
 from flax.training.train_state import TrainState
-from flax.training import orbax_utils
 import jax
-# jax.config.update("jax_debug_nans", True)
 import jax.numpy as jnp
 import numpy as np
 import optax
-import orbax.checkpoint
+from gymnax.environments import spaces
 
 from pobax.algos.ppo import PPO, env_step, filter_period_first_dim, Transition
+from pobax.algos.run_helper import vmap_and_train
 from pobax.config import QRPPOHyperparams
 from pobax.envs import get_env
 from pobax.envs.wrappers.gymnax import LogEnvState
 from pobax.models.actor_critic import QuantileActorCritic
 from pobax.models import ScannedRNN, get_network_fn
-from pobax.utils.file_system import get_results_path, numpyify
 from pobax.utils.sweep import get_grid_hparams, get_randomly_sampled_hparams
 
 
@@ -158,11 +155,25 @@ def make_train(args: QRPPOHyperparams, rand_key: jax.random.PRNGKey):
 
     double_critic = args.double_critic
 
-    n_atoms = args.n_atoms if isinstance(args, QRPPOHyperparams) else None
-    network = QuantileActorCritic(env.action_space(env_params),
-                                  memoryless=args.memoryless,
-                                  double_critic=args.double_critic,
+    is_image = False
+    if isinstance(env.action_space(env_params), spaces.Discrete):
+        action_size = env.action_space(env_params).n
+        is_discrete = True
+    elif isinstance(env.action_space(env_params), spaces.Box):
+        action_size = env.action_space(env_params).shape[0]
+        is_discrete = False
+    else:
+        raise NotImplementedError
+    observation_space = env.observation_space(env_params).spaces['obs']
+    if len(observation_space.shape) > 1:
+        is_image = True
+    network = QuantileActorCritic(args.env,
+                                  action_size,
+                                  double_critic=double_critic,
                                   hidden_size=args.hidden_size,
+                                  memoryless=args.memoryless,
+                                  is_discrete=is_discrete,
+                                  is_image=is_image,
                                   n_atoms=args.n_atoms)
 
     steps_filter = partial(filter_period_first_dim, n=args.steps_log_freq)
@@ -209,9 +220,7 @@ def make_train(args: QRPPOHyperparams, rand_key: jax.random.PRNGKey):
         # INIT NETWORK
         rng, _rng = jax.random.split(rng)
         init_x = (
-            jnp.zeros(
-                (1, args.num_envs, *env.observation_space(env_params).shape)
-            ),
+            env.dummy_observation(args.num_envs, env_params),
             jnp.zeros((1, args.num_envs)),
         )
         init_hstate = ScannedRNN.initialize_carry(args.num_envs, args.hidden_size)
@@ -279,7 +288,7 @@ def make_train(args: QRPPOHyperparams, rand_key: jax.random.PRNGKey):
 
             # CALCULATE ADVANTAGE
             train_state, env_state, last_obs, last_done, hstate, rng = runner_state
-            ac_in = (last_obs[np.newaxis, :], last_done[np.newaxis, :])
+            ac_in = (jax.tree.map(lambda x: x[jnp.newaxis, ...], last_obs), last_done[np.newaxis, :])
             _, _, last_val = network.apply(train_state.params, hstate, ac_in)
             last_val = last_val.squeeze(0)
 
@@ -443,9 +452,7 @@ if __name__ == "__main__":
 
     rng = jax.random.PRNGKey(args.seed)
     make_train_rng, rng = jax.random.split(rng)
-    rngs = jax.random.split(rng, args.n_seeds)
     train_fn = make_train(args, make_train_rng)
-
 
     if args.sweep_type == 'grid':
         hparams, _ = get_grid_hparams(args)
@@ -455,48 +462,4 @@ if __name__ == "__main__":
     else:
         raise NotImplementedError
 
-    vmap_seeds_train_fn = jax.vmap(train_fn, in_axes=[None, 0])
-    vmap_train_fn = jax.vmap(vmap_seeds_train_fn, in_axes=[0, None])
-    train_jit = jax.jit(vmap_train_fn)
-
-    t = time()
-    out = jax.block_until_ready(train_jit(hparams, rngs))
-    new_t = time()
-    total_runtime = new_t - t
-    print('Total runtime:', total_runtime)
-
-    # our final_eval_metric returns max_num_steps.
-    # we can filter that down by the max episode length amongst the runs.
-    final_eval = out['final_eval_metric']
-    final_train_state = out['runner_state'][0]
-
-    # # the +1 at the end is to include the done step
-    # largest_episode = final_eval['returned_episode'].argmax(axis=-2).max() + 1
-
-    # def get_first_n_filter(x):
-    #     return x[..., :largest_episode, :]
-    # out['final_eval_metric'] = jax.tree.map(get_first_n_filter, final_eval)
-
-    final_train_state = out['runner_state'][0]
-    if not args.save_runner_state:
-        del out['runner_state']
-
-    results_path = get_results_path(args, return_npy=False)  # returns a results directory
-
-    all_results = {
-        'swept_hparams': hparams,
-        'out': out,
-        'args': args.as_dict(),
-        'total_runtime': total_runtime,
-        'final_train_state': final_train_state
-    }
-
-    all_results = jax.tree.map(numpyify, all_results)
-
-    # Save all results with Orbax
-    orbax_checkpointer = orbax.checkpoint.PyTreeCheckpointer()
-    save_args = orbax_utils.save_args_from_target(all_results)
-
-    print(f"Saving results to {results_path}")
-    orbax_checkpointer.save(results_path, all_results, save_args=save_args)
-    print("Done.")
+    vmap_and_train(args, train_fn, hparams, rng)

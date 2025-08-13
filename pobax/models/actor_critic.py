@@ -420,57 +420,52 @@ class RandomRewardNetwork(nn.Module):
         return rewards
 
 
-class QuantileActorCritic(nn.Module):
-    action_space: Union[spaces.Discrete, spaces.Box]
-    hidden_size: int = 128
-    memoryless: bool = False
-    double_critic: bool = False
+class QuantileActorCritic(ActorCritic):
     n_atoms: int = None
+
+    def setup(self):
+        if self.is_image:
+            self.embedding = CNN(hidden_size=self.hidden_size)
+        # elif 'battleship' in self.env_name:
+        #     self.embedding = BattleshipEmbedding(hidden_size=self.hidden_size, action_dim=self.action_dim)
+        elif not self.memoryless:
+            self.embedding = nn.Sequential([
+                nn.Dense(self.hidden_size, kernel_init=orthogonal(jnp.sqrt(2)), bias_init=constant(0.0)),
+                nn.relu
+            ])
+        else:
+            self.embedding = SimpleNN(hidden_size=self.hidden_size)
+
+        if not self.memoryless:
+            self.memory = ScannedRNN(hidden_size=self.hidden_size)
+        if self.is_discrete:
+            self.actor = DiscreteActor(self.action_dim, hidden_size=self.hidden_size)
+        else:
+            self.actor = ContinuousActor(self.action_dim, hidden_size=self.hidden_size)
+
+        if self.double_critic:
+            self.critic = nn.vmap(QuantileV,
+                                  variable_axes={'params': 0},
+                                  split_rngs={'params': True},
+                                  in_axes=None,
+                                  out_axes=2,
+                                  axis_size=2)(hidden_size=self.hidden_size,
+                                               n_atoms=self.n_atoms)
+        else:
+            self.critic = QuantileV(hidden_size=self.hidden_size,
+                                    n_atoms=self.n_atoms)
 
     @nn.compact
     def __call__(self, hidden, x):
-        # TODO: Battleship/action masking.
-        obs, dones = x
-
-        if len(obs.shape) > 3:
-            obs_encoding = FullImageCNN(hidden_size=self.hidden_size)(obs)
-            embedding = nn.relu(obs_encoding)
-        else:
-            obs_encoding = nn.Dense(
-                self.hidden_size, kernel_init=orthogonal(jnp.sqrt(2)), bias_init=constant(0.0)
-            )(obs)
-            obs_encoding = nn.relu(obs_encoding)
-            obs_encoding = nn.Dense(
-                self.hidden_size, kernel_init=orthogonal(jnp.sqrt(2)), bias_init=constant(0.0)
-            )(obs_encoding)
-            embedding = nn.relu(obs_encoding)
-
-        if self.memoryless:
-            embedding = SimpleNN(hidden_size=self.hidden_size)(embedding)
-        else:
+        obs_dict, dones = x
+        obs = obs_dict.obs
+        action_mask = obs_dict.action_mask
+        embedding = self.embedding(obs)
+        if not self.memoryless:
             rnn_in = (embedding, dones)
-            hidden, embedding = ScannedRNN(hidden_size=self.hidden_size)(hidden, rnn_in)
+            hidden, embedding = self.memory(hidden, rnn_in)
 
-        actor = Actor(self.action_space, hidden_size=self.hidden_size)
-        pi = actor(embedding)
-
-        args = {'hidden_size': self.hidden_size}
-        critic_class = Critic
-        if self.n_atoms is not None and self.n_atoms > 0:
-            critic_class = QuantileV
-            args['n_atoms'] = self.n_atoms
-
-        if self.double_critic:
-            critic_class = nn.vmap(critic_class,
-                                   variable_axes={'params': 0},
-                                   split_rngs={'params': True},
-                                   in_axes=None,
-                                   out_axes=2,
-                                   axis_size=2)
-        critic = critic_class(**args)
-
-        v = critic(embedding)
-        if v.shape[-1] == 1:
-            v = jnp.squeeze(v, axis=-1)
+        pi = self.actor(embedding, action_mask=action_mask)
+        v = self.critic(embedding)
 
         return hidden, pi, v

@@ -43,6 +43,8 @@ def get_network_fn(env: environment.Environment, env_params: environment.EnvPara
     elif isinstance(env.action_space(env_params), spaces.Box):
         action_size = env.action_space(env_params).shape[0]
         is_discrete = False
+    else:
+        raise NotImplementedError
     observation_space = env.observation_space(env_params).spaces['obs']
     if len(observation_space.shape) > 1:
         is_image = True
