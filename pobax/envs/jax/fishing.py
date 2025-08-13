@@ -9,7 +9,7 @@ import jax
 from jax import random, lax
 import jax.numpy as jnp
 
-from definitions import ROOT_DIR
+from pobax.definitions import ROOT_DIR
 
 
 def positional_choice(key, a, p):
@@ -151,7 +151,7 @@ class Fishing(environment.Environment):
 
     def __init__(self,
                  window_size: int = 5,
-                 config_path: Path = Path(ROOT_DIR, 'porl', 'envs', '../configs', 'ocean_nav', 'fishing_8_config.json')
+                 config_path: Path = Path(ROOT_DIR, 'envs', '../configs', 'ocean_nav', 'fishing_8_config.json')
                  ):
         super(Fishing, self).__init__()
         self.config_path = config_path

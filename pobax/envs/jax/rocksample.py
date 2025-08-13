@@ -11,7 +11,7 @@ import jax
 import jax.numpy as jnp
 from jax import random, lax
 
-from definitions import ROOT_DIR
+from pobax.definitions import ROOT_DIR
 
 from pobax.envs.wrappers.gymnax import GymnaxWrapper
 
@@ -129,7 +129,7 @@ class RockSample(Environment):
 
     def __init__(self,
                  key: chex.PRNGKey,
-                 config_path: Path = Path(ROOT_DIR, 'pobax', 'envs',
+                 config_path: Path = Path(ROOT_DIR, 'envs',
                                           '../configs', 'rocksample_7_8_config.json')):
         """
         RockSample environment in Gymnax.

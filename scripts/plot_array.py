@@ -8,7 +8,7 @@ import numpy as np
 
 from pobax.utils.plot import mean_confidence_interval, colors, smoothen
 
-from definitions import ROOT_DIR
+from pobax.definitions import PROJECT_ROOT_DIR
 
 rc('font', **{'family': 'serif', 'serif': ['cmr10'], 'size': 32})
 rc('axes', unicode_minus=False)
@@ -240,17 +240,17 @@ def generate_ablation_paths(paths: dict):
     for var_val, info in paths.items():
         sweep_var, name = info['sweep_var'], info['env']
         paths = [
-            ('RNN', Path(ROOT_DIR, 'results', f'{name}_{sweep_var}_sweep/{name}_ppo_{sweep_var}_sweep',
+            ('RNN', Path(PROJECT_ROOT_DIR, 'results', f'{name}_{sweep_var}_sweep/{name}_ppo_{sweep_var}_sweep',
                          f'{name}_ppo_{sweep_var}_sweep_{sweep_var}_{var_val}'), 'purple'),
-            ('Memoryless', Path(ROOT_DIR, 'results', f'{name}_{sweep_var}_sweep/{name}_ppo_memoryless_{sweep_var}_sweep',
+            ('Memoryless', Path(PROJECT_ROOT_DIR, 'results', f'{name}_{sweep_var}_sweep/{name}_ppo_memoryless_{sweep_var}_sweep',
                   f'{name}_ppo_memoryless_{sweep_var}_sweep_{sweep_var}_{var_val}'), 'dark gray'),
         ]
         # ORDER MATTERS HERE! Assume all the -F- runs are after the rest.
         if info['state_version'] == 'memoryless':
-            paths.append(('STATE', Path(ROOT_DIR, 'results', f'{name}_{sweep_var}_sweep/{name}_ppo_perfect_memory_{sweep_var}_sweep',
+            paths.append(('STATE', Path(PROJECT_ROOT_DIR, 'results', f'{name}_{sweep_var}_sweep/{name}_ppo_perfect_memory_{sweep_var}_sweep',
                                         f'{name}_ppo_perfect_memory_memoryless_{sweep_var}_sweep_{sweep_var}_{var_val}'), 'green'))
         elif info['state_version'] == 'recurrent':
-            paths.append(('STATE', Path(ROOT_DIR, 'results', f'{name}_{sweep_var}_sweep/{name}_ppo_perfect_memory_{sweep_var}_sweep',
+            paths.append(('STATE', Path(PROJECT_ROOT_DIR, 'results', f'{name}_{sweep_var}_sweep/{name}_ppo_perfect_memory_{sweep_var}_sweep',
                                         f'{name}_ppo_perfect_memory_{sweep_var}_sweep_{sweep_var}_{var_val}'), 'green'))
         curr_path = {
             **info,
@@ -263,7 +263,7 @@ def generate_ablation_paths(paths: dict):
 
 def generate_study_paths(paths: dict):
     all_study_paths = {}
-    results_path = Path(ROOT_DIR) / 'results'
+    results_path = Path(PROJECT_ROOT_DIR) / 'results'
 
     for name, info in paths.items():
         super_dir = results_path / info['super_dir']
@@ -453,7 +453,7 @@ if __name__ == "__main__":
                            legend_loc=legend_loc, smoothen_curve=smoothen_curve)
 
 
-    save_plot_to = Path(ROOT_DIR, 'results', f'{to_plot}.pdf')
+    save_plot_to = Path(PROJECT_ROOT_DIR, 'results', f'{to_plot}.pdf')
 
     fig.savefig(save_plot_to, bbox_inches='tight', dpi=100)
     print(f"Saved figure to {save_plot_to}")

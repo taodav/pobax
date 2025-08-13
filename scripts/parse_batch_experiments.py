@@ -27,7 +27,7 @@ from tqdm import tqdm
 from pobax.config import PPOHyperparams
 from pobax.utils.file_system import get_fn_from_module, get_inner_fn_arguments
 
-from definitions import ROOT_DIR
+from pobax.definitions import PROJECT_ROOT_DIR
 
 def combine_seeds_and_envs(x: jnp.ndarray):
     # Here, dim=-1 is the NUM_ENVS parameter. We take the mean over this.
@@ -336,7 +336,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     study_path = Path(args.study_path).resolve()
-    hyperparams_dir = Path(ROOT_DIR, 'scripts', 'hyperparams').resolve()
+    hyperparams_dir = Path(PROJECT_ROOT_DIR, 'scripts', 'hyperparams').resolve()
     study_hparam_filename = study_path.stem + '.py'
     study_hparam_path = find_file_in_dir(study_hparam_filename, hyperparams_dir)
 

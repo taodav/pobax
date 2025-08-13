@@ -10,7 +10,7 @@ from pathlib import Path
 
 from pobax.utils.file_system import import_module_to_var
 
-from definitions import ROOT_DIR
+from pobax.definitions import PROJECT_ROOT_DIR
 
 
 def generate_onager_runs(run_dicts: List[dict],
@@ -69,7 +69,7 @@ def generate_onager_runs(run_dicts: List[dict],
 
         prelaunch_string = ' '.join(prelaunch_list)
         print(f"Launching prelaunch script: {prelaunch_string}")
-        os.chdir(ROOT_DIR)
+        os.chdir(PROJECT_ROOT_DIR)
         os.system(prelaunch_string)
 
 

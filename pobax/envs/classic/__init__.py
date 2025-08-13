@@ -6,7 +6,7 @@ from gymnasium import spaces
 from jax.tree_util import register_pytree_node_class
 import numpy as np
 
-from definitions import ROOT_DIR
+from pobax.definitions import ROOT_DIR
 
 
 class POMDPFile:
@@ -697,7 +697,7 @@ def load_spec(name: str, **kwargs):
     # Try to load from examples_lib first
     # then from pomdp_files
     try:
-        pomdp_dir = Path(ROOT_DIR) / 'pobax' / 'envs' / 'classic' / 'POMDP'
+        pomdp_dir = Path(ROOT_DIR) / 'envs' / 'classic' / 'POMDP'
 
         potential_pomdp_paths = [pomdp_dir / f'{name}.POMDP', pomdp_dir / f'{name}.pomdp']
 

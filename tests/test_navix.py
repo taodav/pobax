@@ -9,7 +9,7 @@ from jax_tqdm import scan_tqdm
 from pobax.envs import get_env
 from pobax.utils.video import navix_overlay_obs_on_rgb
 
-from definitions import ROOT_DIR
+from pobax.definitions import PROJECT_ROOT_DIR
 
 
 def random_policy_gif():
@@ -51,10 +51,10 @@ def random_policy_gif():
     # concat_obs = jnp.concatenate((obs[:, 0], obs[:, 1]), axis=1)
     #
     imgs = [Image.fromarray(img) for img in np_images]
-    vod_path = Path(ROOT_DIR, 'results', "navix_maze.gif")
+    vod_path = Path(PROJECT_ROOT_DIR, 'results', "navix_maze.gif")
     imgs[0].save(vod_path, save_all=True, append_images=imgs[1:], duration=100, loop=0)
 
-    pdf_path = Path(ROOT_DIR, 'results', f'{env_name}.pdf')
+    pdf_path = Path(PROJECT_ROOT_DIR, 'results', f'{env_name}.pdf')
     imgs[0].save(pdf_path, save_all=True)
 
     print(f"saved to {vod_path} and {pdf_path}")

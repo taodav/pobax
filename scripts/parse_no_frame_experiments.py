@@ -12,7 +12,7 @@ import orbax.checkpoint
 import numpy as np
 from tqdm import tqdm
 
-from definitions import ROOT_DIR
+from pobax.definitions import PROJECT_ROOT_DIR
 from pobax.utils.file_system import load_info
 
 def combine_seeds_and_envs(x: jnp.ndarray):
@@ -114,7 +114,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     study_path = Path(args.study_path)
-    study_hparam_path = Path(ROOT_DIR, 'scripts', 'hyperparams', study_path.stem + '.py')
+    study_hparam_path = Path(PROJECT_ROOT_DIR, 'scripts', 'hyperparams', study_path.stem + '.py')
 
     parsed_res_path = study_path / "best_hyperparam_per_env_res.pkl"
 

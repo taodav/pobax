@@ -6,7 +6,7 @@ import numpy as np
 import orbax.checkpoint
 from tqdm import tqdm
 
-from definitions import ROOT_DIR
+from pobax.definitions import PROJECT_ROOT_DIR
 
 labels = {
     'hidden_size': 'hsize',
@@ -16,8 +16,8 @@ labels = {
 
 if __name__ == "__main__":
     hparam = 'hidden_size'
-    parent_dir = Path(ROOT_DIR, 'results/walker_v_hsize_sweep')
-    study_hparam_parent_dir = Path(ROOT_DIR, 'scripts/hyperparams/masked_mujoco/ablation')
+    parent_dir = Path(PROJECT_ROOT_DIR, 'results/walker_v_hsize_sweep')
+    study_hparam_parent_dir = Path(PROJECT_ROOT_DIR, 'scripts/hyperparams/masked_mujoco/ablation')
 
     study_paths = [s for s in parent_dir.iterdir() if s.is_dir()]
     for study_path in tqdm(study_paths):
