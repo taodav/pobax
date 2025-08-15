@@ -159,9 +159,15 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 .idea/
 
+# vs code
+.vscode
+
+# individual files
+
 results/
 pobax/algos/outputs/
 scripts/videos
+peter_todo.txt
 
 install_requirements.sh
 uv.lock

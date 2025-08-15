@@ -205,20 +205,24 @@ if __name__ == "__main__":
 
     hyperparam_type = 'per_env'  # (all_env | per_env)
 
+    ylims = None
+
     # discounted = False
     # env_name = 'battleship_10'
     # super_dir = 'battleship'
     # best = False
 
-    discounted = False
-    env_name = 'rocksample_11_11'
-    super_dir = 'rocksample_11_11'
-    best = False
+    #discounted = False
+    #env_name = 'rocksample_11_11'
+    #super_dir = 'rocksample_11_11'
+    #best = False
+    # ylims = (0, 40)  # for rocksample_11_11 hsize
 
-    # discounted = True
-    # env_name = 'navix_01'
-    # super_dir = 'navix_01'
-    # best = True
+    discounted = False
+    env_name = 'navix_01'
+    super_dir = 'navix_01'
+    best = True
+    ylims = (0, 1)  # for navix
 
     # discounted = True
     # env_name = 'walker_v'
@@ -228,9 +232,6 @@ if __name__ == "__main__":
     best_str = '_best' if best else ''
     super_dir += best_str
 
-    # ylims = None
-    ylims = (0, 40)  # for rocksample_11_11 hsize
-    # ylims = (0, 1)  # for navix
 
     plot_name = f'{env_name}_{hyperparam_type}'
 
@@ -269,9 +270,11 @@ if __name__ == "__main__":
         # ('SF encoded obs', Path(ROOT_DIR, 'results', 'gd_sf_enc_obs', f'{env_name}_ppo_gd_sf_enc_obs'), 'cyan'),
         # ('SF encoded obs discrep', Path(ROOT_DIR, 'results', 'gd_sf_enc_obs', f'{env_name}_ppo_gd_sf_enc_obs_discrep'), 'yellow'),
 
-        ('RNN', Path(ROOT_DIR, 'results', 'qr_ppo', super_dir, f'{env_name}_ppo_qr'), 'purple'),
-        ('LD', Path(ROOT_DIR, 'results', 'qr_ppo', super_dir, f'{env_name}_ppo_qr_discrep'), 'blue'),
-        ('Ent', Path(ROOT_DIR, 'results', 'qr_ppo', super_dir, f'{env_name}_ppo_qr_ent'), 'yellow'),
+        # ('RNN', Path(ROOT_DIR, 'results', 'qr_ppo', super_dir, f'{env_name}_ppo_qr'), 'purple'),
+        # ('LD', Path(ROOT_DIR, 'results', 'qr_ppo', super_dir, f'{env_name}_ppo_qr_discrep'), 'blue'),
+        # ('Ent', Path(ROOT_DIR, 'results', 'qr_ppo', super_dir, f'{env_name}_ppo_qr_ent'), 'yellow'),
+        ('STATE', Path(ROOT_DIR, 'results','navix_01_ppo_gd_sf_obs_diff_discrep_F'), 'green'),
+        #('GD', Path(ROOT_DIR, 'results','navix_01_ppo_gd_sf_obs_diff_discrep'), 'yellow'),
         # ('Memoryless', Path(ROOT_DIR, 'results', 'qr_ppo', env_name, f'{env_name}_ppo_qr_memoryless{best_str}'), 'dark gray'),
         # ('STATE', Path(ROOT_DIR, 'results', 'qr_ppo', env_name, f'{env_name}_ppo_qr_perfect_memory_memoryless{best_str}'), 'green'),
 
@@ -347,9 +350,10 @@ if __name__ == "__main__":
             new_envs = []
             for env in best_res['envs']:
                 if env in fully_observable_to_base:
-                    if fully_observable_to_base[env] in best_res['hyperparams']:
-                        best_res['hyperparams'][fully_observable_to_base[env]] = best_res['hyperparams'][env]
-                        del best_res['hyperparams'][env]
+                    for key in ['hyperparams', 'scores']:
+                        if env in best_res[key]:
+                            best_res[key][fully_observable_to_base[env]] = best_res[key][env]
+                            del best_res[key][env]
                     new_envs.append(fully_observable_to_base[env])
                 else:
                     new_envs.append(env)

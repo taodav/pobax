@@ -264,13 +264,16 @@ def make_train(args: GDPPOHyperparams, rand_key: jax.random.PRNGKey):
                                         hidden_size=args.hidden_size,
                                         cumulant_size=cumulant_size)
     else:
+        # outputs both the single value estimate and the two GVF critics
         network = GVFActorCritic(env.action_space(env_params),
                               memoryless=args.memoryless,
                               double_critic=args.double_critic,
                               hidden_size=args.hidden_size,
                               cumulant_size=cumulant_size)
 
+    # this defines our observable f(\omega)
     cumulant_network = CumulantNetwork(cumulant_size=args.cumulant_map_size,)
+    # this defines \gamma(\omega)
     hangman_network = HangmanNetwork(gamma=args.gamma,
                                      gamma_type=args.gamma_type,
                                      gamma_max=args.gamma_max,

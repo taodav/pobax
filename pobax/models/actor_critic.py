@@ -179,11 +179,12 @@ class GVFActorCritic(nn.Module):
             gvf_critic = GVF(hidden_size=self.hidden_size, out_size=self.cumulant_size)
             if self.double_critic:
                 gvf_critic = nn.vmap(GVF,
-                                     variable_axes={'params': 0},
-                                     split_rngs={'params': True},
-                                     in_axes=None,
-                                     out_axes=2,
-                                     axis_size=2)(hidden_size=self.hidden_size, out_size=self.cumulant_size)
+                                     variable_axes={'params': 0},  # the 'params' axis input to GVF gets a leading axis, e.g. independent parameters for the two heads
+                                     split_rngs={'params': True},  # rng inputs get split in the 'param' axis, which means the critics have independent random init
+                                     in_axes=None,  # input not mapped -> same input to both heads
+                                     out_axes=2,  # the new mapped axis is placed at index 2 in the output tensor
+                                     axis_size=2  # the new axis has size 2 (two critics)
+                                     )(hidden_size=self.hidden_size, out_size=self.cumulant_size)
 
         v = jnp.squeeze(critic(embedding), axis=-1)
 

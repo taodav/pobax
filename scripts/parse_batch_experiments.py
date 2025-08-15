@@ -161,6 +161,7 @@ if __name__ == "__main__":
     study_hparam_path = find_file_in_dir(study_hparam_filename, hyperparams_dir)
 
     assert study_hparam_path is not None, f"Could not find {study_hparam_filename} in {hyperparams_dir}"
+    print(study_hparam_path)
 
     if args.discounted:
         parsed_res_file = "parsed_hparam_scores_discounted.pkl"
