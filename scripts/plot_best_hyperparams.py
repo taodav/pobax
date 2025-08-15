@@ -274,7 +274,7 @@ if __name__ == "__main__":
         # ('LD', Path(ROOT_DIR, 'results', 'qr_ppo', super_dir, f'{env_name}_ppo_qr_discrep'), 'blue'),
         # ('Ent', Path(ROOT_DIR, 'results', 'qr_ppo', super_dir, f'{env_name}_ppo_qr_ent'), 'yellow'),
         ('STATE', Path(ROOT_DIR, 'results','navix_01_ppo_gd_sf_obs_diff_discrep_F'), 'green'),
-        #('GD', Path(ROOT_DIR, 'results','navix_01_ppo_gd_sf_obs_diff_discrep'), 'yellow'),
+        ('GD', Path(ROOT_DIR, 'results','navix_01_ppo_gd_sf_obs_diff_discrep'), 'yellow'),
         # ('Memoryless', Path(ROOT_DIR, 'results', 'qr_ppo', env_name, f'{env_name}_ppo_qr_memoryless{best_str}'), 'dark gray'),
         # ('STATE', Path(ROOT_DIR, 'results', 'qr_ppo', env_name, f'{env_name}_ppo_qr_perfect_memory_memoryless{best_str}'), 'green'),
 
