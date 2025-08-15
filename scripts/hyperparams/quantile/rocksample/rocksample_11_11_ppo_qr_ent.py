@@ -31,6 +31,8 @@ hparams = {
             'steps_log_freq': 8,
             'update_log_freq': 10,
             'total_steps': int(5e6),
+            'n_run_bins': 2,
+            'run_bin_idx': [i for i in range(2)],
             'seed': 2024,
             'n_seeds': 5,
             'platform': 'gpu',

@@ -68,7 +68,7 @@ class PPOHyperparams(Tap):
     sweep_type: str = 'grid'  # grid (sweeps all listed hyperparams) | random (randomly rejection samples sets of hyperparams)
     n_random_hparams: int = 1  # [sweep_type = random] How many randomly sampled hyperparams do we use?
     n_run_bins: int = None  # How many bins do we split our runs into? Requires run_bin_idx to be not None
-    run_bin_idx: int = None  # After splitting our runs into n_run_bins bins, which index do we run?
+    run_bin_idx: int = 0  # After splitting our runs into n_run_bins bins, which index do we run?
     seed: int = 2020
     n_seeds: int = 5  # How many seeds to run in our experiment?
     platform: Literal['cpu', 'gpu'] = 'cpu'  # use CPU or GPU?
@@ -81,9 +81,6 @@ class PPOHyperparams(Tap):
         # Validate n_run_bins and run_bin_idx
         if self.n_run_bins is not None:
             assert self.run_bin_idx is not None
-
-        if self.run_bin_idx is not None:
-            assert self.n_run_bins is not None
 
 
 class GDPPOHyperparams(PPOHyperparams):

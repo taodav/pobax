@@ -210,10 +210,10 @@ if __name__ == "__main__":
     # super_dir = 'battleship'
     # best = False
 
-    discounted = False
-    env_name = 'rocksample_11_11'
-    super_dir = 'rocksample_11_11_qr'
-    best = False
+    discounted = True
+    env_name = 'navix_01'
+    super_dir = 'navix_01'
+    best = True
 
     # discounted = True
     # env_name = 'navix_01'
@@ -229,8 +229,8 @@ if __name__ == "__main__":
     super_dir += best_str
 
     # ylims = None
-    ylims = (0, 40)  # for rocksample_11_11 hsize
-    # ylims = (0, 1)  # for navix
+    # ylims = (0, 40)  # for rocksample_11_11 hsize
+    ylims = (0, 1)  # for navix
 
     plot_name = f'{env_name}_{hyperparam_type}'
 
@@ -269,17 +269,17 @@ if __name__ == "__main__":
         # ('SF encoded obs', Path(ROOT_DIR, 'results', 'gd_sf_enc_obs', f'{env_name}_ppo_gd_sf_enc_obs'), 'cyan'),
         # ('SF encoded obs discrep', Path(ROOT_DIR, 'results', 'gd_sf_enc_obs', f'{env_name}_ppo_gd_sf_enc_obs_discrep'), 'yellow'),
 
-        ('RNN', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_qr'), 'purple'),
-        ('LD', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_qr_discrep'), 'blue'),
-        ('Ent', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_qr_ent'), 'yellow'),
-        ('Memoryless', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_qr_memoryless{best_str}'), 'dark gray'),
-        ('STATE', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_qr_perfect_memory_memoryless{best_str}'), 'green'),
+        # ('RNN', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_qr'), 'purple'),
+        # ('LD', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_qr_discrep'), 'blue'),
+        # ('Ent', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_qr_ent'), 'yellow'),
+        # ('Memoryless', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_qr_memoryless{best_str}'), 'dark gray'),
+        # ('STATE', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_qr_perfect_memory_memoryless{best_str}'), 'green'),
 
-        # ('RNN', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo{best_str}'), 'purple'),
-        # ('LD', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_LD{best_str}'), 'blue'),
-        # ('Memoryless', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_memoryless{best_str}'), 'dark gray'),
-        # ('STATE', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_perfect_memory{best_str}'), 'green'),
-        # ('TRANFORMER', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_transformer'), 'cyan'),
+        ('RNN', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo{best_str}'), 'purple'),
+        ('LD', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_LD{best_str}'), 'blue'),
+        ('Memoryless', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_memoryless{best_str}'), 'dark gray'),
+        ('STATE', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_perfect_memory{best_str}'), 'green'),
+        ('TRANFORMER', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_transformer{best_str}'), 'cyan'),
     ]
 
     # env_name = 'rocksample_11_11'
