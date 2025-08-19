@@ -866,6 +866,6 @@ class ActionRepeatWrapper(GymnaxWrapper):
 
         (next_obs, next_state, info) = jax.tree.map(get_next, (obss, new_states, infos))
         reward = (reward_mask * rewards).sum(axis=0)
-        done = not none_is_done.astype(bool)
+        done = ~none_is_done.astype(bool)
         return next_obs, next_state, reward, done, info
 
