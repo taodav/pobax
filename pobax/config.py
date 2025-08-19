@@ -32,6 +32,7 @@ class PPOHyperparams(Tap):
 
     num_steps: int = 128  # How many steps do we roll out for each update? Also correponds to the largest n for n-step returns.
     num_epochs: int = 50  # How many epochs do we split our training steps into?
+    n_action_repeats: int = 1  # How many action repeats do we do per step?
     update_epochs: int = 4
     num_minibatches: int = 4
 

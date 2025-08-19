@@ -35,7 +35,8 @@ from pobax.envs.wrappers.gymnax import (
     RewardConcatWrapper,
     AutoResetEnvWrapper,
     OptimisticResetVecEnvWrapper,
-    MadronaWrapper
+    MadronaWrapper,
+    ActionRepeatWrapper
 )
 from pobax.envs.wrappers.pixel import PixelBraxVecEnvWrapper, PixelTMazeVecEnvWrapper, PixelSimpleChainVecEnvWrapper, PixelCraftaxVecEnvWrapper, PixelMadronaVecEnvWrapper
 from pobax.envs.wrappers.gymnasium import GymnaxToGymWrapper
@@ -132,6 +133,7 @@ def get_env(env_name: str,
             gamma: float = 0.99,
             perfect_memory: bool = False,
             action_concat: bool = False,
+            n_action_repeats: int = 1,
             reward_concat: bool = False,
             trace_lambdas: jnp.ndarray = None
             ):
@@ -235,6 +237,9 @@ def get_env(env_name: str,
     if hasattr(env, 'gamma'):
         print(f"Overwriting args gamma {gamma} with env gamma {env.gamma}.")
         gamma = env.gamma
+
+    if n_action_repeats > 1:
+        env = ActionRepeatWrapper(env, n_repeats=n_action_repeats)
 
     if action_concat and not env_name.startswith('craftax'):
         # Action concat is not supported for craftax envs

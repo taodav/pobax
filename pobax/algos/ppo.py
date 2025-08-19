@@ -159,7 +159,7 @@ def filter_period_first_dim(x, n: int):
 
 def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
     num_updates = (
-            args.total_steps // args.num_steps // args.num_envs
+            args.total_steps // args.num_steps // args.num_envs // args.n_repeats
     )
     args.minibatch_size = (
             args.num_envs * args.num_steps // args.num_minibatches
@@ -176,7 +176,8 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
                               perfect_memory=args.perfect_memory,
                               action_concat=args.action_concat,
                               trace_lambdas=trace_lambdas,
-                              reward_concat=args.reward_concat)
+                              reward_concat=args.reward_concat,
+                              n_action_repeats=args.n_action_repeats)
 
     if hasattr(env, 'gamma'):
         args.gamma = env.gamma

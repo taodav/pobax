@@ -816,40 +816,56 @@ class Observation(NamedTuple):
     action_mask: jnp.ndarray = None
 
 
-@struct.dataclass
-class ActionRepeatState:
-    env_state: environment.EnvState
-    action_to_repeat: jnp.ndarray
-    repeat_idx: int
-
-
 class ActionRepeatWrapper(GymnaxWrapper):
+    """
+    This wrapper repeats actions n_repeats times.
+    If there's a done in the sequence of n_repeat time steps, return
+    that done timestep as opposed to the last time step.
+    """
     def __init__(self, env: environment.Environment,
                  n_repeats: int = 1,
                  **kwargs):
         super().__init__(env)
         self.n_repeats = n_repeats
 
-    @partial(jax.jit, static_argnums=(0, -1))
-    def reset(
-            self, key: chex.PRNGKey, params: Optional[environment.EnvParams] = None
-    ) -> Tuple[chex.Array, ActionRepeatState]:
-        obs, env_state = self._env.reset(key, params)
-        zero_action = jnp.zeros(self._env.action_space(params).shape)
-        return obs, ActionRepeatState(env_state, action_to_repeat=zero_action, repeat_idx=0)
-
     @partial(jax.jit, static_argnums=(0,-1))
     def step(
             self,
             key: chex.PRNGKey,
-            state: ActionRepeatState,
+            state: environment.EnvState,
             action: Union[int, float],
             params: Optional[environment.EnvParams] = None,
     ) -> Tuple[chex.Array, environment.EnvState, float, bool, dict]:
+        def _step(runner_state, i):
+            state, key = runner_state
+            step_key, key = jax.random.split(key)
+            step_tuple = self._env.step(step_key, state, action, params)
+            obs, next_state, reward, done, info = step_tuple
+            return (next_state, key), step_tuple
 
+        (after_n_state, _), step_tuples = jax.lax.scan(_step, (state, key), jnp.arange(self.n_repeats), self.n_repeats)
+        obss, new_states, rewards, dones, infos = step_tuples
 
-        # TODO: if repeat_idx is 0, set new action. Otherwise, repeat.
-        (after_n_state, _), step_tuples = jax.lax.scan(_step, (state, key), jax.arange(self.n_repeats), self.n_repeats)
-        obss, new_states, rewards, dones, infos = step_tuple
-        # here we assume that there is only ever ONE element in dones that is true
-        next_obs =
+        # If one of the steps is done, we return that step.
+        # Otherwise, we return the last step.
+        one_is_done = jnp.minimum(dones.sum(), 1)
+        none_is_done = 1 - one_is_done
+
+        # dones: shape (t,), entries are 0/1 (int, float, or bool)
+        # Here we get a mask for the first done
+        cumsum_dones = jnp.cumsum(dones)
+        first = (cumsum_dones == 1) & dones
+        first_done_mask = first.astype(dones.dtype)
+        # And this is a mask for the timesteps in the first episode of the sequencd
+        reward_mask = (first == 0) + first_done_mask
+
+        def get_next(arr):
+            additional_ones = (1, ) * len(arr.shape[1:])
+            usq_first_done_mask = first_done_mask.reshape((first_done_mask.shape[0], ) + additional_ones)
+            return ((arr * usq_first_done_mask).sum(axis=0) + arr[-1] * none_is_done).astype(arr.dtype)
+
+        (next_obs, next_state, info) = jax.tree.map(get_next, (obss, new_states, infos))
+        reward = (reward_mask * rewards).sum(axis=0)
+        done = not none_is_done.astype(bool)
+        return next_obs, next_state, reward, done, info
+
