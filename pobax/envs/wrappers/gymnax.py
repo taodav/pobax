@@ -814,3 +814,42 @@ class MadronaWrapper(GymnaxWrapper):
 class Observation(NamedTuple):
     obs: jnp.ndarray
     action_mask: jnp.ndarray = None
+
+
+@struct.dataclass
+class ActionRepeatState:
+    env_state: environment.EnvState
+    action_to_repeat: jnp.ndarray
+    repeat_idx: int
+
+
+class ActionRepeatWrapper(GymnaxWrapper):
+    def __init__(self, env: environment.Environment,
+                 n_repeats: int = 1,
+                 **kwargs):
+        super().__init__(env)
+        self.n_repeats = n_repeats
+
+    @partial(jax.jit, static_argnums=(0, -1))
+    def reset(
+            self, key: chex.PRNGKey, params: Optional[environment.EnvParams] = None
+    ) -> Tuple[chex.Array, ActionRepeatState]:
+        obs, env_state = self._env.reset(key, params)
+        zero_action = jnp.zeros(self._env.action_space(params).shape)
+        return obs, ActionRepeatState(env_state, action_to_repeat=zero_action, repeat_idx=0)
+
+    @partial(jax.jit, static_argnums=(0,-1))
+    def step(
+            self,
+            key: chex.PRNGKey,
+            state: ActionRepeatState,
+            action: Union[int, float],
+            params: Optional[environment.EnvParams] = None,
+    ) -> Tuple[chex.Array, environment.EnvState, float, bool, dict]:
+
+
+        # TODO: if repeat_idx is 0, set new action. Otherwise, repeat.
+        (after_n_state, _), step_tuples = jax.lax.scan(_step, (state, key), jax.arange(self.n_repeats), self.n_repeats)
+        obss, new_states, rewards, dones, infos = step_tuple
+        # here we assume that there is only ever ONE element in dones that is true
+        next_obs =

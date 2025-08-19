@@ -119,6 +119,7 @@ class PPO:
         return total_loss, (value_loss, loss_actor, entropy)
 
 
+# TODO: add n_action_repeats here
 def env_step(runner_state, unused, agent: PPO, env, env_params):
     train_state, env_state, last_obs, last_done, hstate, rng = runner_state
     rng, _rng = jax.random.split(rng)
