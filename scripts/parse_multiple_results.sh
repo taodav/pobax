@@ -1,4 +1,4 @@
-RESULTS_DIR='../results/qr/rocksample_11_11_ppo_qr'
+RESULTS_DIR='../results/tmaze_repeat_sweep'
 
 for item in $RESULTS_DIR/*/;
 do

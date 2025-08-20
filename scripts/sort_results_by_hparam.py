@@ -11,14 +11,15 @@ from definitions import ROOT_DIR
 labels = {
     'hidden_size': 'hsize',
     'num_envs': 'nenvs',
-    'n_random_rewards': 'num_rr'
+    'n_random_rewards': 'num_rr',
+    'n_action_repeats': 'n_action_repeats'
 }
 
 
 if __name__ == "__main__":
-    hparam = 'num_envs'
-    parent_dir = Path(ROOT_DIR, 'results/qr')
-    study_hparam_parent_dir = Path(ROOT_DIR, 'scripts/hyperparams/rocksample')
+    hparam = 'n_action_repeats'
+    parent_dir = Path(ROOT_DIR, 'results/cartpole_repeat_sweep')
+    study_hparam_parent_dir = Path(ROOT_DIR, 'scripts/hyperparams/repeat/cartpole_p')
     study_hparam_parent_dir.mkdir(exist_ok=True)
 
     study_paths = [s for s in parent_dir.iterdir() if s.is_dir()]
