@@ -60,6 +60,7 @@ if __name__ == "__main__":
             env_best_hparam[k] = all_hyperparams[k][idx]
         best_hyperparams[env] = env_best_hparam
 
+    print("Best hyperparams per env:", best_hyperparams)
     best_hparam_res = {
         'hyperparams': best_hyperparams,
         'scores': max_scores,

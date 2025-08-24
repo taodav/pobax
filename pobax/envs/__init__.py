@@ -273,7 +273,7 @@ def get_transformer_env(env_name: str,
             num_envs: int,
             image_size: int = 64,
             normalize_env: bool = False,
-            normalize_image: bool = True,
+            normalize_image: bool = False,
             gamma: float = 0.99,
             perfect_memory: bool = False,
             action_concat: bool = False):
@@ -370,7 +370,7 @@ def get_transformer_env(env_name: str,
         print(f"Overwriting args gamma {gamma} with env gamma {env.gamma}.")
         gamma = env.gamma
 
-    if action_concat:
+    if action_concat and not env_name.startswith('craftax'):
         env = ActionConcatWrapper(env)
 
     env = LogWrapper(env, gamma=gamma)

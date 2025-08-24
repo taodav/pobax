@@ -3,7 +3,7 @@ from pathlib import Path
 exp_name = Path(__file__).stem
 
 lrs = [0.00025]
-lambda0s = [0.95]
+lambda0s = [0.9]
 lambda1s = [0.5]
 alphas = [1]
 ld_weights = [0]

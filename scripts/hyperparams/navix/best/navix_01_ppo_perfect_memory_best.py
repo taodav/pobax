@@ -29,8 +29,8 @@ hparams = {
             'num_steps': 128,
             'num_envs': 256,
             'total_steps': int(1e7),
-            'seed': [2126 + i for i in range(10)],
-            'n_seeds': 3,
+            'seed': [2126 + i for i in range(30)],
+            'n_seeds': 1,
             'platform': 'gpu',
             'study_name': exp_name
         }
