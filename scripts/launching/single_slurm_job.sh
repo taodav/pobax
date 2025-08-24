@@ -11,7 +11,7 @@
 source ~/pobax_baseline/bin/activate
 
 # Specify the filename
-input_file="../runs/runs_test_craftax_pixels.txt"
+input_file="../runs/runs_tmaze_10_transformer_best.txt"
 job_name=$(basename "$input_file" .txt) # Extract the base name of the file without extension
 
 # Read commands from the file and submit each as a separate job

@@ -1,4 +1,3 @@
-jax
 flax
 distrax
 optax
@@ -9,7 +8,7 @@ pandas
 tqdm
 typed-argument-parser
 numpy
-navix
+navix @ git+https://github.com/taodav/navix
 pytest
 matplotlib
 seaborn

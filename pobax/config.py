@@ -54,6 +54,7 @@ class PPOHyperparams(Tap):
     clip_eps: float = 0.2  # PPO policy gradient clip epsilon
     max_grad_norm: float = 0.5  # Maximum grad norm for updates
     anneal_lr: bool = True  # Do we (linearly) anneal learning rate?
+    offline_eval: bool = True
 
     image_size: int = 32  # [MADRONA/CRAFTAX] what is the size of our image?
 
