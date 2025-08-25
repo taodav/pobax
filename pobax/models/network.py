@@ -5,6 +5,7 @@ import jax
 import jax.numpy as jnp
 from flax.linen.recurrent import Carry
 from flax.typing import PRNGKey
+from flax import struct
 from jax._src.nn.initializers import orthogonal, constant
 import numpy as np
 
@@ -216,3 +217,52 @@ class FullImageCNN(nn.Module):
 
         final_out = nn.Dense(features=self.hidden_size)(dense_out)
         return final_out
+
+
+@struct.dataclass
+class SkipHiddenState:
+    hidden_state: jnp.ndarray
+    u: jnp.ndarray
+    u_bar: jnp.ndarray
+
+
+class SkipRNN(nn.Module):
+    """
+    RNN with a gated skip connection.
+    """
+    hidden_size: int
+
+    @functools.partial(
+        nn.scan,
+        variable_broadcast="params",
+        in_axes=0,
+        out_axes=0,
+        split_rngs={"params": False},
+    )
+    @nn.compact
+    def __call__(self, carry: SkipHiddenState, x):
+        """Applies the module."""
+        rnn_state = carry
+        ins, resets = x
+        rnn_state = jax.tree.map(lambda reset_hs, hs: jnp.where(
+            resets[:, np.newaxis],
+            reset_hs,
+            hs,
+        ), self.initialize_carry(ins.shape[0], ins.shape[1]), rnn_state)
+        # binarize in the actor loop. Need to do the u prediction here.
+        # Write a small test for this
+        # rnn_state = jnp.where(
+        #     resets[:, np.newaxis],
+        #     self.initialize_carry(ins.shape[0], ins.shape[1]),
+        #     rnn_state,
+        # )
+        new_rnn_state, y = nn.GRUCell(features=self.hidden_size)(rnn_state.hidden_state, ins)
+        return new_rnn_state, y
+
+    @staticmethod
+    def initialize_carry(batch_size, hidden_size) -> SkipHiddenState:
+        new_hs = nn.GRUCell(features=hidden_size).initialize_carry(
+            jax.random.PRNGKey(0), (batch_size, hidden_size)
+        ).astype(float)
+        new_u = jnp.zeros(batch_size).astype(float)
+        return SkipHiddenState(new_hs, new_u)
