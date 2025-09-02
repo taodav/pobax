@@ -2,8 +2,10 @@ from functools import partial
 
 from flax import struct
 import flax.linen as nn
+from flax.training.train_state import TrainState
 import jax
 import jax.numpy as jnp
+import optax
 
 @struct.dataclass
 class SkipHiddenState:
@@ -63,5 +65,34 @@ class SkipRNN(nn.Module):
         new_u = jnp.zeros(batch_size).astype(float)
         return SkipHiddenState(new_hs, new_u)
 
+def train_step(state: TrainState, x: jnp.ndarray, y: jnp.ndarray, lr: float = 1e-4):
+    tx = optax.adam(lr)
 
-@partial
+if __name__ == "__main__":
+    b_size = 32
+    d_in = 1
+    d_hidden = 32
+    t = 128 + 1
+
+    one_every = 8
+
+    x = jnp.zeros((b_size, t, d_in))
+    x = x.at[:, ::one_every, 0].set(1)
+
+    y = jnp.zeros((b_size, t))
+    y = y.at[:, 1::one_every].set(1)
+
+    _train_step = jax.jit(partial(train_step, lr=1e-4))
+
+    init_x = (
+        x[:1],
+        jnp.zeros((1, 1)),
+    )
+
+    for step in range(10000):
+        state, aux = train_step(state, x, y)
+        if step % 50 == 0:
+            print(f"step {step:3d}  loss={aux['loss_mean']:.4f}  "
+                  f"p_mean={aux['p_mean']:.3f}  b_rate={aux['b_rate']:.3f}  "
+                  f"pathwise={aux['pathwise']:.4f}  reinforce={aux['reinforce']:.4f}")
+

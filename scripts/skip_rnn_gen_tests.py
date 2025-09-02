@@ -98,9 +98,6 @@ def train_step(state: TrainState, x, y, beta=0.9):
     new_state = TrainState(new_params, new_opt_state, new_baseline, new_key)
     return new_state, aux
 
-def generate_noisy_addition_dataset(B):
-    x = jax.random.normal(state.key, (B, d_in))
-    y = jax.random.normal(state.key, (B,))
 
 
 # ----- demo run -----
@@ -109,6 +106,8 @@ jax.disable_jit(True)
 B, d_in, d_hidden = 64, 16, 32
 state = create_state(key, d_in, d_hidden, lr=1e-4)
 
+x = jax.random.normal(state.key, (B, d_in))
+y = jax.random.normal(state.key, (B,))
 
 for step in range(10000):
     state, aux = train_step(state, x, y)
