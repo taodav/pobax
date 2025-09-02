@@ -537,7 +537,7 @@ def madrona_main(args: PPOHyperparams):
 
 
 if __name__ == "__main__":
-    # jax.disable_jit(True)
+    jax.disable_jit(True)
     # okay some weirdness here. NUM_ENVS needs to match with NUM_MINIBATCHES
     args = PPOHyperparams().parse_args()
     jax.config.update('jax_platform_name', args.platform)
