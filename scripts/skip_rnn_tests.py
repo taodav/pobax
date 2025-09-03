@@ -8,6 +8,31 @@ import jax
 import jax.numpy as jnp
 import optax
 
+# JAX toy datasets for SkipRNNs
+# ------------------------------------------------------------
+from jax import random
+from typing import Dict, Callable
+
+
+def _batch(sample_fn, key, batch_size, **kwargs) -> Dict[str, jnp.ndarray]:
+    keys = random.split(key, batch_size)
+    ex = jax.vmap(lambda k: sample_fn(k, **kwargs), in_axes=0, out_axes=1)(keys)
+    # ex is a dict of arrays with leading batch dim via vmap
+    return ex
+
+# 1) Rare Pulse Counting (mostly zeros; update only on pulses)
+#    x: (B,T,1) binary pulses; y: (B,T,1) cumulative count; mask: all ones
+def sample_pulse_count(key, T=200, p=0.08):
+    key1, key2 = random.split(key)
+    pulses = random.bernoulli(key1, p=p, shape=(T,)).astype(jnp.int32)
+    x = pulses[:, None].astype(jnp.float32)
+    y = jnp.cumsum(pulses)[:, None].astype(jnp.float32)
+    mask = jnp.ones((T,), dtype=bool)
+    return {"x": x, "y": y, "mask": mask}
+
+def make_pulse_count_batch(key, batch_size=32, T=200, p=0.08):
+    return _batch(sample_pulse_count, key, batch_size, T=T, p=p)
+
 @struct.dataclass
 class SkipHiddenState:
     hidden_state: jnp.ndarray
@@ -74,8 +99,11 @@ class SkipRNN(nn.Module):
         return SkipHiddenState(new_hs, new_u)
 
 
-def train_step(step_state, _):
-    state, x, y, rng = step_state
+def train_step(step_state, _, sampler):
+    state, rng = step_state
+    sampler_rng, rng = jax.random.split(rng)
+    samples = sampler(rng)
+    x, y = samples['x'], samples['y']
     init_hstate = SkipRNN.initialize_carry(x.shape[1], d_hidden)
 
     def _loss(params, init_hstate, rng):
@@ -84,9 +112,9 @@ def train_step(step_state, _):
         dones = jnp.zeros((x.shape[0], x.shape[1]))
         ins = (x, dones)
         _, (y_preds, y_logits, us, u_bars) = state.apply_fn(params, init_hstate, apply_rngs, ins)
-        # loss_per_ex = (y[..., None] - y_preds) ** 2
-        # binary cross entropy
-        loss_per_ex = optax.losses.sigmoid_binary_cross_entropy(y_logits, y[..., None])
+        loss_per_ex = (y - y_logits) ** 2
+        # # binary cross entropy
+        # loss_per_ex = optax.losses.sigmoid_binary_cross_entropy(y_logits, y)
 
         logp = jnp.log(u_bars + 1e-10)  # (B,)
 
@@ -115,27 +143,30 @@ def train_step(step_state, _):
     )
     state = state.apply_gradients(grads=grads)
 
-    return (state, x, y, rng), total_loss
+    return (state, rng), total_loss
 
 
-def train(state: TrainState, x: jnp.ndarray, y: jnp.ndarray, rng: jax.random.PRNGKey,
-          steps: int = int(1e5), log_every: int = 50):
+def train(state: TrainState, rng: jax.random.PRNGKey,
+          steps: int = int(1e5), log_every: int = 50,
+          sampler: Callable = make_pulse_count_batch):
     epochs = steps // log_every
+    _train_step = partial(train_step, sampler=sampler)
 
     def _epoch(epoch_state, i):
 
-        new_epoch_state, loss_and_aux = jax.lax.scan(train_step, epoch_state, jnp.arange(log_every), log_every)
+        new_epoch_state, loss_and_aux = jax.lax.scan(_train_step, epoch_state, jnp.arange(log_every), log_every)
         _, aux = loss_and_aux
         aux['step'] = log_every * (i + 1)
 
         def callback(info):
             print(f"Mean statistics over {log_every} steps for step {info['step']:3d}  loss={info['total_loss'].mean():.4f}  "
                   # f"p_mean={aux['p_mean']:.3f}  b_rate={aux['b_rate']:.3f}  "
+                  f"u_rate={info['u'].mean():.3f}  "
                   f"pathwise={info['pathwise_loss'].mean():.4f}  reinforce={info['g_grad_log_pi'].mean():.4f}")
         jax.debug.callback(callback, aux)
         return new_epoch_state, aux
 
-    final_state, aux = jax.lax.scan(_epoch, (state, x, y, rng), jnp.arange(epochs), epochs)
+    final_state, aux = jax.lax.scan(_epoch, (state, rng), jnp.arange(epochs), epochs)
     return final_state, aux
 
 
@@ -144,26 +175,33 @@ if __name__ == "__main__":
     rng = jax.random.PRNGKey(2025)
     # jax.config.update('jax_platform_name', 'cpu')
 
-    b_size = 4
+    b_size = 32
     d_in = 1
-    d_hidden = 32
-    t = 32 + 1
-    lr = 1e-4
+    d_hidden = 64
+    t = 32
+    lr = 1e-5
     steps = 100000
 
-    one_every = 8
+    p = 0.1
+    pulse_sampler = partial(make_pulse_count_batch, T=t, batch_size=b_size, p=p)
 
-    x = jnp.zeros((t, b_size, d_in))
-    x = x.at[::one_every, :, 0].set(1)
+    sample_dict = pulse_sampler(jax.random.PRNGKey(0))
+    x_sample = sample_dict['x']
 
-    y = jnp.zeros((t, b_size))
-    y = y.at[1::one_every, :].set(1)
 
-    _train = jax.jit(partial(train, steps=steps, log_every=10))
+    # output one at next step, every n steps
+    # one_every = 8
+    # x = jnp.zeros((t, b_size, d_in))
+    # x = x.at[::one_every, :, 0].set(1)
+    #
+    # y = jnp.zeros((t, b_size))
+    # y = y.at[1::one_every, :].set(1)
+
+    _train = jax.jit(partial(train, steps=steps, log_every=100))
 
     tx = optax.adam(lr)
     init_x = (
-        jnp.zeros((1,) + x.shape[1:]),
+        jnp.zeros((1,) + x_sample.shape[1:]),
         jnp.zeros((1, b_size)),
     )
 
@@ -181,7 +219,7 @@ if __name__ == "__main__":
 
     t = time()
 
-    final_state, final_out = jax.block_until_ready(train(state, x, y, rng))
+    final_state, final_out = jax.block_until_ready(_train(state, rng))
 
     new_t = time()
     print()
