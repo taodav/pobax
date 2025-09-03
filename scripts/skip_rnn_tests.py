@@ -1,4 +1,5 @@
 from functools import partial
+from time import time
 
 from flax import struct
 import flax.linen as nn
@@ -72,8 +73,9 @@ class SkipRNN(nn.Module):
         new_u = jnp.zeros((batch_size, 1)).astype(float)
         return SkipHiddenState(new_hs, new_u)
 
-def train_step(state: TrainState, x: jnp.ndarray, y: jnp.ndarray, rng: jax.random.PRNGKey):
 
+def train_step(step_state, _):
+    state, x, y, rng = step_state
     init_hstate = SkipRNN.initialize_carry(x.shape[1], d_hidden)
 
     def _loss(params, init_hstate, rng):
@@ -107,12 +109,34 @@ def train_step(state: TrainState, x: jnp.ndarray, y: jnp.ndarray, rng: jax.rando
         return total_loss, aux
 
     grad_fn = jax.value_and_grad(_loss, has_aux=True)
+    grad_rng, rng = jax.random.split(rng)
     total_loss, grads = grad_fn(
-        state.params, init_hstate, rng
+        state.params, init_hstate, grad_rng
     )
     state = state.apply_gradients(grads=grads)
 
-    return state, total_loss
+    return (state, x, y, rng), total_loss
+
+
+def train(state: TrainState, x: jnp.ndarray, y: jnp.ndarray, rng: jax.random.PRNGKey,
+          steps: int = int(1e5), log_every: int = 50):
+    epochs = steps // log_every
+
+    def _epoch(epoch_state, i):
+
+        new_epoch_state, loss_and_aux = jax.lax.scan(train_step, epoch_state, jnp.arange(log_every), log_every)
+        _, aux = loss_and_aux
+        aux['step'] = log_every * (i + 1)
+
+        def callback(info):
+            print(f"Mean statistics over {log_every} steps for step {info['step']:3d}  loss={info['total_loss'].mean():.4f}  "
+                  # f"p_mean={aux['p_mean']:.3f}  b_rate={aux['b_rate']:.3f}  "
+                  f"pathwise={info['pathwise_loss'].mean():.4f}  reinforce={info['g_grad_log_pi'].mean():.4f}")
+        jax.debug.callback(callback, aux)
+        return new_epoch_state, aux
+
+    final_state, aux = jax.lax.scan(_epoch, (state, x, y, rng), jnp.arange(epochs), epochs)
+    return final_state, aux
 
 
 if __name__ == "__main__":
@@ -125,6 +149,7 @@ if __name__ == "__main__":
     d_hidden = 32
     t = 32 + 1
     lr = 1e-4
+    steps = 100000
 
     one_every = 8
 
@@ -134,7 +159,7 @@ if __name__ == "__main__":
     y = jnp.zeros((t, b_size))
     y = y.at[1::one_every, :].set(1)
 
-    _train_step = jax.jit(train_step)
+    _train = jax.jit(partial(train, steps=steps, log_every=10))
 
     tx = optax.adam(lr)
     init_x = (
@@ -154,13 +179,10 @@ if __name__ == "__main__":
         tx=tx,
     )
 
-    for step in range(10000):
-        rng, step_rng = jax.random.split(rng)
-        state, (loss, aux) = train_step(state, x, y, step_rng)
-        if step % 50 == 0:
-            print(f"step {step:3d}  loss={aux['total_loss']:.4f}  "
-                  # f"p_mean={aux['p_mean']:.3f}  b_rate={aux['b_rate']:.3f}  "
-                  f"pathwise={aux['pathwise_loss']:.4f}  reinforce={aux['g_grad_log_pi']:.4f}")
+    t = time()
 
+    final_state, final_out = jax.block_until_ready(train(state, x, y, rng))
+
+    new_t = time()
     print()
 
