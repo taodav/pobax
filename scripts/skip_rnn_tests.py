@@ -57,9 +57,12 @@ class SkipRNN(nn.Module):
         change_in_u = jax.nn.sigmoid(change_in_u_logit)
         next_ubar = u * change_in_u + (1 - u) * (u_bar + jnp.minimum(change_in_u_logit, 1 - u_bar))
 
-        out = nn.Dense(features=self.out_size)(embedding)
+        logits = nn.Dense(features=self.out_size)(embedding)
 
-        return SkipHiddenState(hidden_state=new_hidden_state, u_bar=next_ubar), (out, u)
+        # TODO: change this for general predictions
+        out = nn.sigmoid(logits)
+
+        return SkipHiddenState(hidden_state=new_hidden_state, u_bar=next_ubar), (out, logits, u, u_bar)
 
     @staticmethod
     def initialize_carry(batch_size, hidden_size) -> SkipHiddenState:
@@ -78,10 +81,12 @@ def train_step(state: TrainState, x: jnp.ndarray, y: jnp.ndarray, rng: jax.rando
         apply_rngs = jax.random.split(apply_rng, x.shape[0])
         dones = jnp.zeros((x.shape[0], x.shape[1]))
         ins = (x, dones)
-        hidden_states, (y_preds, us) = state.apply_fn(params, init_hstate, apply_rngs, ins)
-        loss_per_ex = (y[..., None] - y_preds) ** 2
+        _, (y_preds, y_logits, us, u_bars) = state.apply_fn(params, init_hstate, apply_rngs, ins)
+        # loss_per_ex = (y[..., None] - y_preds) ** 2
+        # binary cross entropy
+        loss_per_ex = optax.losses.sigmoid_binary_cross_entropy(y_logits, y[..., None])
 
-        logp = jnp.log(hidden_states.u_bar)  # (B,)
+        logp = jnp.log(u_bars + 1e-10)  # (B,)
 
         g = jax.lax.stop_gradient(loss_per_ex)
         g_grad_log_pi = (g * (-logp)).mean()
@@ -92,6 +97,7 @@ def train_step(state: TrainState, x: jnp.ndarray, y: jnp.ndarray, rng: jax.rando
 
         aux = {
             'y_pred': y_preds,
+            'u_bar': u_bars,
             'u': us,
             'total_loss': total_loss,
             'pathwise_loss': pathwise_loss,
@@ -117,7 +123,7 @@ if __name__ == "__main__":
     b_size = 4
     d_in = 1
     d_hidden = 32
-    t = 128 + 1
+    t = 32 + 1
     lr = 1e-4
 
     one_every = 8
@@ -155,4 +161,6 @@ if __name__ == "__main__":
             print(f"step {step:3d}  loss={aux['total_loss']:.4f}  "
                   # f"p_mean={aux['p_mean']:.3f}  b_rate={aux['b_rate']:.3f}  "
                   f"pathwise={aux['pathwise_loss']:.4f}  reinforce={aux['g_grad_log_pi']:.4f}")
+
+    print()
 
