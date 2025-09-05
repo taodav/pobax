@@ -60,14 +60,14 @@ class SkipRNN(nn.Module):
         # TODO: do alternative versions of this? maybe we do want our u to be recurrent.
         change_in_u_logit = nn.Dense(features=1)(new_hidden_state)
         change_in_u = jax.nn.sigmoid(change_in_u_logit)
-        next_ubar = u * change_in_u + (1 - u) * (u_bar + jnp.minimum(change_in_u_logit, 1 - u_bar))
+        next_ubar = u * change_in_u + (1 - u) * (u_bar + jnp.minimum(change_in_u, 1 - u_bar))
 
         logits = nn.Dense(features=self.out_size)(embedding)
 
         # TODO: change this for general predictions
-        out = nn.sigmoid(logits)
+        # out = nn.sigmoid(logits)
 
-        return SkipHiddenState(hidden_state=new_hidden_state, u_bar=next_ubar), (out, logits, u, u_bar)
+        return SkipHiddenState(hidden_state=new_hidden_state, u_bar=next_ubar), (logits, u, u_bar)
 
     @staticmethod
     def initialize_carry(batch_size, hidden_size) -> SkipHiddenState:
