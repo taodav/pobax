@@ -210,32 +210,6 @@ if __name__ == "__main__":
         # ('TRANFORMER', Path(PROJECT_ROOT_DIR, 'results', super_dir, f'{env_name}_transformer'), 'cyan'),
     ]
 
-    # env_name = 'rocksample_11_11'
-    # sweep_var = 'hsize'
-    # nenvs = 128
-    # # ylims = (0., 0.68)  # for navix_01 nenvs
-    # # ylims = (50, 2500)  # for walker_v hsize
-    # ylims = (0, 21)  # for rocksample_11_11 hsize
-    # # ylims = None
-    #
-    # plot_name = f'{env_name}_{hyperparam_type}_{sweep_var}_{nenvs}'
-    #
-    # study_paths = [
-    #     ('RNN', Path(PROJECT_ROOT_DIR, 'results', f'{env_name}_{sweep_var}_sweep/{env_name}_ppo_{sweep_var}_sweep', f'{env_name}_ppo_{sweep_var}_sweep_{sweep_var}_{nenvs}'), 'purple'),
-    #     # ('RNN + LD', Path(PROJECT_ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_LD'), 'blue'),
-    #     ('Memoryless', Path(PROJECT_ROOT_DIR, 'results', f'{env_name}_{sweep_var}_sweep/{env_name}_ppo_memoryless_{sweep_var}_sweep', f'{env_name}_ppo_memoryless_{sweep_var}_sweep_{sweep_var}_{nenvs}'), 'dark gray'),
-    #     ('STATE', Path(PROJECT_ROOT_DIR, 'results', f'{env_name}_{sweep_var}_sweep/{env_name}_ppo_perfect_memory_{sweep_var}_sweep', f'{env_name}_ppo_perfect_memory_{sweep_var}_sweep_{sweep_var}_{nenvs}'), 'green'),
-    #     # ('TRANFORMER', Path(PROJECT_ROOT_DIR, 'results', super_dir, f'{env_name}_transformer'), 'cyan'),
-    # ]
-
-    # best
-    # study_paths = [
-    #     ('PPO + RNN + LD', Path(PROJECT_ROOT_DIR, 'results', f'{env_name}_LD_ppo_best'), 'green'),
-    #     ('PPO + RNN', Path(PROJECT_ROOT_DIR, 'results', f'{env_name}_ppo_best'), 'blue'),
-    #     # ('Memoryless PPO', Path(PROJECT_ROOT_DIR, 'results', f'{env_name}_memoryless_ppo_best'), 'dark gray'),
-    # ]
-
-
     if study_paths[0][1].stem.endswith('best'):
         plot_name += '_best'
 

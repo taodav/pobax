@@ -4,16 +4,12 @@ from pathlib import Path
 
 import numpy as np
 
-def argmax_last(array):
-    shape = array.shape
-    array = array.reshape((-1, shape[-1]))
-    ravelmax = np.argmax(array, axis=0)
-    return np.unravel_index(ravelmax, shape[:-1]) + (np.arange(shape[-1]),)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('parsed_study_path', type=str)
-    parser.add_argument('--measure', type=str, default='auc')
+    parser.add_argument('--measure', type=str, default='auc',
+                        help='What measure do we use? (auc | final)')
     args = parser.parse_args()
 
     # The math says that this doesn't matter...
@@ -24,49 +20,45 @@ if __name__ == "__main__":
     with open(parsed_path, 'rb') as f:
         parsed_res = pickle.load(f)
     scores = parsed_res['scores']
-    # HACK to take care of nans
-    scores[np.isnan(scores)] = (-10000)
-    # scores = fill_in_first_n_with_zeros(scores)
-    # leave_first_n = 10
-    # scores = scores[..., leave_first_n:, :, :, :]
-
-    all_hyperparams = parsed_res['hyperparams']
-
-    # SELECING HYPERPARAMS
-    # optimize_lambda_discrep = 1  # False
-    # alpha = 0  # 1
-    # preselected_hyperparams = {
-    #     'optimize_lambda_discrep': False,
-    #     'alpha': 1.
-    # }
-    # scores = scores[optimize_lambda_discrep, alpha]
-
-    mean_score = scores
-    changing_mean_order = parsed_res['dim_ref'].copy()
-    for axis_name in mean_order:
-        axis = changing_mean_order.index(axis_name)
-        mean_score = mean_score.mean(axis=axis)
-        changing_mean_order.remove(axis_name)
-
-    max_idxes = argmax_last(mean_score)
-
-    swapped = scores.swapaxes(len(max_idxes) - 1, -1)
-    max_scores = swapped[max_idxes].swapaxes(0, -1)
 
     best_hyperparams = {}
-    for env, env_max_idx in zip(parsed_res['envs'], np.stack(max_idxes[:-1], axis=-1)):
-        env_best_hparam = {}
-        for idx, k in zip(env_max_idx, all_hyperparams):
-            env_best_hparam[k] = all_hyperparams[k][idx]
-        best_hyperparams[env] = env_best_hparam
+    max_scores = {}
+    best_fpaths = {}
+
+    for env, results_dict in scores.items():
+        if args.measure == 'auc':
+            score = results_dict['scores']
+        elif args.measure == 'final':
+            score = results_dict['final_scores']
+        else:
+            raise NotImplementedError
+
+        mean_score = score
+        changing_mean_order = parsed_res['dim_ref'].copy()
+        for axis_name in mean_order:
+            axis = changing_mean_order.index(axis_name)
+            mean_score = mean_score.mean(axis=axis)
+            changing_mean_order.remove(axis_name)
+
+        assert len(mean_score.shape) == 1
+        max_idx = np.argmax(mean_score)
+        max_score = score[max_idx]
+
+        best_hyperparams[env] = {}
+        for k, vals in parsed_res['swept_hyperparams'][env].items():
+            best_hyperparams[env][k] = vals[max_idx]
+        best_fpaths[env] = {'fpath': results_dict['fpaths'], 'max_idx': max_idx}
+
+        max_scores[env] = max_score
 
     best_hparam_res = {
         'hyperparams': best_hyperparams,
         'scores': max_scores,
-        'dim_ref': parsed_res['dim_ref'][len(max_idxes) - 1:],
+        'dim_ref': parsed_res['dim_ref'][1:],
         'envs': parsed_res['envs'],
         'all_hyperparams': parsed_res['all_hyperparams'],
-        'discounted': parsed_res['discounted']
+        'discounted': parsed_res['discounted'],
+        'fpaths': best_fpaths
     }
 
     file_name = "best_hyperparam_per_env_res.pkl"

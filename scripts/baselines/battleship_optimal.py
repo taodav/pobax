@@ -1,15 +1,16 @@
+"""
+Taken from http://datagenetics.com/blog/december32011/index.html
+This file implements the optimal belief-state policy for battleship.
+"""
 from random import random
 from numpy import random
-from random import seed
 from random import randint
 from datetime import datetime
 from datetime import timedelta
 import math
 import numpy
-import time
 import xlsxwriter
 
-#http://datagenetics.com/blog/december32011/index.html
 
 # ----Boat Generation----    
 def ShipGenerator(board_horz,board_vert,Ship):

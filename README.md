@@ -89,7 +89,8 @@ python -m pobax.algos.ppo --env rocksample_11_11 --num_envs 16 --entropy_coeff 0
 ```
 
 This script will run an experiment over 5 seeds over 5M steps on CPU with `entropy coefficient = 0.2`, `GAE lambda = 0.7` and 16 parallel environments for each run,
-while sweeping `learning rate = 0.0025, 0.00025`.
+while sweeping `learning rate = 0.0025, 0.00025`. For more information on running experiments with POBAX, check out
+the [EXPERIMENTS.md](https://github.com/taodav/pobax/blob/main/EXPERIMENTS.md) file.
 
 Hyperparameters and their descriptions can be found in `pobax/config.py`. Any hyperparameter that has a list type can be swept.
 

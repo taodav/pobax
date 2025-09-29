@@ -5,7 +5,6 @@ exp_name = Path(__file__).stem
 lrs = [2.5e-5]
 lambda0s = [0.7]
 lambda1s = [0.95]
-alphas = [1]
 ld_weights = [0]
 
 hparams = {
@@ -22,7 +21,6 @@ hparams = {
             'hidden_size': 512,
             'lambda0': lambda0s,
             'lambda1': ' '.join(map(str, lambda1s)),
-            'alpha': ' '.join(map(str, alphas)),
             'ld_weight': ' '.join(map(str, ld_weights)),
             'entropy_coeff': 0.01,
             'steps_log_freq': 20,

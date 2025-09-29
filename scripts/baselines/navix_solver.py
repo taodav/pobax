@@ -1,7 +1,9 @@
+
 import jax
 import jax.numpy as jnp
 from jax import lax
 
+from pobax.envs import get_env
 
 @jax.jit
 def jax_shortest_path_policy(grid, start, start_orientation, goal):
@@ -165,25 +167,30 @@ def jax_shortest_path_policy(grid, start, start_orientation, goal):
     return policy_fixed, count
 
 
-# Example usage:
 if __name__ == "__main__":
-    import numpy as np
+    env_name = 'Navix-DMLab-Maze-02-v0'
+    seed = 2025
+    n_envs = 100
 
-    # Create a grid (0: free, 1: wall)
-    grid_np = np.array([
-        [0, 0, 0, 0, 0, 0],
-        [1, 1, 0, 1, 1, 0],
-        [0, 0, 0, 0, 1, 0],
-        [0, 1, 1, 0, 1, 0]
-    ], dtype=np.int32)
-    grid = jax.device_put(grid_np)
+    key = jax.random.PRNGKey(seed)
+    env_key, key = jax.random.split(key)
 
-    start = (0, 5)  # starting position (row, col)
-    start_orientation = 1  # facing up
-    goal = (3, 0)  # goal position
+    vmap_shortest_path = jax.vmap(jax_shortest_path_policy, in_axes=[None, 0, 0, 0])
 
-    policy_fixed, count = jax_shortest_path_policy(grid, start, start_orientation, goal)
-    # Outside the jitted function, slice the fixed array using the count.
-    policy = policy_fixed[:count]
-    print("Shortest path policy (actions):", policy)
+    env, env_params = get_env(env_name, env_key, gamma=0.99)
+    reset_rng = jax.random.split(key, n_envs)
+    obsv, env_state = env.reset(reset_rng, env_params)
+
+    state = env_state.env_state.state
+    grid = state.grid[0] * (-1)
+    players = state.entities['player']
+    start_pos = players.position.squeeze()
+    start_orientation = players.direction.squeeze()
+    goal_pos = state.entities['goal'].position.squeeze()
+
+    policies_fixed, counts = vmap_shortest_path(grid, start_pos, start_orientation, goal_pos)
+
+    disc_returns = env.gamma ** counts
+    avg_disc_returns = jnp.mean(disc_returns)
+
     print()

@@ -10,121 +10,106 @@ or best_hyperparams_per_env.py (for best hyperparams for each env), to generate
 a file that has the best hyperparams, and the best score.
 """
 import argparse
-from collections import OrderedDict
-from copy import deepcopy
 import importlib
-import os
 from pathlib import Path
 import pickle
-import sys
 
 import jax
+jax.config.update('jax_platform_name', 'cpu')
+
 import jax.numpy as jnp
 import orbax.checkpoint
 import numpy as np
 from tqdm import tqdm
 
-from pobax.config import PPOHyperparams
-from pobax.utils.file_system import get_fn_from_module, get_inner_fn_arguments
-
 from pobax.definitions import PROJECT_ROOT_DIR
 
-def combine_seeds_and_envs(x: jnp.ndarray):
+def mean_over_parallel_envs(x: np.ndarray):
     # Here, dim=-1 is the NUM_ENVS parameter. We take the mean over this.
     # dim=-2 is the NUM_STEPS parameter.
     # dim=-3 is the NUM_UPDATES, which is TOTAL_TIMESTEPS // NUM_STEPS // NUM_ENVS.
     # dim=-4 is n_seeds.
-    # We take the mean and std_err to the mean over dimensions -1 and -4.
-    envs_seeds_swapped = jnp.swapaxes(x, -2, -4).swapaxes(-3, -4)
+    # we swap dimensions so that n_seeds is -2.
+    envs_seeds_swapped = np.swapaxes(x, -2, -4).swapaxes(-3, -4)
 
     # We take the mean over NUM_ENVS dimension.
     mean_over_num_envs = envs_seeds_swapped.mean(axis=-1)
     return mean_over_num_envs
 
-def parse_exp_dir(study_path, study_hparam_path, discounted: bool = False):
-    # TODO: refactor this to use the entry point and see the arguments to the `train` function.
-    # train_sign_hparams = ['vf_coeff', 'ld_weight', 'alpha', 'lambda1', 'lambda0', 'lr']
+def find_matching_dict(d, list_d):
+    for i, dp in enumerate(list_d):
+        if d == dp:
+            return i
+    return None
 
+def parse_exp_dir(study_path, study_hparam_path, discounted: bool = False):
     spec = importlib.util.spec_from_file_location('temp', study_hparam_path)
     var_module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(var_module)
 
-    entry_name = getattr(var_module, 'hparams')['entry']
-
-    make_train_fn = get_fn_from_module(entry_name, fn_name='make_train')
-    train_sign_hparams = get_inner_fn_arguments(make_train_fn, inner_fn_name='train')
-
-    assert 'rng' in train_sign_hparams
-
-    train_sign_hparams.remove('rng')
-
-    # here we assume all variables that aren't Path or
-    # 'hparams' or 'exp_name'
-    default_hparams = PPOHyperparams()
-
-    swept_hparams = []
-    for hp in train_sign_hparams:
-        if hasattr(var_module, hp + 's'):
-            swept_hparams.append((hp, getattr(var_module, hp + 's')))
-        else:
-            swept_hparams.append((hp, getattr(default_hparams, hp)))
-
-    swept_hparams = OrderedDict(swept_hparams)
-    missing_hparams = OrderedDict()
-
     all_list_hparams = getattr(var_module, 'hparams')['args']
+    assert len(all_list_hparams) == 1
+    all_hparams = all_list_hparams[0]
+    keys_to_add = [k for k, v in all_hparams.items() if isinstance(v, list)]
 
-    different_hyperparams = {}
-
-    if len(all_list_hparams) > 1:
-        # Here we assume all keys are the same across all hparams.
-        ex_hyperparams = all_list_hparams[0]
-        all_hparams = ex_hyperparams.copy()
-        for hparams in all_list_hparams:
-            for k, v in hparams.items():
-                assert k in ex_hyperparams, "Key isn't the same for all hparams."
-                # if our values are different, that means we need to concatenate them later on.
-                if v != ex_hyperparams[k]:
-                    if k not in different_hyperparams:
-                        different_hyperparams[k] = getattr(var_module, k + 's')
-                        all_hparams[k] = ' '.join(map(str, different_hyperparams[k]))
-                    else:
-                        assert v in different_hyperparams[k]
-    else:
-        all_hparams = all_list_hparams[0]
-
-    # here we need to see if we manually sweep over hparams,
-    # instead of vmapping over that hparam.
-    for k, v in all_hparams.items():
-        if isinstance(v, list) and k != 'env':
-            missing_hparams[k] = v
-
-    env_order = all_hparams['env']
+    parsed_res = {}
 
     study_paths = [s for s in study_path.iterdir() if s.is_dir()]
 
     envs = []
     scores_by_env = {}
+    all_swept_hparams_by_env = {}
+    all_args_no_seeds = []
+
+    # TODO: we need to combine by seeds if seed is a list.
+    group_by_seed = isinstance(all_hparams['seed'], list) and len(all_hparams['seed']) > 1
 
     for results_path in tqdm(study_paths):
         orbax_checkpointer = orbax.checkpoint.PyTreeCheckpointer()
 
         restored = orbax_checkpointer.restore(results_path)
 
-        # Make sure the swept hypers are the same order as listed above.
-        # Last argument is rng.
-        swept_order = restored['argument_order']
-
-        if swept_order is not None:
-            for i, k in enumerate(swept_order[:-1]):
-                assert k == train_sign_hparams[i]
-
-        args = restored['args']
         def jnp_to_np(x):
             if isinstance(x, jnp.ndarray):
                 return np.array(x)
             return x
-        args = jax.tree.map(jnp_to_np, args)
+        args = jax.tree.map(jnp_to_np, restored['args'])
+
+        def jnp_to_list(x):
+            if isinstance(x, jnp.ndarray) or isinstance(x, np.ndarray):
+                return x.tolist()
+            return x
+        swept = jax.tree.map(jnp_to_list, restored['swept_hparams'])
+        n_settings = len(list(restored['swept_hparams'].values())[0])
+
+        for key in keys_to_add:
+            swept[key] = [args[key]] * n_settings
+
+        if args['env'] not in all_swept_hparams_by_env:
+            all_swept_hparams_by_env[args['env']] = {}
+
+        args_no_seed = dict(args)
+        del args_no_seed['seed']
+        matched_i = None
+        if group_by_seed:
+            matched_i = find_matching_dict(args_no_seed, all_args_no_seeds)
+
+        if matched_i is None:
+            if group_by_seed:
+                all_args_no_seeds.append(args_no_seed)
+
+            for swept_key, vals in swept.items():
+                if swept_key not in all_swept_hparams_by_env[args['env']]:
+                    all_swept_hparams_by_env[args['env']][swept_key] = []
+
+                all_swept_hparams_by_env[args['env']][swept_key] += vals
+        else:
+            # if we find a matching index, we just append the seed
+            prev_seed = all_swept_hparams_by_env[args['env']]['seed']
+            if not isinstance(prev_seed, list):
+                prev_seed = [prev_seed]
+            prev_seed.append(args['seed'])
+            all_swept_hparams_by_env[args['env']]['seed'] = prev_seed
 
         # Get online metrics
         online_eval = restored['out']['metric']
@@ -144,180 +129,61 @@ def parse_exp_dir(study_path, study_hparam_path, discounted: bool = False):
         # we add a num_updates dimension
         final_disc_returns = np.expand_dims(final_disc_returns, -3)
 
+        # move n_seeds to last dimension
         del restored
-        seeds_combined = combine_seeds_and_envs(online_disc_returns)
+        seeds_combined = mean_over_parallel_envs(online_disc_returns)
+        final_seeds_combined = mean_over_parallel_envs(final_disc_returns)
 
-        final_seeds_combined = combine_seeds_and_envs(final_disc_returns)
-
-        # TODO: we want to deal with missing hparams and lists of hparams in similar ways
-        if len(missing_hparams) > 0:
-
-            arg_vs = []
-            for k in missing_hparams:
-                v = args[k]
-                if isinstance(v, np.ndarray):
-                    assert v.shape[0] == 1
-                    v = v.item()
-                arg_vs.append((k, v))
-
-            missing_id = tuple(arg_vs)
-            if args['env'] not in scores_by_env:
-                scores_by_env[args['env']] = {}
-
-            if missing_id not in scores_by_env[args['env']]:
-                scores_by_env[args['env']][missing_id] = []
-
-            scores_by_env[args['env']][missing_id].append((args, seeds_combined, final_seeds_combined))
+        if args['env'] not in scores_by_env:
+            scores_by_env[args['env']] = {
+                'args': [],
+                'fpaths': [],
+                'scores': [],
+                'final_scores': []
+            }
+        # No seed match
+        if matched_i is None:
+            scores_by_env[args['env']]['args'].append(args)
+            scores_by_env[args['env']]['fpaths'].append(results_path)
+            scores_by_env[args['env']]['scores'].append(seeds_combined)
+            scores_by_env[args['env']]['final_scores'].append(final_seeds_combined)
         else:
-            if args['env'] not in scores_by_env:
-                scores_by_env[args['env']] = []
-            scores_by_env[args['env']].append((args, seeds_combined, final_seeds_combined))
+            # we found a match, we need to concatenate along -1 for all the scores
 
-    # Now we deal with lists of hyperparams
-    def process_group(group: list[dict], diff_hyperparams: dict):
-        """
-        This function processes a list of dictionaries
-        according to diff_hyperparams, BEFORE we do the
-        concatenation for missing_hyperparams.
-        Returns a concatenated array, with arg_index ordered by
-        the order in diff_hyperparams
-        """
-        if not diff_hyperparams:
-            assert len(group) == 1
-            return group[0][-2], group[0][-1]
+            # make a list of things if we need to, then append.
+            # for seeds
+            seeds = scores_by_env[args['env']]['args'][matched_i]['seed']
+            if not isinstance(seeds, list):
+                seeds = [seeds]
+            seeds.append(args['seed'])
+            scores_by_env[args['env']]['args'][matched_i]['seed'] = seeds
 
-        if len(diff_hyperparams.keys()) == 1:
-            # parse the last hyperparam
-            arg, order = next(iter(diff_hyperparams.items()))
+            # fpaths
+            fpaths = scores_by_env[args['env']]['fpaths'][matched_i]
+            if not isinstance(fpaths, list):
+                fpaths = [fpaths]
+            fpaths.append(results_path)
+            scores_by_env[args['env']]['fpaths'][matched_i] = fpaths
 
-            arg_index = train_sign_hparams.index(arg)
+            scores = np.concatenate([scores_by_env[args['env']]['scores'][matched_i], seeds_combined], axis=-1)
+            scores_by_env[args['env']]['scores'][matched_i] = scores
 
-            ordered_scores = []
-            ordered_final_scores = []
-            for v in order:
-                for args, seeds_combined, final_seeds_combined in group:
-                    if args[arg] == v:
-                        ordered_scores.append(seeds_combined)
-                        ordered_final_scores.append(final_seeds_combined)
-                        break
-                else:
-                    raise IndexError(f"{args} Not found!")
-            return jnp.concatenate(ordered_scores, axis=arg_index), jnp.concatenate(ordered_final_scores, axis=arg_index)
+            final_scores = np.concatenate([scores_by_env[args['env']]['final_scores'][matched_i], final_seeds_combined], axis=-1)
+            scores_by_env[args['env']]['final_scores'][matched_i] = final_scores
 
-        raise NotImplementedError
+    dim_ref = ['swept_hparams', 'num_update', 'num_steps', 'seeds']
 
-    for env, env_dict in scores_by_env.items():
-        if len(missing_hparams) > 0:
-            for missing_id, missing_dict in env_dict.items():
-                scores_by_env[env][missing_id] = process_group(missing_dict, different_hyperparams)
-        else:
-            scores_by_env[env] = process_group(env_dict, different_hyperparams)
+    for env in scores_by_env.keys():
+        scores_by_env[env]['scores'] = np.concatenate(scores_by_env[env]['scores'], axis=0)
+        scores_by_env[env]['final_scores'] = np.concatenate(scores_by_env[env]['final_scores'], axis=0)
 
-    def find_close_idx(list_els, el):
-        """
-        We use this function b/c there's weird floating
-        point errors in np.ndarray.item().
-        """
-        if isinstance(el, float):
-            for i, e in enumerate(list_els):
-                if np.isclose(e, el, atol=1e-8):
-                    return i
-        else:
-            return list_els.index(el)
-
-    # we add new dimensions for each swept over hparam.
-    # if the hparam exists in train_sign_hparams,
-    def get_reduced_score_dict(score_dict, k):
-        filtered_keys = set()
-        for missing_id in score_dict.keys():
-            filtered_keys.add(tuple(sorted((name, val) for name, val in missing_id if name != k)))
-
-        return list(filtered_keys)
-
-    if len(missing_hparams) > 0:
-        to_delete_keys = []
-        prev_swept_hparams = None
-        for env, score_dict in scores_by_env.items():
-            # keep track in current env the dim ref through curr_swept_hparams.
-            # We prepend the hparam key and values if we add a dimension.
-            curr_swept_hparams = deepcopy(swept_hparams)
-
-            # we do reversed here to match the prepending of dimensions
-            for k, v in reversed(missing_hparams.items()):
-                new_score_keys = get_reduced_score_dict(score_dict, k)
-                new_score_dict = {k:
-                                      {'grouped_reses': [None] * len(v),
-                                       'final_grouped_reses': [None] * len(v)}
-                                  for k in new_score_keys}
-
-                for id, (scores, final_scores) in score_dict.items():
-                    new_score_key = tuple(sorted((name, val) for name, val in id if name != k))
-                    for kp, vp in id:
-                        if kp == k:
-                            idx = find_close_idx(v, vp)
-                            new_score_dict[new_score_key]['grouped_reses'][idx] = scores
-                            new_score_dict[new_score_key]['final_grouped_reses'][idx] = final_scores
-                            break
-                    else:
-                        raise KeyError(f'{k} not in {id}')
-
-                score_dict = {}
-                # we're done sorting the hyperparams here.
-                # Now we have to stack them, either to an existing dimension
-                # or to a new dimension
-                if k in train_sign_hparams:
-                    k_idx = list(curr_swept_hparams.keys()).index(k)
-                    for new_score_key, new_score in new_score_dict.items():
-                        score_dict[new_score_key] = (
-                            np.concatenate(new_score['grouped_reses'], axis=k_idx),
-                            np.concatenate(new_score['final_grouped_reses'], axis=k_idx)
-                        )
-
-                    # we delete here so we don't concatenate this to the dim_ref
-                    if k not in to_delete_keys:
-                        to_delete_keys.append(k)
-                else:
-                    for new_score_key, new_score in new_score_dict.items():
-                        score_dict[new_score_key] = (
-                            np.stack(new_score['grouped_reses'], axis=0),
-                            np.stack(new_score['final_grouped_reses'], axis=0)
-                        )
-                    # Now we need to add the added dimension to the curr_swept_hparams
-                    curr_swept_hparams.update({k: v})
-                    curr_swept_hparams.move_to_end(k, last=False)
-
-            scores_by_env[env] = score_dict[()]
-            if prev_swept_hparams is not None:
-                assert prev_swept_hparams == curr_swept_hparams
-
-        if to_delete_keys:
-            for k in to_delete_keys:
-                del missing_hparams[k]
-        # add our missing hyperparams
-        swept_hparams = curr_swept_hparams
-        # swept_hparams = OrderedDict(list(missing_hparams.items()) + list(swept_hparams.items()))
-
-    # Stack by envs
-    envs = []
-    scores = []
-    final_scores = []
-    for k, (v, final_v) in scores_by_env.items():
-        envs.append(k)
-        scores.append(v)
-        final_scores.append(final_v)
-    stacked_scores = np.stack(scores, axis=-1)
-    stacked_final_scores = np.stack(final_scores, axis=-1)
-
-    dim_ref = [*swept_hparams, 'num_update', 'num_steps', 'seeds']
 
     parsed_res = {
-        'envs': envs,
-        'scores': stacked_scores,
-        'final_scores': stacked_final_scores,
+        'envs': list(scores_by_env.keys()),
+        'swept_hyperparams': all_swept_hparams_by_env,
+        'all_hyperparams': all_hparams,
         'dim_ref': dim_ref,
-        'swept_hparams': swept_hparams,
-        'hyperparams': swept_hparams,
-        'all_hyperparams': all_hparams
+        'scores': scores_by_env
     }
     return parsed_res
 
@@ -334,7 +200,7 @@ if __name__ == "__main__":
     parser.add_argument('--discounted', action='store_true',
                         help='Do we discount returns?')
     args = parser.parse_args()
-    
+
     study_path = Path(args.study_path).resolve()
     hyperparams_dir = Path(PROJECT_ROOT_DIR, 'scripts', 'hyperparams').resolve()
     study_hparam_filename = study_path.stem + '.py'
