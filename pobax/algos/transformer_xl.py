@@ -411,7 +411,19 @@ def make_train(args: TransformerHyperparams, rand_key: jax.random.PRNGKey):
         )
         # save metrics only every update_log_freq
         metric = jax.tree.map(update_filter, metric)
-        res = {"runner_state": runner_state, "metric": metric}
+
+        eval_reset_rng, eval_step_rng, rng = jax.random.split(runner_state[-1], 3)
+        eval_reset_rngs = jax.random.split(eval_reset_rng, args.num_envs)
+
+        eval_obsv, eval_env_state = env.reset(eval_reset_rngs, env_params)
+        eval_runner_state = (runner_state[0], eval_env_state, memories, memories_mask, memories_mask_idx, eval_obsv, done, 0, eval_step_rng)
+
+        # SCAN THE STEP TO GET THE TRANSITIONS AND CACHED MEMORIES
+        eval_runner_state, (eval_traj_batch, eval_memories_batch) = jax.lax.scan(
+            _env_step, runner_state, jnp.arange(env_params.max_steps_in_episode), env_params.max_steps_in_episode
+        )
+
+        res = {"runner_state": runner_state, "metric": metric, 'final_eval_metric': eval_traj_batch.info}
         return res
 
     return train

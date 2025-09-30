@@ -423,7 +423,7 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
         # TODO: offline eval here.
         final_train_state = runner_state[0]
 
-        reset_rng = jax.random.split(_rng, args.num_envs)
+        reset_rng = jax.random.split(runner_state[-1], args.num_envs)
         eval_obsv, eval_env_state = env.reset(reset_rng, env_params)
 
         eval_init_hstate = ScannedRNN.initialize_carry(args.num_envs, args.hidden_size)
