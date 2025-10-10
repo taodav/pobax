@@ -65,6 +65,35 @@ cd pobax
 pip install -e .
 ```
 
+### Installing Madrona_MJX (Optional)
+
+POBAX's pixel-based continuous control environments (`ant-pixels`, `halfcheetah-pixels`, `hopper-pixels`, `walker2d-pixels`) require the [Madrona_MJX](https://github.com/shacklettbp/madrona_mjx) renderer for GPU-accelerated rendering.
+
+**Installation:**
+```shell
+git clone https://github.com/KevinGuo27/madrona_mjx.git
+cd madrona_mjx
+pip install -e .
+```
+
+**Requirements:**
+- CUDA 12.6.3 or compatible version
+- GPU support required
+
+**Note:** Madrona_MJX currently does not support `jax.vmap`, so experiments must run with a single seed at a time. See `scripts/hyperparams/visual_mujoco/ant/best/ant_ppo_madrona_best.py` for an example configuration.
+
+**Compilation:** The first time you run a Madrona_MJX environment, the renderer will compile (takes ~4 minutes on an RTX 3090). You'll see output like this:
+```
+Using raytracer
+Compiling .../madrona/src/mw/device/bvh.cpp
+Compiling .../madrona/src/mw/device/memory.cpp
+Compiling .../madrona/src/mw/device/host_print.cpp
+Compiling .../madrona/src/mw/device/bvh_raycast.cpp
+Compiling GPU engine code:
+Initialization finished
+```
+Here is an example script to run a Madrona_MJX environment:
+
 ## Agents
 
 POBAX includes algorithms loosely based on the [PureJAXRL](https://github.com/luchris429/purejaxrl/tree/main/purejaxrl) framework, with algorithms based on [proximal policy optimization (PPO)](https://arxiv.org/abs/1707.06347). These include:
@@ -90,6 +119,11 @@ python -m pobax.algos.ppo --env rocksample_11_11 --num_envs 16 --entropy_coeff 0
 
 This script will run an experiment over 5 seeds over 5M steps on CPU with `entropy coefficient = 0.2`, `GAE lambda = 0.7` and 16 parallel environments for each run,
 while sweeping `learning rate = 0.0025, 0.00025`.
+
+Here's an example of how to run a pixel-based ant environment (requires Madrona_MJX):
+```shell
+python -m pobax.algos.ppo --env ant_pixels --action_concat --lambda0 0.7 --lambda1 0.95 --hidden_size 512 --total_steps 5000000 --n_seeds 1 --platform gpu --debug --study_name ant_ppo_madrona_best
+```
 
 Hyperparameters and their descriptions can be found in `pobax/config.py`. Any hyperparameter that has a list type can be swept.
 

@@ -5,7 +5,7 @@ from dataclasses import replace
 from functools import partial
 import inspect
 from time import time
-# import os
+import os
 # os.environ["CRAFTAX_RELOAD_TEXTURES"] = "True"
 
 import chex
