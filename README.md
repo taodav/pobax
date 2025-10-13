@@ -77,12 +77,12 @@ pip install -e .
 ```
 
 **Requirements:**
-- CUDA 12.6.3 or compatible version
-- GPU support required
+- CUDA 12.6.3 or compatible versions
+- GPU support
 
 **Note:** Madrona_MJX currently does not support `jax.vmap`, so experiments must run with a single seed at a time. See `scripts/hyperparams/visual_mujoco/ant/best/ant_ppo_madrona_best.py` for an example configuration.
 
-**Compilation:** The first time you run a Madrona_MJX environment, the renderer will compile (takes ~4 minutes on an RTX 3090). You'll see output like this:
+**Compilation:** The first time you run a Madrona_MJX environment, the renderer will compile (takes ~4 minutes on an RTX 3090). You'll see outputs like this:
 ```
 Using raytracer
 Compiling .../madrona/src/mw/device/bvh.cpp
@@ -92,7 +92,11 @@ Compiling .../madrona/src/mw/device/bvh_raycast.cpp
 Compiling GPU engine code:
 Initialization finished
 ```
-Here is an example script to run a Madrona_MJX environment:
+
+Here's an example of how to run a pixel-based Madrona_MJX ant environment:
+```shell
+python -m pobax.algos.ppo --env ant_pixels --action_concat --lambda0 0.7 --lambda1 0.95 --hidden_size 512 --total_steps 5000000 --n_seeds 1 --platform gpu --debug --study_name ant_ppo_madrona_best
+```
 
 ## Agents
 
@@ -119,11 +123,6 @@ python -m pobax.algos.ppo --env rocksample_11_11 --num_envs 16 --entropy_coeff 0
 
 This script will run an experiment over 5 seeds over 5M steps on CPU with `entropy coefficient = 0.2`, `GAE lambda = 0.7` and 16 parallel environments for each run,
 while sweeping `learning rate = 0.0025, 0.00025`.
-
-Here's an example of how to run a pixel-based ant environment (requires Madrona_MJX):
-```shell
-python -m pobax.algos.ppo --env ant_pixels --action_concat --lambda0 0.7 --lambda1 0.95 --hidden_size 512 --total_steps 5000000 --n_seeds 1 --platform gpu --debug --study_name ant_ppo_madrona_best
-```
 
 Hyperparameters and their descriptions can be found in `pobax/config.py`. Any hyperparameter that has a list type can be swept.
 
