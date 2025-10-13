@@ -461,6 +461,26 @@ nx.register_env(
 )
 
 nx.register_env(
+    "Navix-Annas-Maze-F-v0",
+    lambda *args, **kwargs: ASCIIMaze.create(
+        # observation_fn=kwargs.pop("observation_fn", nx.observations.categorical_first_person),
+        observation_fn=kwargs.pop("observation_fn", categorical_full_position_encoded),
+        observation_space=categorical_full_positional_obs_space_fn(14, 26),
+        reward_fn=kwargs.pop("reward_fn", nx.rewards.on_goal_reached),
+        termination_fn=kwargs.pop("termination_fn", nx.terminations.on_goal_reached),
+        height=14,
+        width=26,
+        max_steps=2000,
+        spec="annas_maze",
+        random_start_state=True,
+        random_goal_pos=False,
+        goal_pos=annas_goal_position,
+        *args,
+    ),
+)
+
+
+nx.register_env(
     "Navix-DMLab-TestMaze-F-01-v0",
     lambda *args, **kwargs: ASCIIMaze.create(
         # observation_fn=kwargs.pop("observation_fn", nx.observations.categorical_first_person),

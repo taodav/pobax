@@ -13,7 +13,7 @@ hparams = {
     'entry': '-m pobax.algos.ppo',
     'args': [
         {
-            'env': 'Navix-Annas-Maze-v0',
+            'env': 'Navix-Annas-Maze-F-v0',
             'double_critic': False,
             'memoryless': False,
             'action_concat': True,
@@ -25,7 +25,7 @@ hparams = {
             'ld_weight': ' '.join(map(str, ld_weights)),
             'entropy_coeff': 0.02,
             'num_steps': 128,
-            'num_envs': 32,
+            'num_envs': 64,
             'steps_log_freq': 16,
             'update_log_freq': 10,
             'total_steps': int(5e6),
