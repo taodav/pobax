@@ -20,7 +20,7 @@ hparams = {
             'lr': lrs,
             'anneal_lr': True,
             'hidden_size': 256,
-            'lambda0': ' '.join(map(str, lambda0s)),
+            'lambda0': lambda0s,
             'lambda1': ' '.join(map(str, lambda1s)),
             'ld_weight': ' '.join(map(str, ld_weights)),
             'entropy_coeff': 0.02,
