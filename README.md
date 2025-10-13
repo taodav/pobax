@@ -65,6 +65,39 @@ cd pobax
 pip install -e .
 ```
 
+### Installing Madrona_MJX (Optional)
+
+POBAX's pixel-based continuous control environments (`ant-pixels`, `halfcheetah-pixels`, `hopper-pixels`, `walker2d-pixels`) require the [Madrona_MJX](https://github.com/shacklettbp/madrona_mjx) renderer for GPU-accelerated rendering.
+
+**Installation:**
+```shell
+git clone https://github.com/KevinGuo27/madrona_mjx.git
+cd madrona_mjx
+pip install -e .
+```
+
+**Requirements:**
+- CUDA 12.6.3 or compatible versions
+- GPU support
+
+**Note:** Madrona_MJX currently does not support `jax.vmap`, so experiments must run with a single seed at a time. See `scripts/hyperparams/visual_mujoco/ant/best/ant_ppo_madrona_best.py` for an example configuration.
+
+**Compilation:** The first time you run a Madrona_MJX environment, the renderer will compile (takes ~4 minutes on an RTX 3090). You'll see outputs like this:
+```
+Using raytracer
+Compiling .../madrona/src/mw/device/bvh.cpp
+Compiling .../madrona/src/mw/device/memory.cpp
+Compiling .../madrona/src/mw/device/host_print.cpp
+Compiling .../madrona/src/mw/device/bvh_raycast.cpp
+Compiling GPU engine code:
+Initialization finished
+```
+
+Here's an example of how to run a pixel-based Madrona_MJX ant environment:
+```shell
+python -m pobax.algos.ppo --env ant_pixels --action_concat --lambda0 0.7 --lambda1 0.95 --hidden_size 512 --total_steps 5000000 --n_seeds 1 --platform gpu --debug --study_name ant_ppo_madrona_best
+```
+
 ## Agents
 
 POBAX includes algorithms loosely based on the [PureJAXRL](https://github.com/luchris429/purejaxrl/tree/main/purejaxrl) framework, with algorithms based on [proximal policy optimization (PPO)](https://arxiv.org/abs/1707.06347). These include:

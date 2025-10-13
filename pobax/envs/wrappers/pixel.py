@@ -6,13 +6,14 @@ import chex
 import jax
 from flax import struct
 import mujoco
+import numpy as np
 from brax import base
 from gymnax.environments import spaces, environment
 from jax import numpy as jnp
 
 from pobax.envs import VecEnv
 from pobax.envs.jax.tmaze import TMazeState
-from pobax.envs.wrappers.gymnax import GymnaxWrapper, MadronaWrapper, LogEnvState
+from pobax.envs.wrappers.gymnax import GymnaxWrapper, MadronaWrapper, LogEnvState, Observation
 
 from brax.envs.base import State
 from mujoco import mjx
@@ -57,11 +58,17 @@ class PixelBraxVecEnvWrapper(GymnaxWrapper):
         low, high = 0, 255
         if self.normalize:
             high = 1
-        return spaces.Box(
-            low=low,
-            high=high,
-            shape=(self.size, self.size, 3),
-        )
+        return spaces.Dict({
+            "obs": spaces.Box(
+                low=low,
+                high=high,
+                shape=(self.size, self.size, 3),
+            )
+        })
+
+    def dummy_observation(self, num_env, params=None):
+        obs_space = self.observation_space(params).spaces["obs"]
+        return Observation(obs=jnp.zeros((1, num_env,) + obs_space.shape, dtype=obs_space.dtype))
 
     def reset(
             self, key: chex.PRNGKey, params: Optional[environment.EnvParams] = None
@@ -74,7 +81,7 @@ class PixelBraxVecEnvWrapper(GymnaxWrapper):
         image_obs = self.render(env_state)
         if self.normalize:
             image_obs /= 255.
-        return image_obs, env_state
+        return Observation(obs=image_obs), env_state
 
     def step(
             self,
@@ -89,7 +96,7 @@ class PixelBraxVecEnvWrapper(GymnaxWrapper):
         image_obs = self.render(env_state)
         if self.normalize:
             image_obs /= 255.
-        return image_obs, env_state, reward, done, info
+        return Observation(obs=image_obs), env_state, reward, done, info
 
     def render(self, states, mode='rgb_array'):
         states = unwrap_env_state(states)
@@ -143,7 +150,7 @@ class PixelCraftaxVecEnvWrapper(GymnaxWrapper):
         image_obs, env_state = self._env.reset(key, params)
         # Craftax already returned normalized visual input
         image_obs = self.get_obs(image_obs, self.normalize)
-        return image_obs, env_state
+        return Observation(obs=image_obs), env_state
     
     @functools.partial(jax.jit, static_argnums=(0,-1))
     def step(
@@ -157,7 +164,7 @@ class PixelCraftaxVecEnvWrapper(GymnaxWrapper):
             key, state, action, params
         )
         image_obs = self.get_obs(image_obs, self.normalize)
-        return image_obs, env_state, reward, done, info
+        return Observation(obs=image_obs), env_state, reward, done, info
 
     @functools.partial(jax.jit, static_argnums=(0, 2))
     def get_obs(self, obs, normalize):
@@ -171,15 +178,21 @@ class PixelCraftaxVecEnvWrapper(GymnaxWrapper):
         low, high = 0, 255
         if self.normalize:
             high = 1
-        return spaces.Box(
-            low=low,
-            high=high,
-            shape=(
-                27,
-                33,
-                3,
-            ),
-        )
+        return spaces.Dict({
+            "obs": spaces.Box(
+                low=low,
+                high=high,
+                shape=(
+                    27,
+                    33,
+                    3,
+                ),
+            )
+        })
+
+    def dummy_observation(self, num_env, params=None):
+        obs_space = self.observation_space(params).spaces["obs"]
+        return Observation(obs=jnp.zeros((1, num_env,) + obs_space.shape, dtype=obs_space.dtype))
 
 class PixelTMazeVecEnvWrapper(PixelBraxVecEnvWrapper):
     def __init__(self, env: VecEnv,
@@ -191,11 +204,17 @@ class PixelTMazeVecEnvWrapper(PixelBraxVecEnvWrapper):
 
     def observation_space(self, params):
         low, high = 0, 1
-        return spaces.Box(
-            low=low,
-            high=high,
-            shape=(self.size, self.size, 4),
-        )
+        return spaces.Dict({
+            "obs": spaces.Box(
+                low=low,
+                high=high,
+                shape=(self.size, self.size, 4),
+            )
+        })
+
+    def dummy_observation(self, num_env, params=None):
+        obs_space = self.observation_space(params).spaces["obs"]
+        return Observation(obs=jnp.zeros((1, num_env,) + obs_space.shape, dtype=obs_space.dtype))
 
     def reset(
             self, key: chex.PRNGKey, params: Optional[environment.EnvParams] = None
@@ -204,7 +223,7 @@ class PixelTMazeVecEnvWrapper(PixelBraxVecEnvWrapper):
         image_obs = self.render(env_state)
         if self.normalize:
             image_obs /= 255.
-        return image_obs, env_state
+        return Observation(obs=image_obs), env_state
 
     def render(self, states, mode='rgb_array'):
         states = states.env_state
@@ -223,11 +242,17 @@ class PixelSimpleChainVecEnvWrapper(PixelBraxVecEnvWrapper):
 
     def observation_space(self, params):
         low, high = 0, 1
-        return spaces.Box(
-            low=low,
-            high=high,
-            shape=(self.size, self.size, 2),
-        )
+        return spaces.Dict({
+            "obs": spaces.Box(
+                low=low,
+                high=high,
+                shape=(self.size, self.size, 2),
+            )
+        })
+
+    def dummy_observation(self, num_env, params=None):
+        obs_space = self.observation_space(params).spaces["obs"]
+        return Observation(obs=jnp.zeros((1, num_env,) + obs_space.shape, dtype=obs_space.dtype))
 
     def reset(
             self, key: chex.PRNGKey, params: Optional[environment.EnvParams] = None
@@ -236,7 +261,7 @@ class PixelSimpleChainVecEnvWrapper(PixelBraxVecEnvWrapper):
         image_obs = self.render(env_state)
         if self.normalize:
             image_obs /= 255.
-        return image_obs, env_state
+        return Observation(obs=image_obs), env_state
 
     def render(self, states, mode='rgb_array'):
         return jnp.ones((self.size, self.size, 2))
@@ -280,11 +305,17 @@ class PixelMadronaVecEnvWrapper(GymnaxWrapper):
         low, high = 0, 255
         if self.normalize:
             high = 1
-        return spaces.Box(
-            low=low,
-            high=high,
-            shape=(self.size, self.size, 3),
-        )
+        return spaces.Dict({
+            "obs": spaces.Box(
+                low=low,
+                high=high,
+                shape=(self.size, self.size, 3),
+            )
+        })
+
+    def dummy_observation(self, num_env, params=None):
+        obs_space = self.observation_space(params).spaces["obs"]
+        return Observation(obs=jnp.zeros((1, num_env,) + obs_space.shape, dtype=obs_space.dtype))
 
     def init(self, model):
         def init_(model):
@@ -309,7 +340,7 @@ class PixelMadronaVecEnvWrapper(GymnaxWrapper):
             image_obs = image_obs[..., :3]
         if self.normalize:
             image_obs /= 255.
-        return image_obs, env_state
+        return Observation(obs=image_obs), env_state
 
     def step(
             self,
@@ -330,7 +361,7 @@ class PixelMadronaVecEnvWrapper(GymnaxWrapper):
             image_obs = image_obs[..., :3]
         if self.normalize:
             image_obs /= 255.
-        return image_obs, states, reward, done, info
+        return Observation(obs=image_obs), states, reward, done, info
 
     def render(self, model, env_state, data, mode='rgb_array'):
         env_state = unwrap_env_state(env_state)
