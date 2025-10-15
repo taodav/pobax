@@ -13,7 +13,7 @@ hparams = {
     'entry': '-m pobax.algos.transformer_xl',
     'args': [
         {
-            'env': 'Navix-DMLab-Maze-01-v0',
+            'env': 'Navix-Annas-Maze-v0',
             'double_critic': False,
             'action_concat': True,
             'lr': lrs,
