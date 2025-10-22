@@ -712,7 +712,7 @@ class MadronaWrapper(GymnaxWrapper):
     super().__init__(env)
     self.num_worlds = num_worlds
     if not randomization_fn:
-      randomization_fn = functools.partial(
+      randomization_fn = partial(
           _identity_randomization_fn, num_worlds=num_worlds
       )
     self.sys = self._unwrapped._env.sys

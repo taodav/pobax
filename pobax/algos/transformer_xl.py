@@ -5,6 +5,8 @@ from collections import deque
 from functools import partial
 import inspect
 from time import time
+import os
+# os.environ["CRAFTAX_RELOAD_TEXTURES"] = "True"
 
 from flax.training.train_state import TrainState
 from flax.training import orbax_utils
