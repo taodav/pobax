@@ -70,6 +70,24 @@ nav_random_goal_01 = """
 #####################
 """
 
+annas_maze = """
+##########################
+#.....#....#.............#
+#.....#....#.............#
+#..#..#..########.##..#..#
+#..#..#..#.........#..#..#
+#..#..#..#.........#..#..#
+#..#.....#.........#..#..#
+#..#######......#..#..#..#
+#........#......#..#..#..#
+#........#......#..#..#..#
+#######..#..###########..#
+#........................#
+#........................#
+##########################
+"""
+annas_goal_position = (6, 13)
+
 nav_maze_random_goal_02 = """
 ###############################
 #.#...............#.......#...#
@@ -91,6 +109,29 @@ nav_maze_random_goal_02 = """
 #.......#.......#.............#
 ###############################
 """
+
+annas_big_maze = """
+###############################
+#.#...............#.......#...#
+#.#.###.###########.###.#.#.#.#
+#...#...#.............#.#...#.#
+#.###.###.#########.###.#####.#
+#...#...#.#.........#...#.....#
+###.###.#.#.........#.#####.#.#
+#.....#...#.........#.#.....#.#
+#.###.#####.........#.#.....#.#
+#.#.....#...........#.#.....#.#
+#.#.....#.#.........#.#.....#.#
+#.......#.#...........#.....#.#
+#.#.....#.#########...#.....#.#
+#.#.....#.......#...........#.#
+#.#####.#######.#.###.#######.#
+#...#.........#.#.#.....#.....#
+###.###.#####.#.#.#######.#####
+#.......#.......#.............#
+###############################
+"""
+annas_big_maze_goal = (10, 25)
 
 nav_maze_random_goal_03 = """
 #########################################
@@ -125,6 +166,9 @@ nav_maze_random_goal_03 = """
 class ASCIIMaze(NavixEnvironment):
     grid: jnp.ndarray = struct.field(pytree_node=False, default=None)
     wall_pos: jnp.ndarray = struct.field(pytree_node=False, default=None)
+    goal_pos: jnp.ndarray = struct.field(pytree_node=False, default=None)
+    random_start_state: bool = True
+    random_goal_pos: bool = False
 
     @classmethod
     def create(
@@ -145,6 +189,9 @@ class ASCIIMaze(NavixEnvironment):
             action_space: Space | None = None,
             reward_space: Space | None = None,
             spec: str = 'nav_maze_random_goal_01',
+            random_start_state: bool = True,
+            random_goal_pos: bool = False,
+            goal_pos: tuple[int, int] = None,
             **kwargs,
     ) -> NavixEnvironment:
 
@@ -158,6 +205,9 @@ class ASCIIMaze(NavixEnvironment):
 
         # Get our wall positions
         wall_pos = jnp.stack(jnp.nonzero(grid == -1), axis=1)
+        if goal_pos is not None:
+            goal_pos = jnp.array(goal_pos, dtype=int)
+
         return cls(
             height=height,
             width=width,
@@ -172,6 +222,9 @@ class ASCIIMaze(NavixEnvironment):
             reward_space=reward_space,
             grid=grid,
             wall_pos=wall_pos,
+            random_start_state=random_start_state,
+            random_goal_pos=random_goal_pos,
+            goal_pos=goal_pos,
             **kwargs,
         )
 
@@ -179,12 +232,20 @@ class ASCIIMaze(NavixEnvironment):
         walls = Wall.create(position=self.wall_pos)
         player_pos_key, player_dir_key, goal_key = jax.random.split(key, 3)
 
+        if self.goal_pos is not None:
+            goal_pos = self.goal_pos
+        else:
+            goal_pos = random_positions(goal_key, self.grid)
+            if not self.random_goal_pos:
+                goal_pos = jnp.ones_like(goal_pos)
+
         # player position
-        player_pos = random_positions(player_pos_key, self.grid)
+        avail_player_grid = self.grid.at[goal_pos].set(-1)
+        player_pos = random_positions(player_pos_key, avail_player_grid)
+        if not self.random_start_state:
+            player_pos = jnp.ones_like(player_pos)
         player_dir = random_directions(player_dir_key)
 
-        avail_goal_grid = self.grid.at[player_pos].set(-1)
-        goal_pos = random_positions(goal_key, avail_goal_grid)
 
         # spawn goal and player
         player = Player.create(
@@ -361,6 +422,26 @@ nx.register_env(
 )
 
 nx.register_env(
+    "Navix-Annas-Maze-v0",
+    lambda *args, **kwargs: ASCIIMaze.create(
+        # observation_fn=kwargs.pop("observation_fn", nx.observations.categorical_first_person),
+        observation_fn=kwargs.pop("observation_fn", categorical_one_hot_first_person),
+        observation_space=categorical_first_person_obs_space,
+        reward_fn=kwargs.pop("reward_fn", nx.rewards.on_goal_reached),
+        termination_fn=kwargs.pop("termination_fn", nx.terminations.on_goal_reached),
+        height=14,
+        width=26,
+        max_steps=2000,
+        spec="annas_maze",
+        random_start_state=True,
+        random_goal_pos=False,
+        goal_pos=annas_goal_position,
+        *args,
+    ),
+)
+
+
+nx.register_env(
     "Navix-DMLab-Maze-F-01-v0",
     lambda *args, **kwargs: ASCIIMaze.create(
         # observation_fn=kwargs.pop("observation_fn", nx.observations.categorical_first_person),
@@ -378,6 +459,26 @@ nx.register_env(
         *args,
     ),
 )
+
+nx.register_env(
+    "Navix-Annas-Maze-F-v0",
+    lambda *args, **kwargs: ASCIIMaze.create(
+        # observation_fn=kwargs.pop("observation_fn", nx.observations.categorical_first_person),
+        observation_fn=kwargs.pop("observation_fn", categorical_full_position_encoded),
+        observation_space=categorical_full_positional_obs_space_fn(14, 26),
+        reward_fn=kwargs.pop("reward_fn", nx.rewards.on_goal_reached),
+        termination_fn=kwargs.pop("termination_fn", nx.terminations.on_goal_reached),
+        height=14,
+        width=26,
+        max_steps=2000,
+        spec="annas_maze",
+        random_start_state=True,
+        random_goal_pos=False,
+        goal_pos=annas_goal_position,
+        *args,
+    ),
+)
+
 
 nx.register_env(
     "Navix-DMLab-TestMaze-F-01-v0",
@@ -454,6 +555,24 @@ nx.register_env(
         width=31,
         max_steps=4000,
         spec="nav_maze_random_goal_02",
+        *args,
+    ),
+)
+
+nx.register_env(
+    "Navix-Annas-Big-Maze-v0",
+    lambda *args, **kwargs: ASCIIMaze.create(
+        observation_fn=kwargs.pop("observation_fn", categorical_one_hot_first_person),
+        observation_space=categorical_first_person_obs_space,
+        reward_fn=kwargs.pop("reward_fn", nx.rewards.on_goal_reached),
+        termination_fn=kwargs.pop("termination_fn", nx.terminations.on_goal_reached),
+        height=19,
+        width=31,
+        max_steps=4000,
+        spec="annas_big_maze",
+        random_start_state=True,
+        random_goal_pos=False,
+        goal_pos=annas_big_maze_goal,
         *args,
     ),
 )

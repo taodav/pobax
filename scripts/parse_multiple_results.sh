@@ -1,4 +1,4 @@
-RESULTS_DIR='../results/pocman'
+RESULTS_DIR='../results/new_pobax_res/annas_maze'
 
 for item in $RESULTS_DIR/*/;
 do

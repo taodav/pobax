@@ -6,11 +6,10 @@ from tap import Tap
 
 class Hyperparams(Tap):
     env: str = 'tmaze_5'
-    alg: Literal['ppo'] = 'ppo'
 
-    default_max_steps_in_episode: int = 1000
-    total_steps: int = int(1.5e6)
-    gamma: float = 0.99
+    num_envs: int = 4  # Number of environments to run in parallel.
+    default_max_steps_in_episode: int = 1000  # Gets overridden if this is defined by the env.
+    gamma: float = 0.99  # will be replaced if env has gamma property.
 
     num_eval_envs: int = 10
     steps_log_freq: int = 1
@@ -44,13 +43,12 @@ class PPOHyperparams(Tap):
     lr: list[float] = [2.5e-4]  # Learning rate
     lambda0: list[float] = [0.95]  # GAE lambda_0
     lambda1: list[float] = [0.5]  # GAE lambda_1
-    alpha: list[float] = [1.]  # adv = alpha * adv_lambda_0 + (1 - alpha) * adv_lambda_1
     ld_weight: list[float] = [0.0]  # How much to we weight the LD loss? only applies when double_critic is True.
     vf_coeff: list[float] = [0.5]  # How much do we weight value loss?
+    entropy_coeff: list[float] = [0.01]  # PPO policy entropy coefficient for exploration
 
     hidden_size: int = 128  # Hidden size of our neural net
     total_steps: int = int(1.5e6)  # How many training steps do we run?
-    entropy_coeff: float = 0.01  # PPO policy entropy coefficient for exploration
     clip_eps: float = 0.2  # PPO policy gradient clip epsilon
     max_grad_norm: float = 0.5  # Maximum grad norm for updates
     anneal_lr: bool = True  # Do we (linearly) anneal learning rate?
@@ -62,21 +60,22 @@ class PPOHyperparams(Tap):
     update_log_freq: int = 1  # Over all updates, how often do we save training statistics?
     save_checkpoints: bool = False  # Do we save train_state along with our per timestep outputs?
     save_runner_state: bool = False  # Do we save the checkpoint in the end?
+    sweep_type: str = 'grid'  # grid (sweeps all listed hyperparams) | random (randomly rejection samples sets of hyperparams)
+    n_random_hparams: int = 1  # [sweep_type = random] How many randomly sampled hyperparams do we use?
+    n_run_bins: int = None  # How many bins do we split our runs into? Requires run_bin_idx to be not None
+    run_bin_idx: int = 0  # After splitting our runs into n_run_bins bins, which index do we run?
     seed: int = 2020
     n_seeds: int = 5  # How many seeds to run in our experiment?
     platform: Literal['cpu', 'gpu'] = 'cpu'  # use CPU or GPU?
     debug: bool = False  # Do we print run statistics during training?
     show_discounted: bool = False  # For debug plotting, do we show undisc returns or disc returns?
 
-    study_name: str = 'batch_ppo_test'  # Save checkpoints and run statistics into results/{study_name}.
+    study_name: str = 'ppo_test'  # Save checkpoints and run statistics into results/{study_name}.
 
-    def process_args(self) -> None:
-        self.vf_coeff = jnp.array(self.vf_coeff)
-        self.lr = jnp.array(self.lr)
-        self.lambda0 = jnp.array(self.lambda0)
-        self.lambda1 = jnp.array(self.lambda1)
-        self.alpha = jnp.array(self.alpha)
-        self.ld_weight = jnp.array(self.ld_weight)
+    def process_args(self):
+        # Validate n_run_bins and run_bin_idx
+        if self.n_run_bins is not None:
+            assert self.run_bin_idx is not None
 
 
 class DQNHyperparams(Tap):
@@ -127,13 +126,12 @@ class TransformerHyperparams(Tap):
     lr: list[float] = [2.5e-4]
     lambda0: list[float] = [0.95]  # GAE lambda_0
     lambda1: list[float] = [0.5]  # GAE lambda_1
-    alpha: list[float] = [1.]  # adv = alpha * adv_lambda_0 + (1 - alpha) * adv_lambda_1
     ld_weight: list[float] = [0.0]  # how much to we weight the LD loss vs. value loss? only applies when optimize LD is True.
     vf_coeff: list[float] = [0.5]
+    entropy_coeff: list[float] = [0.01]  # PPO policy entropy coefficient for exploration
 
     hidden_size: int = 128
     total_steps: int = int(1.5e6)
-    entropy_coeff: float = 0.01
     clip_eps: float = 0.2
     max_grad_norm: float = 0.5
     anneal_lr: bool = True
@@ -145,6 +143,10 @@ class TransformerHyperparams(Tap):
     update_log_freq: int = 1
     save_checkpoints: bool = False  # Do we save train_state along with our per timestep outputs?
     save_runner_state: bool = False  # Do we save the checkpoint in the end?
+    sweep_type: str = 'grid'  # grid (sweeps all listed hyperparams) | random (randomly rejection samples sets of hyperparams)
+    n_random_hparams: int = 1  # [sweep_type = random] How many randomly sampled hyperparams do we use?
+    n_run_bins: int = None  # How many bins do we split our runs into? Requires run_bin_idx to be not None
+    run_bin_idx: int = 0  # After splitting our runs into n_run_bins bins, which index do we run?
     seed: int = 2020
     n_seeds: int = 5
     platform: Literal['cpu', 'gpu'] = 'cpu'
@@ -161,12 +163,9 @@ class TransformerHyperparams(Tap):
     gating: bool = True
     gating_bias: float = 2.0
 
-    study_name: str = 'batch_ppo_test'
+    study_name: str = 'ppo_gtrxl_test'
 
-    def process_args(self) -> None:
-        self.vf_coeff = jnp.array(self.vf_coeff)
-        self.lr = jnp.array(self.lr)
-        self.lambda0 = jnp.array(self.lambda0)
-        self.lambda1 = jnp.array(self.lambda1)
-        self.alpha = jnp.array(self.alpha)
-        self.ld_weight = jnp.array(self.ld_weight)
+    def process_args(self):
+        # Validate n_run_bins and run_bin_idx
+        if self.n_run_bins is not None:
+            assert self.run_bin_idx is not None

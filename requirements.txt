@@ -13,3 +13,4 @@ navix @ git+https://github.com/taodav/navix
 pytest
 matplotlib
 seaborn
+-e .

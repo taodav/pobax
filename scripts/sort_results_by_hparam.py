@@ -1,8 +1,10 @@
+"""
+Splits an experiment into multiple experiments, one for each hyperparameter listed under the variable `hparam`
+"""
 from pathlib import Path
 import re
 import shutil
 
-import numpy as np
 import orbax.checkpoint
 from tqdm import tqdm
 

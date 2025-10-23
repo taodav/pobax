@@ -1,4 +1,3 @@
-
 from collections import deque
 from dataclasses import replace
 from functools import partial
@@ -6,7 +5,6 @@ import inspect
 import os
 from time import time
 from typing import NamedTuple
-# os.environ["CRAFTAX_RELOAD_TEXTURES"] = "True"
 
 import chex
 import flax.training.train_state
@@ -18,12 +16,14 @@ import numpy as np
 import optax
 import orbax.checkpoint
 
+from pobax.algos.run_helper import vmap_and_train
 from pobax.config import PPOHyperparams
 from pobax.envs import get_env
 from pobax.envs.wrappers.gymnax import LogEnvState
 from pobax.models import ScannedRNN, get_network_fn
 from pobax.utils.file_system import get_results_path, numpyify
 from pobax.envs import brax_envs
+from pobax.utils.sweep import get_grid_hparams, get_randomly_sampled_hparams
 
 
 class Transition(NamedTuple):
@@ -35,18 +35,17 @@ class Transition(NamedTuple):
     obs: jnp.ndarray
     info: jnp.ndarray = None
 
+
 class PPO:
     def __init__(self, network,
                  double_critic: bool = False,
                  ld_weight: float = 0.,
-                 alpha: float = 0.,
                  vf_coeff: float = 0.,
                  entropy_coeff: float = 0.01,
                  clip_eps: float = 0.2):
         self.network = network
         self.double_critic = double_critic
         self.ld_weight = ld_weight
-        self.alpha = alpha
         self.vf_coeff = vf_coeff
         self.entropy_coeff = entropy_coeff
         self.clip_eps = clip_eps
@@ -96,8 +95,8 @@ class PPO:
 
         # which advantage do we use to update our policy?
         if self.double_critic:
-            gae = (self.alpha * gae[..., 0] +
-                   (1 - self.alpha) * gae[..., 1])
+            gae = gae[..., 0]
+
         gae = (gae - gae.mean()) / (gae.std() + 1e-8)
         loss_actor1 = ratio * gae
         loss_actor2 = (
@@ -138,14 +137,16 @@ def env_step(runner_state, unused, agent: PPO, env, env_params):
 
 def calculate_gae(traj_batch, last_val, last_done, gae_lambda, gamma):
     def _get_advantages(carry, transition):
-        gae, next_value, next_done, gae_lambda = carry
+        gae, next_value, gae_lambda, next_done = carry
         done, value, reward = transition.done, transition.value, transition.reward
+        if len(next_value.shape) > 1:
+            reward, next_done = reward[..., None], next_done[..., None]
         delta = reward + gamma * next_value * (1 - next_done) - value
         gae = delta + gamma * gae_lambda * (1 - next_done) * gae
-        return (gae, value, done, gae_lambda), gae
+        return (gae, value, gae_lambda, done), gae
 
     _, advantages = jax.lax.scan(_get_advantages,
-                                 (jnp.zeros_like(last_val), last_val, last_done, gae_lambda),
+                                 (jnp.zeros_like(last_val), last_val, gae_lambda, last_done),
                                  traj_batch, reverse=True, unroll=16)
     target = advantages + traj_batch.value
     return advantages, target
@@ -155,6 +156,7 @@ def filter_period_first_dim(x, n: int):
     if isinstance(x, jnp.ndarray) or isinstance(x, np.ndarray):
         return x[::n]
 
+
 def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
     num_updates = (
             args.total_steps // args.num_steps // args.num_envs
@@ -163,6 +165,7 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
             args.num_envs * args.num_steps // args.num_minibatches
     )
     env_key, rand_key = jax.random.split(rand_key)
+
     env, env_params = get_env(args.env, env_key,
                               num_envs=args.num_envs,
                               image_size=args.image_size,
@@ -199,12 +202,16 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
     if double_critic:
         # last_val is index 1 here b/c we squeezed earlier.
         _calculate_gae = jax.vmap(calculate_gae,
-                                 in_axes=[transition_axes_map, 1, None, 0, None],
-                                 out_axes=2)
+                                  in_axes=[transition_axes_map, 1, None, 0, None],
+                                  out_axes=2)
 
-    def train(vf_coeff, ld_weight, alpha, lambda1, lambda0, lr, rng):
-        agent = PPO(network, double_critic=double_critic, ld_weight=ld_weight, alpha=alpha, vf_coeff=vf_coeff,
-                    clip_eps=args.clip_eps, entropy_coeff=args.entropy_coeff)
+    def train(sweep_args_dict, rng):
+        lr, ld_weight, vf_coeff, lambda0, lambda1, entropy_coeff = \
+            sweep_args_dict['lr'], sweep_args_dict['ld_weight'], sweep_args_dict['vf_coeff'], \
+                sweep_args_dict['lambda0'], sweep_args_dict['lambda1'], sweep_args_dict['entropy_coeff']
+
+        agent = PPO(network, double_critic=double_critic, ld_weight=ld_weight, vf_coeff=vf_coeff,
+                    clip_eps=args.clip_eps, entropy_coeff=entropy_coeff)
 
         # initialize functions
         _env_step = partial(env_step, agent=agent, env=env, env_params=env_params)
@@ -416,7 +423,7 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
         # TODO: offline eval here.
         final_train_state = runner_state[0]
 
-        reset_rng = jax.random.split(_rng, args.num_envs)
+        reset_rng = jax.random.split(runner_state[-1], args.num_envs)
         eval_obsv, eval_env_state = env.reset(reset_rng, env_params)
 
         eval_init_hstate = ScannedRNN.initialize_carry(args.num_envs, args.hidden_size)
@@ -441,103 +448,56 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
 
     return train
 
+
 def main(args):
     rng = jax.random.PRNGKey(args.seed)
     make_train_rng, rng = jax.random.split(rng)
-    rngs = jax.random.split(rng, args.n_seeds)
     train_fn = make_train(args, make_train_rng)
-    train_args = list(inspect.signature(train_fn).parameters.keys())
 
-    vmaps_train = train_fn
-    swept_args = deque()
+    if args.sweep_type == 'grid':
+        hparams, _ = get_grid_hparams(args)
+    elif args.sweep_type == 'random':
+        _rng, rng = jax.random.split(rng)
+        hparams = get_randomly_sampled_hparams(_rng, args, n_samples=args.n_random_hparams)
+    else:
+        raise NotImplementedError
 
-    # we need to go backwards, since JAX returns indices
-    # in the order in which they're vmapped.
-    for i, arg in reversed(list(enumerate(train_args))):
-        dims = [None] * len(train_args)
-        dims[i] = 0
-        vmaps_train = jax.vmap(vmaps_train, in_axes=dims)
-        if arg == 'rng':
-            swept_args.appendleft(rngs)
-        else:
-            assert hasattr(args, arg)
-            swept_args.appendleft(getattr(args, arg))
+    vmap_and_train(args, train_fn, hparams, rng)
 
-    train_jit = jax.jit(vmaps_train)
-    t = time()
-    out = train_jit(*swept_args)
-    new_t = time()
-    total_runtime = new_t - t
-    print('Total runtime:', total_runtime)
-
-    # our final_eval_metric returns max_num_steps.
-    # we can filter that down by the max episode length amongst the runs.
-    final_eval = out['final_eval_metric']
-    final_train_state = out['runner_state'][0]
-
-    final_train_state = out['runner_state'][0]
-    if not args.save_runner_state:
-        del out['runner_state']
-
-    results_path = get_results_path(args, return_npy=False)  # returns a results directory
-
-    all_results = {
-        'argument_order': train_args,
-        'out': out,
-        'args': args.as_dict(),
-        'total_runtime': total_runtime,
-        'final_train_state': final_train_state
-    }
-
-    all_results = jax.tree.map(numpyify, all_results)
-
-    # Save all results with Orbax
-    orbax_checkpointer = orbax.checkpoint.PyTreeCheckpointer()
-    save_args = orbax_utils.save_args_from_target(all_results)
-
-    print(f"Saving results to {results_path}")
-    orbax_checkpointer.save(results_path, all_results, save_args=save_args)
-    print("Done.")
 
 def madrona_main(args):
+    """
+    NOTE: currently Madrona (visual mujoco) runs can only run a single set hyperparameters.
+    If you want to sweep over hyperparams, you'll have to sweep over programs.
+    """
     rng = jax.random.PRNGKey(args.seed)
     make_train_rng, rng = jax.random.split(rng)
-    rngs = jax.random.split(rng, args.n_seeds)
     train_fn = make_train(args, make_train_rng)
 
     train_args = list(inspect.signature(train_fn).parameters.keys())
 
     vmaps_train = train_fn
-    swept_args = deque()
+    if args.sweep_type == 'grid':
+        hparams, _ = get_grid_hparams(args)
+    elif args.sweep_type == 'random':
+        _rng, rng = jax.random.split(rng)
+        hparams = get_randomly_sampled_hparams(_rng, args, n_samples=args.n_random_hparams)
+    else:
+        raise NotImplementedError
 
-    # we need to go backwards, since JAX returns indices
-    # in the order in which they're vmapped.
-    for i, arg in reversed(list(enumerate(train_args))):
-        if arg == 'rng':
-            swept_args.appendleft(rng)
-        else:
-            assert hasattr(args, arg)
-            train_arg = getattr(args, arg)
-            swept_args.appendleft(train_arg[0])
-        
+    def flatten_and_assert_singleton(hparam):
+        assert len(hparam) == 1
+        return hparams[0]
+
+    hparams = jax.tree.map(flatten_and_assert_singleton, hparams)
+
     train_jit = jax.jit(vmaps_train)
 
     t = time()
-    out = train_jit(*swept_args)
+    out = train_jit(hparams, rng)
     new_t = time()
     total_runtime = new_t - t
     print('Total runtime:', total_runtime)
-
-    # our final_eval_metric returns max_num_steps.
-    # we can filter that down by the max episode length amongst the runs.
-    # final_eval = out['final_eval_metric']
-
-    # the +1 at the end is to include the done step
-    # largest_episode = final_eval['returned_episode'].argmax(axis=-2).max() + 1
-
-    # def get_first_n_filter(x):
-    #     return x[..., :largest_episode, :]
-    # out['final_eval_metric'] = jax.tree.map(get_first_n_filter, final_eval)
 
     final_train_state = out['runner_state'][0]
     if not args.save_runner_state:
@@ -561,6 +521,7 @@ def madrona_main(args):
     orbax_checkpointer.save(results_path, all_results, save_args=save_args)
 
     print("Done.")
+
 
 if __name__ == "__main__":
     # jax.disable_jit(True)

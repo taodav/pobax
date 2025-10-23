@@ -5,7 +5,6 @@ exp_name = Path(__file__).stem
 lrs = [2.5e-4]
 lambda0s = [0.3]
 lambda1s = [0.95]
-alphas = [1]
 ld_weights = [0]
 
 hparams = {
@@ -20,7 +19,6 @@ hparams = {
             'lr': lrs,
             'lambda0': ' '.join(map(str, lambda0s)),
             'lambda1': ' '.join(map(str, lambda1s)),
-            'alpha': ' '.join(map(str, alphas)),
             'ld_weight': ' '.join(map(str, ld_weights)),
             'num_envs': 16,
             'hidden_size': 512,

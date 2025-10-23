@@ -8,6 +8,7 @@ from matplotlib import rc
 import matplotlib.pyplot as plt
 from scipy.stats import sem
 
+from pobax.utils.plot import mean_confidence_interval, colors, smoothen
 
 from pobax.definitions import PROJECT_ROOT_DIR
 
@@ -15,22 +16,6 @@ rc('font', **{'family': 'serif', 'serif': ['cmr10']})
 rc('axes', unicode_minus=False)
 
 # rc('text', usetex=True)
-
-colors = {
-    'pink': '#ff96b6',
-    'red': '#df5b5d',
-    'orange': '#DD8453',
-    'yellow': '#f8de7c',
-    'green': '#3FC57F',
-    'cyan': '#48dbe5',
-    'blue': '#3180df',
-    'purple': '#9d79cf',
-    'brown': '#886a2c',
-    'white': '#ffffff',
-    'light gray': '#d5d5d5',
-    'dark gray': '#666666',
-    'black': '#000000'
-}
 
 env_name_to_title = {
     'rocksample_15_15': 'RockSample (15, 15)',
@@ -62,6 +47,7 @@ fully_observable_to_base = {
     'Navix-DMLab-Maze-F-03-v0': 'Navix-DMLab-Maze-03-v0',
     'Navix-DMLab-Maze-F-02-v0': 'Navix-DMLab-Maze-02-v0',
     'Navix-DMLab-Maze-F-01-v0': 'Navix-DMLab-Maze-01-v0',
+    'Navix-Annas-Maze-F-v0': 'Navix-Annas-Maze-v0',
 }
 
 def plot_reses(all_reses: list[tuple], n_rows: int = 2,
@@ -69,8 +55,8 @@ def plot_reses(all_reses: list[tuple], n_rows: int = 2,
                plot_title: str = None,
                discounted: bool = False,
                ylims: Tuple[float, float] = None):
-    plt.rcParams.update({'font.size': 32})
-
+    plt.rcParams.update({'font.size': 24})
+    
     # check to see that all our envs are the same across all reses.
     for _, x, _ in all_reses:
         for i in range(len(x['envs'])):
@@ -85,7 +71,7 @@ def plot_reses(all_reses: list[tuple], n_rows: int = 2,
 
     n_rows = min(n_rows, len(envs))
     n_cols = max((len(envs) + 1) // n_rows, 1) if len(envs) > 1 else 1
-    fig, axes = plt.subplots(n_rows, n_cols, figsize=(15, 10))
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(12, 8))
 
     for k, (study_name, res, color) in enumerate(all_reses):
         scores = res['scores']
@@ -93,6 +79,17 @@ def plot_reses(all_reses: list[tuple], n_rows: int = 2,
             mean_over_steps = [score.mean(axis=1)[..., 0] for score in scores]
             mean = [m.mean(axis=-1) for m in mean_over_steps]
             std_err = [sem(m, axis=-1) for m in mean_over_steps]
+        elif isinstance(scores, dict):
+            mean, std_err = {}, {}
+            n_seeds = None
+            for k, v in scores.items():
+                mean_over_steps = v.mean(axis=1)
+                if n_seeds is None:
+                    n_seeds = mean_over_steps.shape[-1]
+
+                m, c = mean_confidence_interval(mean_over_steps, axis=-1)
+                mean[k] = m
+                std_err[k] = c
         else:
             # take mean over both
             mean_over_steps = scores.mean(axis=1)
@@ -109,6 +106,8 @@ def plot_reses(all_reses: list[tuple], n_rows: int = 2,
             if isinstance(mean, list):
                 env_mean, env_std_err = mean[env_idx], std_err[env_idx]
                 n_seeds = mean_over_steps[0].shape[-1]
+            elif isinstance(mean, dict):
+                env_mean, env_std_err = mean[env], std_err[env]
             else:
                 env_mean, env_std_err = mean[..., env_idx], std_err[..., env_idx]
                 n_seeds = mean_over_steps.shape[-2]
@@ -125,10 +124,12 @@ def plot_reses(all_reses: list[tuple], n_rows: int = 2,
 
             ax.plot(x, env_mean, label=study_name, color=colors[color])
             if individual_runs:
-                # -2 index is seeds.
-                for j in range(mean_over_steps.shape[-2]):
-                    alpha = 1 / mean_over_steps.shape[-2]
-                    m = mean_over_steps[..., j, env_idx] if isinstance(mean_over_steps, np.ndarray) else mean_over_steps[env_idx][..., j]
+                # -1 index is seeds.
+                # mean_over_steps = mean_over_steps[..., 20:30]
+                alpha = (mean_over_steps.shape[-1] - mean_over_steps.shape[-1] // 3) / mean_over_steps.shape[-1]
+                for j in range(mean_over_steps.shape[-1]):
+                    # m = mean_over_steps[..., j, env_idx] if isinstance(mean_over_steps, np.ndarray) else mean_over_steps[env_idx][..., j]
+                    m = mean_over_steps[..., j]
                     ax.plot(x, m, color=colors[color], alpha=alpha)
             else:
                 ax.fill_between(x, env_mean - env_std_err, env_mean + env_std_err,
@@ -146,7 +147,8 @@ def plot_reses(all_reses: list[tuple], n_rows: int = 2,
             ax.spines[['right', 'top']].set_visible(False)
 
     # Customize legend to use square markers
-    legend = plt.legend(loc='lower right')
+    # after all plotting loops
+    legend = fig.legend(ncol=1, bbox_to_anchor=(1.01, 0.8), prop={'size': 16})
 
     # # Change line in legend to square
     # for line in legend.get_lines():
@@ -162,6 +164,7 @@ def plot_reses(all_reses: list[tuple], n_rows: int = 2,
         fig.supylabel(f'Online returns ({n_seeds} runs)')
     #
     fig.tight_layout()
+    plt.subplots_adjust(right=0.8)
 
     plt.show()
     return fig, axes
@@ -192,11 +195,16 @@ def find_file_in_dir(file_name: str, base_dir: Path) -> Path:
 
 if __name__ == "__main__":
 
-    discounted = False
     hyperparam_type = 'per_env'  # (all_env | per_env)
 
-    env_name = 'rocksample_11_11'
-    super_dir = 'rocksample_11_11'
+    discounted = True
+    env_name = 'annas_maze'
+    super_dir = 'new_pobax_res/annas_maze'
+    best = False
+
+    best_str = '_best' if best else ''
+    # super_dir += best_str
+
     ylims = None
 
     plot_name = f'{env_name}_{hyperparam_type}'
@@ -204,35 +212,19 @@ if __name__ == "__main__":
     # normal
     study_paths = [
         ('RNN', Path(PROJECT_ROOT_DIR, 'results', super_dir, f'{env_name}_ppo'), 'purple'),
-        ('RNN + LD', Path(PROJECT_ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_LD'), 'blue'),
-        ('Memoryless', Path(PROJECT_ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_memoryless'), 'dark gray'),
-        ('STATE', Path(PROJECT_ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_perfect_memory_memoryless'), 'green'),
-        # ('TRANFORMER', Path(PROJECT_ROOT_DIR, 'results', super_dir, f'{env_name}_transformer'), 'cyan'),
+        ('LD', Path(PROJECT_ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_LD'), 'blue'),
+        ('Memoryless', Path(PROJECT_ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_memoryless{best_str}'), 'dark gray'),
+        # ('STATE', Path(ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_perfect_memory_memoryless{best_str}'), 'green'),
+        ('STATE', Path(PROJECT_ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_perfect_memory{best_str}'), 'green'),
+        ('TRANSFORMER', Path(PROJECT_ROOT_DIR, 'results', super_dir, f'{env_name}_transformer{best_str}'), 'yellow'),
     ]
 
-    # env_name = 'rocksample_11_11'
-    # sweep_var = 'hsize'
-    # nenvs = 128
-    # # ylims = (0., 0.68)  # for navix_01 nenvs
-    # # ylims = (50, 2500)  # for walker_v hsize
-    # ylims = (0, 21)  # for rocksample_11_11 hsize
-    # # ylims = None
-    #
-    # plot_name = f'{env_name}_{hyperparam_type}_{sweep_var}_{nenvs}'
-    #
-    # study_paths = [
-    #     ('RNN', Path(PROJECT_ROOT_DIR, 'results', f'{env_name}_{sweep_var}_sweep/{env_name}_ppo_{sweep_var}_sweep', f'{env_name}_ppo_{sweep_var}_sweep_{sweep_var}_{nenvs}'), 'purple'),
-    #     # ('RNN + LD', Path(PROJECT_ROOT_DIR, 'results', super_dir, f'{env_name}_ppo_LD'), 'blue'),
-    #     ('Memoryless', Path(PROJECT_ROOT_DIR, 'results', f'{env_name}_{sweep_var}_sweep/{env_name}_ppo_memoryless_{sweep_var}_sweep', f'{env_name}_ppo_memoryless_{sweep_var}_sweep_{sweep_var}_{nenvs}'), 'dark gray'),
-    #     ('STATE', Path(PROJECT_ROOT_DIR, 'results', f'{env_name}_{sweep_var}_sweep/{env_name}_ppo_perfect_memory_{sweep_var}_sweep', f'{env_name}_ppo_perfect_memory_{sweep_var}_sweep_{sweep_var}_{nenvs}'), 'green'),
-    #     # ('TRANFORMER', Path(PROJECT_ROOT_DIR, 'results', super_dir, f'{env_name}_transformer'), 'cyan'),
-    # ]
 
     # best
     # study_paths = [
-    #     ('PPO + RNN + LD', Path(PROJECT_ROOT_DIR, 'results', f'{env_name}_LD_ppo_best'), 'green'),
-    #     ('PPO + RNN', Path(PROJECT_ROOT_DIR, 'results', f'{env_name}_ppo_best'), 'blue'),
-    #     # ('Memoryless PPO', Path(PROJECT_ROOT_DIR, 'results', f'{env_name}_memoryless_ppo_best'), 'dark gray'),
+    #     ('PPO + RNN + LD', Path(ROOT_DIR, 'results', f'{env_name}_LD_ppo_best'), 'green'),
+    #     ('PPO + RNN', Path(ROOT_DIR, 'results', f'{env_name}_ppo_best'), 'blue'),
+    #     # ('Memoryless PPO', Path(ROOT_DIR, 'results', f'{env_name}_memoryless_ppo_best'), 'dark gray'),
     # ]
 
 
@@ -274,10 +266,15 @@ if __name__ == "__main__":
 
         all_reses.append((name, best_res, color))
 
+        if isinstance(best_res['scores'], dict):
+            denom = list(best_res['scores'].values())[0].shape[0]
+        else:
+            denom = best_res['scores'].shape[0]
+
         if 'all_hyperparams' in best_res:
-            step_multiplier = best_res['all_hyperparams']['total_steps'] // best_res['scores'].shape[0]
+            step_multiplier = best_res['all_hyperparams']['total_steps'] // denom
         elif 'total_steps' in best_res['hyperparams']:
-            step_multiplier = best_res['hyperparams']['total_steps'] // best_res['scores'].shape[0]
+            step_multiplier = best_res['hyperparams']['total_steps'] // denom
         else:
             raise NotImplementedError("Missing total steps")
 
@@ -287,11 +284,11 @@ if __name__ == "__main__":
             # step_multiplier = get_total_steps_multiplier(best_res['scores'].shape[0], hyperparam_path)
         best_res['step_multiplier'] = [step_multiplier] * len(best_res['envs'])
 
-    fig, axes = plot_reses(all_reses, individual_runs=False, n_rows=3, plot_title=plot_name,
+    fig, axes = plot_reses(all_reses, individual_runs=False, n_rows=1, plot_title=plot_name,
                            discounted=discounted, ylims=ylims)
 
     discount_str = '_discounted' if discounted else ''
-    save_plot_to = Path(PROJECT_ROOT_DIR, 'results', f'{plot_name}{discount_str}.pdf')
+    save_plot_to = Path(ROOT_DIR, 'results', f'{plot_name}{discount_str}.pdf')
 
     fig.savefig(save_plot_to, bbox_inches='tight')
     print(f"Saved figure to {save_plot_to}")

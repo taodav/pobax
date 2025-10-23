@@ -261,7 +261,7 @@ def get_env(
             # env = RSPerfectMemoryWrapper(env)
             env = RSFullyObservableWrapper(env)
 
-    elif env_name.startswith("Navix-DMLab"):
+    elif env_name.startswith("Navix-"):
         nx_env = nx.make(env_name)
         env = NavixGymnaxWrapper(nx_env)
         env_params = env.default_params

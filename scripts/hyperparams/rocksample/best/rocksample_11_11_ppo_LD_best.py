@@ -5,7 +5,6 @@ exp_name = Path(__file__).stem
 lrs = [2.5e-3]  # Learning rates
 lambda0s = [0.5]
 lambda1s = [0.5]
-alphas = [1]
 ld_weights = [0.25]
 vf_coeffs = [0.5]  # Value function coefficients
 
@@ -21,7 +20,6 @@ hparams = {
             'lr': ' '.join(map(str, lrs)),
             'lambda0': lambda0s,
             'lambda1': lambda1s,
-            'alpha': ' '.join(map(str, alphas)),
             'ld_weight': ld_weights,
             'hidden_size': 256,
             'num_envs': 8,
