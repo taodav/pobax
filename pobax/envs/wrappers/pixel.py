@@ -147,7 +147,8 @@ class PixelCraftaxVecEnvWrapper(GymnaxWrapper):
     def reset(
             self, key: chex.PRNGKey, params: Optional[environment.EnvParams] = None
     ) -> Tuple[chex.Array, environment.EnvState]:
-        image_obs, env_state = self._env.reset(key, params)
+        obs_obj, env_state = self._env.reset(key, params)
+        image_obs = obs_obj.obs
         # Craftax already returned normalized visual input
         image_obs = self.get_obs(image_obs, self.normalize)
         return Observation(obs=image_obs), env_state
@@ -160,9 +161,10 @@ class PixelCraftaxVecEnvWrapper(GymnaxWrapper):
             action: Union[int, float],
             params: Optional[environment.EnvParams] = None,
     ) -> Tuple[chex.Array, environment.EnvState, float, bool, dict]:
-        image_obs, env_state, reward, done, info = self._env.step(
+        obs_obj, env_state, reward, done, info = self._env.step(
             key, state, action, params
         )
+        image_obs = obs_obj.obs
         image_obs = self.get_obs(image_obs, self.normalize)
         return Observation(obs=image_obs), env_state, reward, done, info
 
