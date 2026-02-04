@@ -1,4 +1,4 @@
-jax==0.6.2
+jax[cuda12]
 flax
 distrax
 optax
@@ -9,8 +9,10 @@ pandas
 tqdm
 typed-argument-parser
 numpy
-navix @ git+https://github.com/taodav/navix
+Navix
+# navix @ git+https://github.com/taodav/navix
 pytest
 matplotlib
 seaborn
+craftax
 -e .
