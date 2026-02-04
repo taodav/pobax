@@ -19,12 +19,12 @@ class Hyperparams(Tap):
     n_seeds: int = 1
     platform: Literal['cpu', 'gpu'] = 'cpu'
     debug: bool = False
-
     study_name: str = 'test'
 
 
 class PPOHyperparams(Tap):
     env: str = 'tmaze_5'
+    collect_offline_data: bool = False
     num_envs: int = 4  # Number of environments to run in parallel.
     default_max_steps_in_episode: int = 1000  # Gets overridden if this is defined by the env.
     gamma: float = 0.99  # will be replaced if env has gamma property.

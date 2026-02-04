@@ -131,9 +131,10 @@ class LogEnvState:
 class LogWrapper(GymnaxWrapper):
     """Log the episode returns and lengths."""
 
-    def __init__(self, env: environment.Environment, gamma: float = 0.99):
+    def __init__(self, env: environment.Environment, gamma: float = 0.99, collect_offline_data: bool = False):
         super().__init__(env)
         self.gamma = gamma
+        self.collect_offline_data = collect_offline_data
 
     @partial(jax.jit, static_argnums=(0, -1))
     def reset(
@@ -177,6 +178,9 @@ class LogWrapper(GymnaxWrapper):
         info["timestep"] = state.timestep
         info["returned_episode"] = done
         info["reward"] = reward
+        if self.collect_offline_data:
+            info["observation"] = obs
+            info["action"] = action
         return obs, state, reward, done, info
 
 

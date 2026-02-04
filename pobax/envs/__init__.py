@@ -175,6 +175,7 @@ def get_env(
     normalize_env: bool = False,
     normalize_image: bool = False,
     gamma: float = 0.99,
+    collect_offline_data: bool = False,
     perfect_memory: bool = False,
     action_concat: bool = False,
 ):
@@ -281,7 +282,7 @@ def get_env(
         gamma = env.gamma
 
 
-    env = LogWrapper(env, gamma=gamma)
+    env = LogWrapper(env, gamma=gamma, collect_offline_data=collect_offline_data)
 
     if mask_dims is not None:
         env = MaskObservationWrapper(env, mask_dims=mask_dims)
