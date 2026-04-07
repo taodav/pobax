@@ -33,6 +33,7 @@ from pobax.envs.wrappers.gymnax import (
     NormalizeVecObservation,
     NormalizeVecReward,
     OptimisticResetVecEnvWrapper,
+    TimeLimitWrapper,
     VecEnv,
 )
 from pobax.envs.wrappers.nx import MazeFoVWrapper, NavixGymnaxWrapper
@@ -284,6 +285,7 @@ def get_env(
         # Action concat is not supported for craftax envs
         env = ActionConcatWrapper(env)
 
+    env = TimeLimitWrapper(env)
     env = LogWrapper(env, gamma=gamma)
 
     if mask_dims is not None:
@@ -426,6 +428,7 @@ def get_transformer_env(
     if action_concat:
         env = ActionConcatWrapper(env)
 
+    env = TimeLimitWrapper(env)
     env = LogWrapper(env, gamma=gamma)
 
     if mask_dims is not None:

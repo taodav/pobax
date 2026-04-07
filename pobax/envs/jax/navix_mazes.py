@@ -343,7 +343,9 @@ def categorical_full_position_encoded(state: State):
 #                             dir_one_hot])
 
 radius = nx.observations.RADIUS
-categorical_first_person_obs_space = nx.spaces.Discrete.create(n_elements=9, shape=(radius + 1, radius * 2 + 1, 2))
+categorical_first_person_obs_space = nx.spaces.Discrete.create(
+    n_elements=9, shape=(radius * 2 + 1, radius * 2 + 1, 2)
+)
 
 def categorical_full_obs_space_fn(h, w):
     one_side = 2 * max(h, w) - 1
@@ -351,7 +353,9 @@ def categorical_full_obs_space_fn(h, w):
 
 def categorical_full_positional_obs_space_fn(h, w):
     return nx.spaces.Discrete.create(n_elements=9, shape=(2 * h - 1, 2 * w - 1, 2 + 4))
-categorical_full_positional_obs_space = nx.spaces.Discrete.create(n_elements=9, shape=(radius + 1, radius * 2 + 1, 2))
+categorical_full_positional_obs_space = nx.spaces.Discrete.create(
+    n_elements=9, shape=(radius * 2 + 1, radius * 2 + 1, 2)
+)
 
 nx.register_env(
     "Navix-DMLab-Maze-00-v0",
@@ -625,4 +629,3 @@ nx.register_env(
         *args,
     ),
 )
-
