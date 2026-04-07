@@ -180,6 +180,65 @@ class LogWrapper(GymnaxWrapper):
         return obs, state, reward, done, info
 
 
+@struct.dataclass
+class TimeLimitEnvState:
+    env_state: environment.EnvState
+    elapsed_steps: int
+
+
+class TimeLimitWrapper(GymnaxWrapper):
+    """Enforce max episode length for envs that do not track it internally."""
+
+    @partial(jax.jit, static_argnums=(0, -1))
+    def reset(
+            self, key: chex.PRNGKey, params: Optional[environment.EnvParams] = None
+    ) -> Tuple[chex.Array, environment.EnvState]:
+        obs, env_state = self._env.reset(key, params)
+        state = TimeLimitEnvState(
+            env_state=env_state,
+            elapsed_steps=jnp.array(0, dtype=jnp.int32),
+        )
+        return obs, state
+
+    @partial(jax.jit, static_argnums=(0, -1))
+    def step(
+            self,
+            key: chex.PRNGKey,
+            state: TimeLimitEnvState,
+            action: Union[int, float, jnp.ndarray],
+            params: Optional[environment.EnvParams] = None,
+    ) -> Tuple[chex.Array, environment.EnvState, float, bool, dict]:
+        if params is None:
+            params = self.default_params
+
+        step_key, reset_key = jax.random.split(key)
+        obs_st, env_state_st, reward, done_env, info = self._env.step(
+            step_key, state.env_state, action, params
+        )
+
+        next_elapsed_steps = state.elapsed_steps + 1
+        time_limit_reached = next_elapsed_steps >= params.max_steps_in_episode
+        truncated = jnp.logical_and(time_limit_reached, jnp.logical_not(done_env))
+        done = jnp.logical_or(done_env, time_limit_reached)
+
+        def do_reset(_):
+            return self._env.reset(reset_key, params)
+
+        def keep_state(_):
+            return obs_st, env_state_st
+
+        obs, env_state = jax.lax.cond(truncated, do_reset, keep_state, operand=None)
+        next_state = TimeLimitEnvState(
+            env_state=env_state,
+            elapsed_steps=jax.lax.select(done, jnp.array(0, dtype=jnp.int32), next_elapsed_steps),
+        )
+
+        info["time_limit_reached"] = time_limit_reached
+        info["truncated"] = truncated
+
+        return obs, next_state, reward, done, info
+
+
 class BraxGymnaxWrapper:
     def __init__(self, env_name, backend="positional"):
         env = envs.get_environment(env_name=env_name, backend=backend)

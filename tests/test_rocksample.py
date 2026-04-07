@@ -3,6 +3,7 @@ from pathlib import Path
 import jax
 
 from pobax.envs.jax.rocksample import RockSample
+from pobax.envs.wrappers.gymnax import TimeLimitWrapper
 from pobax.definitions import ROOT_DIR
 
 def test_rocksample():
@@ -85,6 +86,35 @@ def test_rocksample():
     assert term and rew > 0
 
     print("All tests pass.")
+
+
+def test_rocksample_time_limit_wrapper():
+    seed = 2026
+    env_name = "rocksample_11_11"
+    left_action = 3
+
+    key = jax.random.PRNGKey(seed)
+    reset_key, env_key, key = jax.random.split(key, 3)
+
+    config_path = Path(ROOT_DIR, "envs", "configs", f"{env_name}_config.json")
+    env = TimeLimitWrapper(RockSample(env_key, config_path=config_path))
+    env_params = env.default_params
+
+    obs, state = env.reset(reset_key, env_params)
+
+    done = False
+    for _ in range(env_params.max_steps_in_episode - 1):
+        step_key, key = jax.random.split(key)
+        obs, state, _, done, info = env.step(step_key, state, left_action, env_params)
+        assert not bool(done)
+
+    step_key, key = jax.random.split(key)
+    obs, state, _, done, info = env.step(step_key, state, left_action, env_params)
+
+    assert bool(done)
+    assert bool(info["time_limit_reached"])
+    assert bool(info["truncated"])
+    assert int(state.elapsed_steps) == 0
 
 
 if __name__ == "__main__":

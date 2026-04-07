@@ -37,6 +37,10 @@ class SimpleChain(Environment):
     def action_space(self, params: EnvParams):
         return spaces.Discrete(1)
 
+    @property
+    def default_params(self) -> EnvParams:
+        return EnvParams(max_steps_in_episode=self.n)
+
     @partial(jax.jit, static_argnums=(0,))
     def reset_env(
             self, key: chex.PRNGKey, params: EnvParams
