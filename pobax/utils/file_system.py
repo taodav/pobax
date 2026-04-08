@@ -94,7 +94,9 @@ def load_train_state(key: jax.random.PRNGKey, fpath: Path):
                          memoryless=args['memoryless'])
     tx = optax.adam(args['lr'][0])
     ts = TrainState.create(apply_fn=network.apply,
-                           params=jax.tree_map(lambda x: x[0, 0, 0, 0, 0, 0], unpacked_ts['params']),
+                           params=jax.tree_util.tree_map(
+                               lambda x: x[0, 0, 0, 0, 0, 0], unpacked_ts['params']
+                           ),
                            tx=tx)
 
     return env, env_params, args, network, ts

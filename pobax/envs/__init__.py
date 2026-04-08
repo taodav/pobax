@@ -151,7 +151,7 @@ def load_brax_env(env_str: str, gamma: float = 0.99):
     env = BraxGymnaxWrapper(env_str)
     env_params = EnvParams(max_steps_in_episode=env.max_steps_in_episode)
 
-    env = ClipAction(env)
+    # env = ClipAction(env)
 
     return env, env_params
 
@@ -281,15 +281,16 @@ def get_env(
         print(f"Overwriting args gamma {gamma} with env gamma {env.gamma}.")
         gamma = env.gamma
 
-    if action_concat and not env_name.startswith("craftax"):
-        # Action concat is not supported for craftax envs
-        env = ActionConcatWrapper(env)
 
     env = TimeLimitWrapper(env)
     env = LogWrapper(env, gamma=gamma)
 
     if mask_dims is not None:
         env = MaskObservationWrapper(env, mask_dims=mask_dims)
+
+    if action_concat and not env_name.startswith("craftax"):
+        # Action concat is not supported for craftax envs
+        env = ActionConcatWrapper(env)
 
     # Make Observation Dict
     if not env_name.startswith("battleship"):
