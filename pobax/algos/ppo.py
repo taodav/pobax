@@ -296,6 +296,13 @@ def make_train(args: PPOHyperparams, rand_key: jax.random.PRNGKey):
                 _env_step, runner_state, jnp.arange(args.num_steps), args.num_steps
             )
 
+            # TODO: MEMORY STACK
+            """
+            1. Augment action space with memory actions
+            2. Pass in the "working_buffer" into runner_state.
+            3. After collecting new batch of data (traj_batch), iterate through traj_batch with working_buffer to make newest working buffer.
+            """
+
             # CALCULATE ADVANTAGE
             train_state, env_state, last_obs, last_done, hstate, rng = runner_state
             ac_in = (jax.tree.map(lambda x: x[jnp.newaxis, ...], last_obs), last_done[np.newaxis, :])
